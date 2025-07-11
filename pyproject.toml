@@ -6,4 +6,7 @@ dependencies = [
     "mcp[cli]",
     "openpyxl",
     "Jinja2",
+    "xlrd",        # For .xls files
+    "pyxlsb",      # For .xlsb files
+    "xlwt",        # Additional support for .xls files
 ]
