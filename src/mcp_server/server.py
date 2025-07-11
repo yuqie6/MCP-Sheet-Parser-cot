@@ -1,52 +1,50 @@
 #!/usr/bin/env python3
 """
-MCP Sheet Parser Server
+MCP 表格解析服务器
 
-A Model Context Protocol server that provides spreadsheet parsing and HTML conversion tools.
-Supports multiple file formats and provides both convenience and professional tool interfaces.
+一个模型上下文协议服务器，提供表格解析和HTML转换工具。
+支持多种文件格式，提供便捷和专业的工具接口。
 """
 
 import asyncio
 import logging
-from typing import Any, Dict
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool
 
 from .tools import register_tools
 
-# Configure logging
+# 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 def create_server() -> Server:
-    """Create and configure the MCP server."""
+    """创建并配置MCP服务器。"""
     server = Server("mcp-sheet-parser")
-    
-    # Register all tools
+
+    # 注册所有工具
     register_tools(server)
-    
-    logger.info("MCP Sheet Parser Server initialized")
+
+    logger.info("MCP 表格解析服务器初始化完成")
     return server
 
 
 async def main():
-    """Main entry point for the MCP Sheet Parser Server."""
+    """MCP 表格解析服务器的主入口点。"""
     try:
         server = create_server()
-        
-        # Run the server using stdio transport
+
+        # 使用stdio传输运行服务器
         async with stdio_server() as (read_stream, write_stream):
-            logger.info("Starting MCP Sheet Parser Server...")
+            logger.info("启动 MCP 表格解析服务器...")
             await server.run(
                 read_stream,
                 write_stream,
                 server.create_initialization_options()
             )
     except Exception as e:
-        logger.error(f"Server error: {e}")
+        logger.error(f"服务器错误: {e}")
         raise
 
 

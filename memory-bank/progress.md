@@ -15,7 +15,6 @@ This file tracks the project's progress using a task list format.
 
 ## Current Tasks
 
-* 📁 **格式扩展支持** - 实现对xls、xlsb等格式的支持。
 * 🚀 **进阶功能实现** - 实现超链接转换、单元格注释、分页机制等进阶功能。
 * 📚 **测试覆盖完善** - 完善整个项目的测试覆盖，确保代码质量。
 

@@ -1,8 +1,11 @@
 import pytest
 from pathlib import Path
 from src.models.table_model import Sheet, Row, Cell
+from src.parsers.base_parser import BaseParser
 from src.parsers.csv_parser import CsvParser
 from src.parsers.xlsx_parser import XlsxParser
+from src.parsers.xls_parser import XlsParser
+from src.parsers.xlsb_parser import XlsbParser
 from src.parsers.factory import ParserFactory, UnsupportedFileType
 
 @pytest.fixture
@@ -264,3 +267,109 @@ def test_border_style_mapping():
     empty_border = MockBorderSide(None)
     css_style = parser._get_border_style(empty_border)
     assert css_style == ""
+
+
+# 新格式解析器测试
+class TestXlsParser:
+    """XLS解析器测试类。"""
+
+    def test_xls_parser_basic_functionality(self):
+        """测试XLS解析器的基本功能。"""
+        parser = XlsParser()
+
+        # 测试解析器实例化
+        assert isinstance(parser, XlsParser)
+        assert isinstance(parser, BaseParser)
+
+    def test_xls_cell_value_processing(self):
+        """测试XLS单元格值处理功能。"""
+        parser = XlsParser()
+
+        # 测试不同类型的值处理
+        assert parser._process_cell_value("text", 1, None) == "text"
+        assert parser._process_cell_value(123.0, 2, None) == 123
+        assert parser._process_cell_value(123.5, 2, None) == 123.5
+        assert parser._process_cell_value(True, 4, None) == True
+        assert parser._process_cell_value(None, 0, None) is None
+
+    def test_xls_color_mapping(self):
+        """测试XLS颜色映射功能。"""
+        parser = XlsParser()
+
+        # 测试标准颜色索引
+        assert parser._get_color_from_index(None, 0) == "#000000"  # 黑色
+        assert parser._get_color_from_index(None, 1) == "#FFFFFF"  # 白色
+        assert parser._get_color_from_index(None, 2) == "#FF0000"  # 红色
+        assert parser._get_color_from_index(None, 999) == "#000000"  # 未知索引默认黑色
+
+
+class TestXlsbParser:
+    """XLSB解析器测试类。"""
+
+    def test_xlsb_parser_basic_functionality(self):
+        """测试XLSB解析器的基本功能。"""
+        parser = XlsbParser()
+
+        # 测试解析器实例化
+        assert isinstance(parser, XlsbParser)
+        assert isinstance(parser, BaseParser)
+
+    def test_xlsb_cell_value_processing(self):
+        """测试XLSB单元格值处理功能。"""
+        parser = XlsbParser()
+
+        # 测试不同类型的值处理
+        assert parser._process_cell_value("text") == "text"
+        assert parser._process_cell_value(123.0) == 123
+        assert parser._process_cell_value(123.5) == 123.5
+        assert parser._process_cell_value(True) == True
+        assert parser._process_cell_value(None) is None
+
+    def test_xlsb_basic_style_creation(self):
+        """测试XLSB基础样式创建。"""
+        parser = XlsbParser()
+        style = parser._extract_basic_style()
+
+        # 验证样式对象
+        assert style.bold == False
+        assert style.italic == False
+        assert style.font_color == "#000000"
+        assert style.background_color == "#FFFFFF"
+        assert style.text_align == "left"
+
+
+class TestParserFactoryExtended:
+    """扩展的解析器工厂测试类。"""
+
+    def test_get_parser_xls(self):
+        """测试工厂返回XLS解析器。"""
+        parser = ParserFactory.get_parser("test.xls")
+        assert isinstance(parser, XlsParser)
+
+    def test_get_parser_xlsb(self):
+        """测试工厂返回XLSB解析器。"""
+        parser = ParserFactory.get_parser("test.xlsb")
+        assert isinstance(parser, XlsbParser)
+
+    def test_get_supported_formats(self):
+        """测试获取支持的格式列表。"""
+        formats = ParserFactory.get_supported_formats()
+
+        # 验证包含所有支持的格式
+        expected_formats = ["csv", "xlsx", "xls", "xlsb"]
+        for fmt in expected_formats:
+            assert fmt in formats
+
+        # 验证返回类型
+        assert isinstance(formats, list)
+        assert len(formats) >= 4
+
+    def test_unsupported_format_error_message(self):
+        """测试不支持格式的错误信息。"""
+        with pytest.raises(UnsupportedFileType) as exc_info:
+            ParserFactory.get_parser("test.unknown")
+
+        error_message = str(exc_info.value)
+        assert "不支持的文件格式" in error_message
+        assert "unknown" in error_message
+        assert "支持的格式" in error_message

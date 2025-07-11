@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-MCP Sheet Parser Server - Main Entry Point
+MCP 表格解析服务器 - 主入口点
 
-A Model Context Protocol server that provides spreadsheet parsing and HTML conversion tools.
-Supports multiple file formats and provides both convenience and professional tool interfaces.
+一个模型上下文协议服务器，提供表格解析和HTML转换工具。
+支持多种文件格式，提供便捷和专业的工具接口。
 """
 
 import asyncio
@@ -11,7 +11,7 @@ from src.mcp_server.server import main as server_main
 
 
 def main():
-    """Main entry point for the MCP Sheet Parser Server."""
+    """MCP 表格解析服务器的主入口点。"""
     asyncio.run(server_main())
 
 
