@@ -4,11 +4,33 @@ from typing import List, Optional, Any
 @dataclass
 class Style:
     """Represents the styling of a cell."""
+    # Basic text formatting (existing attributes - preserved for compatibility)
     bold: Optional[bool] = None
     italic: Optional[bool] = None
     underline: Optional[bool] = None
     font_color: Optional[str] = None
     fill_color: Optional[str] = None
+
+    # Extended font properties
+    font_size: Optional[int] = None
+    font_name: Optional[str] = None
+
+    # Text alignment
+    alignment: Optional[str] = None  # 'left', 'center', 'right', 'justify'
+    vertical_alignment: Optional[str] = None  # 'top', 'middle', 'bottom'
+
+    # Border styling
+    border_style: Optional[str] = None  # CSS border style string
+    border_color: Optional[str] = None
+    border_width: Optional[str] = None
+
+    # Additional text decoration
+    text_decoration: Optional[str] = None  # 'none', 'underline', 'line-through', etc.
+
+    # Cell dimensions and spacing
+    width: Optional[str] = None
+    height: Optional[str] = None
+    padding: Optional[str] = None
 
 @dataclass
 class Cell:
