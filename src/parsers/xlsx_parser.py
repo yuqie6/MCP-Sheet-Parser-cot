@@ -54,30 +54,18 @@ class XlsxParser(BaseParser):
             style.font_size = font.size if font.size else None
             style.font_name = font.name if font.name else None
 
-            # Extract font color (simplified approach for reliability)
+            # Extract font color (comprehensive approach)
             if font.color:
-                try:
-                    if hasattr(font.color, 'indexed') and font.color.indexed is not None:
-                        indexed_color = self._get_indexed_color_for_font(font.color.indexed)
-                        # Only set font color if it's not the default black
-                        if indexed_color != "#000000":
-                            style.font_color = indexed_color
-                    # For now, keep default color for complex color objects
-                except:
-                    pass
+                font_color = self._extract_color(font.color)
+                if font_color and font_color != "#000000":  # Only set if not default black
+                    style.font_color = font_color
 
-        # Extract fill/background properties (simplified approach)
+        # Extract fill/background properties (comprehensive approach)
         if cell.fill and cell.fill.start_color:
-            fill = cell.fill
-            try:
-                if hasattr(fill.start_color, 'indexed') and fill.start_color.indexed is not None:
-                    indexed_color = self._get_indexed_color(fill.start_color.indexed)
-                    # Only set background if it's not the default white
-                    if indexed_color != "#FFFFFF":
-                        style.background_color = indexed_color
-                # For now, keep default background for complex fill objects
-            except:
-                pass
+            background_color = self._extract_color(cell.fill.start_color)
+            # 特殊处理：00000000 ARGB 通常表示透明/自动背景，应视为白色
+            if background_color and background_color not in ["#FFFFFF", "#000000"]:
+                style.background_color = background_color
 
         # Extract alignment properties
         if cell.alignment:
@@ -99,10 +87,18 @@ class XlsxParser(BaseParser):
             style.border_left = self._get_border_style(border.left) if border.left else ""
             style.border_right = self._get_border_style(border.right) if border.right else ""
 
-            # Extract border color (use top border color as default)
-            if border.top and border.top.color and border.top.color.rgb:
-                border_rgb = str(border.top.color.rgb)
-                style.border_color = f"#{border_rgb}"
+            # Extract border color (comprehensive approach)
+            # 尝试从任何有颜色的边框中提取颜色
+            border_color = None
+            for border_side in [border.top, border.bottom, border.left, border.right]:
+                if border_side and border_side.color:
+                    extracted_color = self._extract_color(border_side.color)
+                    if extracted_color:
+                        border_color = extracted_color
+                        break  # 使用找到的第一个有效颜色
+
+            if border_color:
+                style.border_color = border_color
 
         # Extract number format
         if cell.number_format and cell.number_format != 'General':
@@ -206,3 +202,68 @@ class XlsxParser(BaseParser):
         }
 
         return border_style_map.get(border_side.style, '1px solid')
+
+    def _extract_color(self, color_obj) -> str | None:
+        """
+        从 openpyxl 颜色对象中提取颜色值，支持所有颜色类型。
+
+        Args:
+            color_obj: openpyxl 颜色对象
+
+        Returns:
+            十六进制颜色字符串，如 "#FF0000"，失败时返回 None
+        """
+        if not color_obj:
+            return None
+
+        try:
+            # 1. RGB 颜色（最常见）
+            if hasattr(color_obj, 'rgb') and color_obj.rgb is not None:
+                # 检查是否是有效的 RGB 字符串
+                if isinstance(color_obj.rgb, str):
+                    rgb_value = color_obj.rgb
+                    # 处理 ARGB 格式（8位）和 RGB 格式（6位）
+                    if len(rgb_value) == 8:  # ARGB
+                        return f"#{rgb_value[2:]}"  # 去掉前两位 Alpha 通道
+                    elif len(rgb_value) == 6:  # RGB
+                        return f"#{rgb_value}"
+
+            # 2. 索引颜色
+            if hasattr(color_obj, 'indexed') and color_obj.indexed is not None:
+                # 确保 indexed 是一个有效的整数
+                if isinstance(color_obj.indexed, int):
+                    return self._get_indexed_color(color_obj.indexed)
+
+            # 3. 主题颜色
+            if hasattr(color_obj, 'theme') and color_obj.theme is not None:
+                # 主题颜色的基本映射（可以根据需要扩展）
+                theme_colors = {
+                    0: "#FFFFFF",  # 背景1
+                    1: "#000000",  # 文本1
+                    2: "#E7E6E6",  # 背景2
+                    3: "#44546A",  # 文本2
+                    4: "#5B9BD5",  # 强调1
+                    5: "#70AD47",  # 强调2
+                    6: "#FFC000",  # 强调3
+                    7: "#264478",  # 强调4
+                    8: "#7030A0",  # 强调5
+                    9: "#0F243E",  # 强调6
+                }
+                base_color = theme_colors.get(color_obj.theme, "#000000")
+
+                # 处理色调变化（tint）
+                if hasattr(color_obj, 'tint') and color_obj.tint:
+                    # 简化的色调处理，实际应该更复杂
+                    return base_color
+
+                return base_color
+
+            # 4. 自动颜色
+            if hasattr(color_obj, 'auto') and color_obj.auto:
+                return None  # 使用默认颜色
+
+        except Exception as e:
+            # 记录错误但不中断处理
+            print(f"颜色提取失败: {e}")
+
+        return None

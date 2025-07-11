@@ -44,7 +44,7 @@ def test_process_file_xlsx(sheet_service):
     # 检查实际的XLSX数据内容
     assert "Name" in html_output or "ID" in html_output
     assert "Alice" in html_output or "Bob" in html_output
-    assert "<td>" in html_output
+    assert "<td" in html_output  # 检查td标签存在（可能带有class属性）
 
 
 def test_service_with_mock_components():

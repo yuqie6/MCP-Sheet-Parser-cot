@@ -114,7 +114,8 @@ class PerformanceOptimizer:
             style.text_align != "left" or
             style.border_top or style.border_bottom or
             style.border_left or style.border_right or
-            style.hyperlink is not None or style.comment is not None
+            (style.hyperlink is not None and style.hyperlink != "") or
+            (style.comment is not None and style.comment != "")
         )
     
     def _estimate_html_size(self, sheet: Sheet, non_empty_cells: int, styled_cells: int) -> int:

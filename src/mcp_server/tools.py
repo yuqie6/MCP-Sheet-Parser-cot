@@ -132,21 +132,21 @@ def register_tools(server: Server) -> None:
             ),
             Tool(
                 name="convert_file_to_html_paginated",
-                description="Convert a large spreadsheet file to HTML with pagination support for better performance",
+                description="Enterprise-grade pagination solution for massive spreadsheets (50,000+ cells). Intelligently splits large files into manageable HTML pages with navigation index, preserving data integrity and styling across pages. Generates responsive navigation interface with statistics and direct page links. Prevents browser crashes and memory issues while maintaining professional presentation quality.",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "Path to the spreadsheet file"
+                            "description": "Path to the large spreadsheet file requiring pagination. Automatically handles files that exceed browser memory limits."
                         },
                         "output_dir": {
                             "type": "string",
-                            "description": "Directory to save paginated HTML files"
+                            "description": "Target directory for paginated HTML files and navigation index. Creates organized file structure with numbered pages."
                         },
                         "max_rows_per_page": {
                             "type": "integer",
-                            "description": "Maximum number of rows per page (default: 1000)",
+                            "description": "Rows per page for optimal performance. Default 1000 balances load time and navigation convenience.",
                             "default": 1000
                         },
                         "compact_mode": {

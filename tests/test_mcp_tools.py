@@ -100,7 +100,7 @@ async def test_parse_sheet_to_json(mock_service):
         result = await _handle_parse_sheet_to_json({"file_path": test_file}, mock_service)
         assert len(result) == 1
         assert "JSON 转换成功" in result[0].text
-        assert "JSON Data:" in result[0].text
+        assert "JSON 数据:" in result[0].text
 
 
 @pytest.mark.asyncio
@@ -202,9 +202,9 @@ async def test_get_table_summary(mock_service):
         result = await _handle_get_table_summary({"file_path": test_file}, mock_service)
         assert len(result) == 1
         assert "表格摘要:" in result[0].text
-        assert "Basic Statistics:" in result[0].text
-        assert "Sample Data" in result[0].text
-        assert "Processing Recommendation:" in result[0].text
+        assert "基本统计:" in result[0].text
+        assert "前5行样例:" in result[0].text
+        assert "处理建议:" in result[0].text
 
 
 @pytest.mark.asyncio
@@ -224,10 +224,10 @@ async def test_get_sheet_metadata(mock_service):
         result = await _handle_get_sheet_metadata({"file_path": test_file}, mock_service)
         assert len(result) == 1
         assert "表格元数据:" in result[0].text
-        assert "File Information:" in result[0].text
-        assert "Structure:" in result[0].text
-        assert "Styling:" in result[0].text
-        assert "Output Estimates:" in result[0].text
+        assert "文件信息:" in result[0].text
+        assert "结构:" in result[0].text
+        assert "样式:" in result[0].text
+        assert "输出估算:" in result[0].text
 
 
 def test_json_to_sheet_conversion(sample_json_data):
@@ -265,3 +265,84 @@ def test_json_to_sheet_empty_data():
     assert sheet.name == "Empty"
     assert len(sheet.rows) == 0
     assert len(sheet.merged_cells) == 0
+
+
+# MCP 服务器测试
+class TestMCPServer:
+    """MCP 服务器相关测试。"""
+
+    def test_create_server(self):
+        """测试服务器创建功能。"""
+        from src.mcp_server.server import create_server
+
+        server = create_server()
+        assert server is not None
+        assert server.name == "mcp-sheet-parser"
+
+        # 验证服务器基本属性
+        assert hasattr(server, 'list_tools')
+        assert hasattr(server, 'call_tool')
+        assert hasattr(server, 'run')
+
+    def test_server_initialization_logging(self, caplog):
+        """测试服务器初始化日志。"""
+        from src.mcp_server.server import create_server
+        import logging
+
+        with caplog.at_level(logging.INFO):
+            server = create_server()
+
+        assert "MCP 表格解析服务器初始化完成" in caplog.text
+        assert server is not None
+
+    def test_tool_registration_count(self):
+        """测试工具注册数量。"""
+        from src.mcp_server.server import create_server
+
+        server = create_server()
+
+        # 验证服务器有工具注册功能
+        assert hasattr(server, 'call_tool')
+        assert hasattr(server, 'list_tools')
+
+        # 验证服务器名称
+        assert server.name == "mcp-sheet-parser"
+
+    @pytest.mark.asyncio
+    async def test_parse_sheet_missing_file_path(self):
+        """测试解析表格缺少文件路径参数。"""
+        from src.mcp_server.tools import _handle_parse_sheet_to_json
+
+        mock_service = MagicMock()
+
+        # 测试缺少file_path参数，应该抛出ValueError
+        with pytest.raises(ValueError, match="必须提供 file_path"):
+            await _handle_parse_sheet_to_json({}, mock_service)
+
+    @pytest.mark.asyncio
+    async def test_parse_sheet_file_not_found(self):
+        """测试解析不存在的文件。"""
+        from src.mcp_server.tools import _handle_parse_sheet_to_json
+
+        mock_service = MagicMock()
+
+        # 测试文件不存在，应该抛出FileNotFoundError
+        with pytest.raises(FileNotFoundError, match="文件未找到"):
+            await _handle_parse_sheet_to_json(
+                {"file_path": "nonexistent.xlsx"},
+                mock_service
+            )
+
+    @pytest.mark.asyncio
+    async def test_convert_json_to_html_missing_output_path(self):
+        """测试JSON转HTML缺少输出路径。"""
+        from src.mcp_server.tools import _handle_convert_json_to_html
+
+        mock_service = MagicMock()
+
+        # 测试缺少output_path参数，应该抛出ValueError
+        with pytest.raises(ValueError, match="必须提供 output_path"):
+            await _handle_convert_json_to_html(
+                {"json_data": "some json"},
+                mock_service
+            )

@@ -182,26 +182,4 @@ MCP接口层 (tools.py)
 - **更多格式** - WPS格式(.et, .ett)支持
 - **云端部署** - Docker容器化和云服务支持
 
-### 长期目标
-- **实时协作** - 多用户实时编辑支持
-- **AI增强** - 智能数据分析和可视化建议
-- **插件系统** - 可扩展的功能插件架构
-- **企业集成** - 与主流办公软件的深度集成
 
-## 📄 许可证
-
-MIT License - 详见 [LICENSE](LICENSE) 文件
-
-## 🤝 贡献指南
-
-欢迎贡献代码！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详细信息。
-
-## 📞 支持与反馈
-
-- **问题报告**: [GitHub Issues](https://github.com/your-repo/issues)
-- **功能请求**: [GitHub Discussions](https://github.com/your-repo/discussions)
-- **技术支持**: support@example.com
-
----
-
-**MCP Sheet Parser** - 让表格转换变得简单、高效、专业！

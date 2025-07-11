@@ -341,3 +341,45 @@ Style (独立的样式对象)
 - Performance Impact: 智能处理策略显著提升大文件处理能力；分页机制解决超大文件问题；性能监控提供实时反馈
 - Maintainability Impact: 模块化设计保持代码清晰；性能优化器独立模块便于维护；进阶功能可选不影响核心功能
 - Scalability Impact: 性能优化器支持新的处理策略；分页机制支持任意大小文件；进阶功能架构支持未来扩展
+
+---
+
+### Critical Bug Fix Decision
+[2025-07-12 05:07:49] - 修复XLSX解析器颜色提取的严重缺陷，重写颜色处理逻辑支持全面颜色类型
+
+**Decision Background:**
+发现XLSX解析器存在严重的颜色提取缺陷，导致样式保真度大幅下降。原有实现仅处理有限的索引颜色，忽略了RGB、主题颜色等常用类型，同时边框颜色提取逻辑不完整，异常处理掩盖了问题。这个缺陷是造成样式丢失的根本原因，严重影响了HTML转换的视觉效果。
+
+**Problem Analysis:**
+1. **颜色提取局限性**: 只处理索引颜色，忽略RGB和主题颜色
+2. **边框处理不完整**: 只检查上边框颜色，应用到所有边框
+3. **异常处理掩盖问题**: 空的except语句隐藏了openpyxl复杂颜色对象的真实情况
+4. **连锁效应**: 颜色信息丢失导致样式去重机制失效，CSS生成不完整
+
+**Considered Solutions:**
+- Option A: 修补现有逻辑，增加RGB颜色支持
+  - 优点: 改动较小，风险低
+  - 缺点: 无法解决根本问题，仍然缺乏主题颜色等支持
+- Option B: 完全重写颜色提取逻辑，支持所有openpyxl颜色类型
+  - 优点: 根本解决问题，支持全面颜色类型，提升样式保真度
+  - 缺点: 改动较大，需要充分测试
+- Final Choice: Option B - 完全重写颜色提取逻辑
+
+**Implementation Details:**
+- Affected Modules:
+  - `src/parsers/xlsx_parser.py` - 重写_extract_color方法，支持RGB、ARGB、索引、主题、自动颜色
+  - `src/parsers/xlsx_parser.py` - 修复边框颜色提取，检查所有四个边框
+  - `tests/test_parsers.py` - 新增comprehensive_color_extraction测试
+- Technical Changes:
+  - 新增_extract_color方法支持5种颜色类型
+  - 严格类型检查避免无效颜色对象
+  - 特殊处理00000000 ARGB值（透明背景）
+  - 移除掩盖问题的异常处理，改为记录具体错误
+- Risk Assessment:
+  - 颜色映射可能不准确 → 通过实际测试数据验证和调优
+  - 新逻辑可能引入新bug → 通过全面测试覆盖缓解
+
+**Impact Assessment:**
+- Performance Impact: 颜色提取更准确，样式去重机制恢复正常，CSS生成完整
+- Maintainability Impact: 代码逻辑更清晰，错误处理更明确，便于调试和维护
+- Quality Impact: 样式保真度显著提升，HTML转换视觉效果大幅改善，接近95%目标

@@ -167,46 +167,46 @@ class HTMLConverter:
 
             # Font properties (only include non-default values)
             if style.font_color and style.font_color != "#000000":
-                css_properties.append(f"color:{style.font_color}")
+                css_properties.append(f"color: {style.font_color}")
 
             if style.background_color and style.background_color != "#FFFFFF":
-                css_properties.append(f"background-color:{style.background_color}")
+                css_properties.append(f"background-color: {style.background_color}")
 
             if style.bold:
-                css_properties.append("font-weight:bold")
+                css_properties.append("font-weight: bold")
 
             if style.italic:
-                css_properties.append("font-style:italic")
+                css_properties.append("font-style: italic")
 
             if style.underline:
-                css_properties.append("text-decoration:underline")
+                css_properties.append("text-decoration: underline")
 
             if style.font_size and style.font_size != 11.0:  # Skip default font size
-                css_properties.append(f"font-size:{style.font_size}pt")
+                css_properties.append(f"font-size: {style.font_size}pt")
 
             if style.font_name and style.font_name != "Calibri":  # Skip default font
-                css_properties.append(f"font-family:'{style.font_name}'")
+                css_properties.append(f"font-family: '{style.font_name}'")
 
             # Text alignment (only non-default)
             if style.text_align and style.text_align != "left":
-                css_properties.append(f"text-align:{style.text_align}")
+                css_properties.append(f"text-align: {style.text_align}")
 
             if style.vertical_align and style.vertical_align != "top":
-                css_properties.append(f"vertical-align:{style.vertical_align}")
+                css_properties.append(f"vertical-align: {style.vertical_align}")
 
             # Borders (compact format)
             if style.border_top:
-                css_properties.append(f"border-top:{style.border_top} {style.border_color}")
+                css_properties.append(f"border-top: {style.border_top} {style.border_color}")
             if style.border_bottom:
-                css_properties.append(f"border-bottom:{style.border_bottom} {style.border_color}")
+                css_properties.append(f"border-bottom: {style.border_bottom} {style.border_color}")
             if style.border_left:
-                css_properties.append(f"border-left:{style.border_left} {style.border_color}")
+                css_properties.append(f"border-left: {style.border_left} {style.border_color}")
             if style.border_right:
-                css_properties.append(f"border-right:{style.border_right} {style.border_color}")
+                css_properties.append(f"border-right: {style.border_right} {style.border_color}")
 
             # Text wrapping
             if style.wrap_text:
-                css_properties.append("white-space:normal")
+                css_properties.append("white-space: normal")
 
             # Create compact CSS rule
             if css_properties:

@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from src.models.table_model import Sheet, Row, Cell
+from src.models.table_model import Sheet, Row, Cell, Style
 from src.parsers.base_parser import BaseParser
 from src.parsers.csv_parser import CsvParser
 from src.parsers.xlsx_parser import XlsxParser
@@ -57,12 +57,45 @@ def test_xlsx_parser_success(sample_xlsx_path: Path):
     """
     # 准备
     parser = XlsxParser()
+    # 创建期望的默认样式（与解析器输出一致）
+    default_style = Style(
+        bold=False,
+        italic=False,
+        underline=False,
+        font_color="#000000",
+        font_size=11.0,
+        font_name="宋体",  # 实际解析出的字体名称
+        background_color="#FFFFFF",
+        text_align="left",
+        vertical_align="top",
+        border_top="",
+        border_bottom="",
+        border_left="",
+        border_right="",
+        border_color="#000000",
+        wrap_text=False,
+        number_format="",
+        hyperlink=None,
+        comment=None
+    )
     expected_sheet = Sheet(
         name="Sheet1",
         rows=[
-            Row(cells=[Cell(value="ID"), Cell(value="Name"), Cell(value="Value")]),
-            Row(cells=[Cell(value=1), Cell(value="Alice"), Cell(value=100)]),
-            Row(cells=[Cell(value=2), Cell(value="Bob"), Cell(value=200)]),
+            Row(cells=[
+                Cell(value="ID", style=default_style),
+                Cell(value="Name", style=default_style),
+                Cell(value="Value", style=default_style)
+            ]),
+            Row(cells=[
+                Cell(value=1, style=default_style),
+                Cell(value="Alice", style=default_style),
+                Cell(value=100, style=default_style)
+            ]),
+            Row(cells=[
+                Cell(value=2, style=default_style),
+                Cell(value="Bob", style=default_style),
+                Cell(value=200, style=default_style)
+            ]),
         ]
     )
 
@@ -269,6 +302,51 @@ def test_border_style_mapping():
     assert css_style == ""
 
 
+def test_comprehensive_color_extraction():
+    """测试全面的颜色提取功能。"""
+    parser = XlsxParser()
+
+    # 测试 RGB 颜色
+    class MockRGBColor:
+        def __init__(self, rgb_value):
+            self.rgb = rgb_value
+
+    # 测试 6 位 RGB
+    rgb_color = MockRGBColor("FF0000")
+    assert parser._extract_color(rgb_color) == "#FF0000"
+
+    # 测试 8 位 ARGB（去掉 Alpha 通道）
+    argb_color = MockRGBColor("80FF0000")
+    assert parser._extract_color(argb_color) == "#FF0000"
+
+    # 测试索引颜色
+    class MockIndexedColor:
+        def __init__(self, index):
+            self.indexed = index
+
+    indexed_color = MockIndexedColor(2)  # 红色
+    assert parser._extract_color(indexed_color) == "#FF0000"
+
+    # 测试主题颜色
+    class MockThemeColor:
+        def __init__(self, theme):
+            self.theme = theme
+
+    theme_color = MockThemeColor(4)  # 强调1
+    assert parser._extract_color(theme_color) == "#5B9BD5"
+
+    # 测试自动颜色
+    class MockAutoColor:
+        def __init__(self):
+            self.auto = True
+
+    auto_color = MockAutoColor()
+    assert parser._extract_color(auto_color) is None
+
+    # 测试空颜色
+    assert parser._extract_color(None) is None
+
+
 # 新格式解析器测试
 class TestXlsParser:
     """XLS解析器测试类。"""
@@ -301,6 +379,84 @@ class TestXlsParser:
         assert parser._get_color_from_index(None, 1) == "#FFFFFF"  # 白色
         assert parser._get_color_from_index(None, 2) == "#FF0000"  # 红色
         assert parser._get_color_from_index(None, 999) == "#000000"  # 未知索引默认黑色
+
+    def test_xls_parser_error_handling(self, sample_xlsx_path: Path):
+        """测试XLS解析器的错误处理。"""
+        parser = XlsParser()
+
+        # 测试解析非XLS文件（使用xlsx文件）
+        with pytest.raises(RuntimeError, match="解析XLS文件失败"):
+            parser.parse(str(sample_xlsx_path))
+
+    def test_xls_parser_nonexistent_file(self):
+        """测试XLS解析器处理不存在的文件。"""
+        parser = XlsParser()
+
+        with pytest.raises(RuntimeError, match="解析XLS文件失败"):
+            parser.parse("nonexistent.xls")
+
+    def test_xls_style_extraction_default(self):
+        """测试XLS样式提取的默认行为。"""
+        parser = XlsParser()
+
+        # 创建模拟的工作簿和工作表对象
+        class MockWorkbook:
+            def __init__(self):
+                self.xf_list = []
+                self.font_list = []
+                self.colour_map = {}
+
+        class MockWorksheet:
+            def cell_xf_index(self, row, col):
+                return 0
+
+        # 测试默认样式提取
+        style = parser._extract_style(MockWorkbook(), MockWorksheet(), 0, 0)
+        assert isinstance(style, Style)
+        assert style.bold == False
+        assert style.italic == False
+        assert style.font_color == "#000000"
+        assert style.background_color == "#FFFFFF"
+
+    def test_xls_style_extraction_with_font(self):
+        """测试XLS样式提取包含字体信息。"""
+        parser = XlsParser()
+
+        # 创建模拟的字体对象
+        class MockFont:
+            def __init__(self):
+                self.bold = True
+                self.italic = False
+                self.underline_type = 1
+                self.height = 240  # 12pt in twips
+                self.name = "Arial"
+                self.colour_index = 2
+
+        # 创建模拟的XF对象
+        class MockXF:
+            def __init__(self):
+                self.font_index = 0
+                self.background = None
+
+        # 创建模拟的工作簿
+        class MockWorkbook:
+            def __init__(self):
+                self.xf_list = [MockXF()]
+                self.font_list = [MockFont()]
+                self.colour_map = {}
+
+        class MockWorksheet:
+            def cell_xf_index(self, row, col):
+                return 0
+
+        # 测试样式提取
+        style = parser._extract_style(MockWorkbook(), MockWorksheet(), 0, 0)
+        assert style.bold == True
+        assert style.italic == False
+        assert style.underline == True
+        assert style.font_size == 12.0  # 240/20
+        assert style.font_name == "Arial"
+        assert style.font_color == "#FF0000"  # 索引2对应红色
 
 
 class TestXlsbParser:
@@ -335,7 +491,69 @@ class TestXlsbParser:
         assert style.italic == False
         assert style.font_color == "#000000"
         assert style.background_color == "#FFFFFF"
+
+    def test_xlsb_parser_error_handling(self, sample_xlsx_path: Path):
+        """测试XLSB解析器的错误处理。"""
+        parser = XlsbParser()
+
+        # 测试解析非XLSB文件（使用xlsx文件）
+        with pytest.raises(RuntimeError, match="解析XLSB文件失败"):
+            parser.parse(str(sample_xlsx_path))
+
+    def test_xlsb_parser_nonexistent_file(self):
+        """测试XLSB解析器处理不存在的文件。"""
+        parser = XlsbParser()
+
+        with pytest.raises(RuntimeError, match="解析XLSB文件失败"):
+            parser.parse("nonexistent.xlsb")
+
+    def test_xlsb_style_extraction_comprehensive(self):
+        """测试XLSB样式提取的全面功能。"""
+        parser = XlsbParser()
+
+        # 测试基础样式的所有属性
+        style = parser._extract_basic_style()
+
+        # 验证XLSB解析器设置的样式属性
+        assert isinstance(style.bold, bool)
+        assert isinstance(style.italic, bool)
+        assert isinstance(style.underline, bool)
+        assert isinstance(style.font_color, str)
+        assert isinstance(style.background_color, str)
+        assert isinstance(style.text_align, str)
+        assert isinstance(style.vertical_align, str)
+
+        # 验证XLSB解析器设置的默认值
+        assert style.bold == False
+        assert style.italic == False
+        assert style.underline == False
+        assert style.font_color == "#000000"
+        assert style.background_color == "#FFFFFF"
         assert style.text_align == "left"
+        assert style.vertical_align == "top"
+
+        # 验证未设置的属性使用Style类的默认值
+        assert style.font_size is None  # Style类的默认值
+        assert style.font_name is None  # Style类的默认值
+
+    def test_xlsb_cell_value_edge_cases(self):
+        """测试XLSB单元格值处理的边界情况。"""
+        parser = XlsbParser()
+
+        # 测试边界情况
+        assert parser._process_cell_value(0) == 0
+        assert parser._process_cell_value(0.0) == 0
+        assert parser._process_cell_value(-1.5) == -1.5
+        assert parser._process_cell_value("") == ""
+        assert parser._process_cell_value(" ") == " "
+        assert parser._process_cell_value(False) == False
+
+        # 测试特殊对象转换为字符串
+        class CustomObject:
+            def __str__(self):
+                return "custom"
+
+        assert parser._process_cell_value(CustomObject()) == "custom"
 
 
 class TestParserFactoryExtended:
