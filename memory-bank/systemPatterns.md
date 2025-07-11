@@ -93,16 +93,23 @@ from .csv_parser import CsvParser
 from src.exceptions.custom_exceptions import UnsupportedFormatError
 
 class ParserFactory:
-    def __init__(self):
-        self._parsers = {
-            "xlsx": XlsxParser(),
-            "csv": CsvParser(),
-        }
+    _parsers = {
+        "csv": CsvParser(),
+        "xlsx": XlsxParser(),
+        "xls": XlsParser(),
+        "xlsb": XlsbParser(),
+    }
 
-    def get_parser(self, file_extension: str) -> BaseParser:
-        parser = self._parsers.get(file_extension.lower())
+    @staticmethod
+    def get_parser(file_path: str) -> BaseParser:
+        file_extension = file_path.split('.')[-1].lower()
+        parser = ParserFactory._parsers.get(file_extension)
         if not parser:
-            raise UnsupportedFormatError(f"Unsupported file format: '{file_extension}'")
+            supported_formats = ", ".join(ParserFactory._parsers.keys())
+            raise UnsupportedFileType(
+                f"不支持的文件格式: '{file_extension}'. "
+                f"支持的格式: {supported_formats}"
+            )
         return parser
 ```
 

@@ -188,11 +188,37 @@ class XlsParser(BaseParser):
                     style.border_left = "1px solid"
                 if hasattr(border, 'right_line_style') and border.right_line_style:
                     style.border_right = "1px solid"
-            
+
+            # 提取超链接信息（XLS格式的超链接提取较复杂，暂时简化处理）
+            # 注意：xlrd库对超链接的支持有限，这里提供基础框架
+            try:
+                # 检查工作表是否有超链接记录
+                if hasattr(worksheet, 'hyperlink_list'):
+                    for hyperlink in worksheet.hyperlink_list:
+                        if (hasattr(hyperlink, 'first_row') and hasattr(hyperlink, 'first_col') and
+                            hyperlink.first_row == row_idx and hyperlink.first_col == col_idx):
+                            if hasattr(hyperlink, 'url_or_path'):
+                                style.hyperlink = hyperlink.url_or_path
+                            break
+            except:
+                pass
+
+            # 提取注释信息（XLS格式的注释提取）
+            try:
+                # 检查工作表是否有注释
+                if hasattr(worksheet, 'cell_note_map'):
+                    note_key = (row_idx, col_idx)
+                    if note_key in worksheet.cell_note_map:
+                        note = worksheet.cell_note_map[note_key]
+                        if hasattr(note, 'text'):
+                            style.comment = note.text
+            except:
+                pass
+
         except Exception:
             # 如果样式提取失败，返回默认样式
             pass
-        
+
         return style
     
     def _get_color_from_index(self, workbook, color_index) -> str:

@@ -30,6 +30,10 @@ class Style:
     wrap_text: bool = False
     number_format: str = ""
 
+    # 进阶功能
+    hyperlink: str | None = None  # 超链接URL
+    comment: str | None = None    # 单元格注释
+
 @dataclass
 class Cell:
     """单元格类，包含值、样式和合并信息。"""

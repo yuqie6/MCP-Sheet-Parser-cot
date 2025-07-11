@@ -1,1 +1,39 @@
-<!DOCTYPE html><html><head><title>{{ sheet.name }}</title><style>table,th,td{border:1px solid black;border-collapse:collapse}th,td{padding:5px;text-align:left}{% if css_classes %}{{ converter.generate_css_styles(css_classes) }}{% endif %}</style></head><body>{% if not compact_mode %}<h2>{{ sheet.name }}</h2>{% endif %}<table>{% for row in sheet.rows %}<tr>{% for cell in row.cells %}{% set css_class = converter.get_cell_css_class(cell, css_classes) %}<td{% if css_class %} class="{{ css_class }}"{% endif %}{% if cell.col_span and cell.col_span != 1 %} colspan="{{ cell.col_span }}"{% endif %}{% if cell.row_span and cell.row_span != 1 %} rowspan="{{ cell.row_span }}"{% endif %}>{{ cell.value }}</td>{% endfor %}</tr>{% endfor %}</table></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ sheet.name }}</title>
+    <style>
+        table, th, td { border: 1px solid black; border-collapse: collapse; }
+        th, td { padding: 5px; text-align: left; }
+        .hyperlink { color: blue; text-decoration: underline; cursor: pointer; }
+        .has-comment { position: relative; }
+        .comment-indicator { position: absolute; top: 2px; right: 2px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid red; border-bottom: 5px solid red; }
+        .comment-tooltip { display: none; position: absolute; background: #ffffcc; border: 1px solid #ccc; padding: 5px; border-radius: 3px; z-index: 1000; max-width: 200px; font-size: 12px; }
+        .has-comment:hover .comment-tooltip { display: block; }
+        {% if css_classes %}{{ converter.generate_css_styles(css_classes) }}{% endif %}
+    </style>
+</head>
+<body>
+    {% if not compact_mode %}<h2>{{ sheet.name }}</h2>{% endif %}
+    <table>
+        {% for row in sheet.rows %}
+        <tr>
+            {% for cell in row.cells %}
+            {% set css_class = converter.get_cell_css_class(cell, css_classes) %}
+            <td{% if css_class %} class="{{ css_class }}{% if cell.style and cell.style.comment %} has-comment{% endif %}"{% elif cell.style and cell.style.comment %} class="has-comment"{% endif %}{% if cell.col_span and cell.col_span != 1 %} colspan="{{ cell.col_span }}"{% endif %}{% if cell.row_span and cell.row_span != 1 %} rowspan="{{ cell.row_span }}"{% endif %}>
+                {% if cell.style and cell.style.hyperlink %}
+                <a href="{{ cell.style.hyperlink }}" class="hyperlink" target="_blank">{{ cell.value }}</a>
+                {% else %}
+                {{ cell.value }}
+                {% endif %}
+                {% if cell.style and cell.style.comment %}
+                <div class="comment-indicator"></div>
+                <div class="comment-tooltip">{{ cell.style.comment }}</div>
+                {% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

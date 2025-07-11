@@ -4,7 +4,7 @@ from src.converters.html_converter import HTMLConverter
 from src.converters.json_converter import JSONConverter
 
 def test_html_converter():
-    # 1. Arrange: Create a simple Sheet object
+    # 1. 准备：创建一个简单的 Sheet 对象
     sheet = Sheet(
         name="Test Sheet",
         rows=[
@@ -13,15 +13,15 @@ def test_html_converter():
         ]
     )
 
-    # 2. Act: Convert the Sheet to an HTML string
+    # 2. 执行：将 Sheet 转换为 HTML 字符串
     converter = HTMLConverter()
     html_output = converter.convert(sheet)
 
-    # 3. Assert: Check if the output is a valid HTML table
+    # 3. 断言：检查输出是否为有效的 HTML 表格
     assert '<table>' in html_output
     assert '</table>' in html_output
 
-    # Check for basic table structure (updated for optimized output)
+    # 检查基本表格结构（兼容优化输出）
     assert 'A1' in html_output
     assert 'B1' in html_output
     assert 'A2' in html_output
@@ -31,8 +31,8 @@ def test_html_converter():
 
 
 def test_json_converter_basic_conversion():
-    """Test basic JSON conversion functionality."""
-    # Create a simple sheet
+    """测试基本的 JSON 转换功能。"""
+    # 创建一个简单的 sheet
     sheet = Sheet(
         name="TestSheet",
         rows=[
@@ -44,13 +44,13 @@ def test_json_converter_basic_conversion():
     converter = JSONConverter()
     json_data = converter.convert(sheet)
 
-    # Test metadata
+    # 测试元数据
     assert json_data['metadata']['name'] == "TestSheet"
     assert json_data['metadata']['rows'] == 2
     assert json_data['metadata']['cols'] == 2
     assert json_data['metadata']['has_merged_cells'] == False
 
-    # Test data structure
+    # 测试数据结构
     assert len(json_data['data']) == 2
     assert json_data['data'][0]['row'] == 0
     assert len(json_data['data'][0]['cells']) == 2
@@ -59,8 +59,8 @@ def test_json_converter_basic_conversion():
 
 
 def test_json_converter_with_styles():
-    """Test JSON conversion with styled cells."""
-    # Create a sheet with styled cells
+    """测试带样式单元格的 JSON 转换。"""
+    # 创建一个带样式单元格的 sheet
     styled_cell = Cell(value="Styled", style=Style(bold=True, font_color="#FF0000"))
     normal_cell = Cell(value="Normal")
 
@@ -72,17 +72,17 @@ def test_json_converter_with_styles():
     converter = JSONConverter()
     json_data = converter.convert(sheet)
 
-    # Test styles extraction
+    # 测试样式提取
     assert len(json_data['styles']) > 0
 
-    # Test style references
+    # 测试样式引用
     first_cell = json_data['data'][0]['cells'][0]
     second_cell = json_data['data'][0]['cells'][1]
 
     assert first_cell['style_id'] is not None
     assert second_cell['style_id'] is None
 
-    # Test style content
+    # 测试样式内容
     style_id = first_cell['style_id']
     style_data = json_data['styles'][style_id]
     assert style_data['bold'] == True
@@ -90,8 +90,8 @@ def test_json_converter_with_styles():
 
 
 def test_json_converter_with_merged_cells():
-    """Test JSON conversion with merged cells."""
-    # Create a sheet with merged cells
+    """测试带合并单元格的 JSON 转换。"""
+    # 创建一个带合并单元格的 sheet
     sheet = Sheet(
         name="MergedSheet",
         rows=[Row(cells=[Cell(value="Merged"), Cell(value="Cell2")])],
@@ -101,21 +101,21 @@ def test_json_converter_with_merged_cells():
     converter = JSONConverter()
     json_data = converter.convert(sheet)
 
-    # Test merged cells metadata
+    # 测试合并单元格元数据
     assert json_data['metadata']['has_merged_cells'] == True
     assert json_data['metadata']['merged_cells_count'] == 1
     assert json_data['merged_cells'] == ["A1:B1"]
 
 
 def test_json_converter_empty_sheet():
-    """Test JSON conversion with empty sheet."""
-    # Create an empty sheet
+    """测试空 sheet 的 JSON 转换。"""
+    # 创建一个空的 sheet
     sheet = Sheet(name="EmptySheet", rows=[])
 
     converter = JSONConverter()
     json_data = converter.convert(sheet)
 
-    # Test empty sheet handling
+    # 测试空 sheet 处理
     assert json_data['metadata']['rows'] == 0
     assert json_data['metadata']['cols'] == 0
     assert len(json_data['data']) == 0
@@ -313,10 +313,10 @@ def test_html_converter_compression():
 
 
 def test_html_converter_css_generation():
-    """Test CSS style generation."""
+    """测试 CSS 样式生成。"""
     converter = HTMLConverter()
 
-    # Create test styles
+    # 创建测试样式
     css_classes = {
         'test1': Style(bold=True, font_color="#FF0000"),
         'test2': Style(italic=True, background_color="#FFFF00"),
@@ -325,7 +325,7 @@ def test_html_converter_css_generation():
 
     css_styles = converter.generate_css_styles(css_classes)
 
-    # Test CSS content
+    # 测试 CSS 内容
     assert isinstance(css_styles, str)
     assert ".test1" in css_styles
     assert "font-weight: bold" in css_styles
@@ -336,12 +336,12 @@ def test_html_converter_css_generation():
 
 
 def test_html_converter_empty_sheet_optimization():
-    """Test optimization with empty sheet."""
+    """测试空 sheet 的优化。"""
     empty_sheet = Sheet(name="EmptyTest", rows=[])
 
     converter = HTMLConverter()
 
-    # Should handle empty sheet gracefully
+    # 输出中应包含 sheet 名称
     css_classes = converter._generate_css_classes(empty_sheet)
     assert len(css_classes) == 0
 
@@ -354,6 +354,6 @@ def test_html_converter_error_handling():
     """Test HTML converter error handling."""
     converter = HTMLConverter()
 
-    # Test None sheet
+    # 测试空的sheet
     with pytest.raises(ValueError):
         converter.convert(None)

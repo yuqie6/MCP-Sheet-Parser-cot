@@ -110,6 +110,28 @@ class XlsxParser(BaseParser):
         else:
             style.number_format = ""
 
+        # Extract hyperlink information
+        if cell.hyperlink:
+            try:
+                # 获取超链接目标
+                if hasattr(cell.hyperlink, 'target'):
+                    style.hyperlink = cell.hyperlink.target
+                elif hasattr(cell.hyperlink, 'location'):
+                    style.hyperlink = cell.hyperlink.location
+            except:
+                pass
+
+        # Extract comment information
+        if cell.comment:
+            try:
+                # 获取注释文本
+                if hasattr(cell.comment, 'text'):
+                    style.comment = str(cell.comment.text)
+                elif hasattr(cell.comment, 'content'):
+                    style.comment = str(cell.comment.content)
+            except:
+                pass
+
         return style
 
     def _get_indexed_color(self, index: int) -> str:

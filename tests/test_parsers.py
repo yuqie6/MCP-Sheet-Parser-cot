@@ -18,9 +18,9 @@ def sample_xlsx_path() -> Path:
 
 def test_csv_parser_success(sample_csv_path: Path):
     """
-    Tests that the CsvParser can successfully parse a simple CSV file.
+    测试 CsvParser 能否成功解析简单的 CSV 文件。
     """
-    # Arrange
+    # 准备
     parser = CsvParser()
     expected_sheet = Sheet(
         name="sample",
@@ -32,30 +32,30 @@ def test_csv_parser_success(sample_csv_path: Path):
         ]
     )
 
-    # Act
+    # 执行
     result_sheet = parser.parse(str(sample_csv_path))
 
-    # Assert
+    # 断言
     assert isinstance(result_sheet, Sheet)
     assert result_sheet.name == "sample"
     assert len(result_sheet.rows) == 4
     
-    # Check headers
+    # 检查表头
     assert [cell.value for cell in result_sheet.rows[0].cells] == ["header1", "header2", "header3"]
     
-    # Check data rows
+    # 检查数据行
     assert [cell.value for cell in result_sheet.rows[1].cells] == ["value1_1", "value1_2", "value1_3"]
     assert [cell.value for cell in result_sheet.rows[2].cells] == ["value2_1", "value2_2", "value2_3"]
     assert [cell.value for cell in result_sheet.rows[3].cells] == ["value3_1", "value3_2", "value3_3"]
 
-    # Deep comparison
+    # 深度比较
     assert result_sheet == expected_sheet
 
 def test_xlsx_parser_success(sample_xlsx_path: Path):
     """
-    Tests that the XlsxParser can successfully parse a simple XLSX file.
+    测试 XlsxParser 能否成功解析简单的 XLSX 文件。
     """
-    # Arrange
+    # 准备
     parser = XlsxParser()
     expected_sheet = Sheet(
         name="Sheet1",
@@ -66,65 +66,65 @@ def test_xlsx_parser_success(sample_xlsx_path: Path):
         ]
     )
 
-    # Act
+    # 执行
     result_sheet = parser.parse(str(sample_xlsx_path))
 
-    # Assert
+    # 断言
     assert isinstance(result_sheet, Sheet)
     assert result_sheet.name == "Sheet1"
     assert len(result_sheet.rows) == 3
     
-    # Check headers
+    # 检查表头
     assert [cell.value for cell in result_sheet.rows[0].cells] == ["ID", "Name", "Value"]
     
-    # Check data rows
+    # 检查数据行
     assert [cell.value for cell in result_sheet.rows[1].cells] == [1, "Alice", 100]
     assert [cell.value for cell in result_sheet.rows[2].cells] == [2, "Bob", 200]
 
-    # Deep comparison
+    # 深度比较
     assert result_sheet == expected_sheet
 
 
 class TestParserFactory:
     def test_get_parser_csv(self, sample_csv_path: Path):
         """
-        Tests that the ParserFactory returns a CsvParser instance for .csv files.
+        测试 ParserFactory 能否为 .csv 文件返回 CsvParser 实例。
         """
-        # Act
+        # 执行
         parser = ParserFactory.get_parser(str(sample_csv_path))
-        # Assert
+        # 断言
         assert isinstance(parser, CsvParser)
 
     def test_get_parser_xlsx(self, sample_xlsx_path: Path):
         """
-        Tests that the ParserFactory returns an XlsxParser instance for .xlsx files.
+        测试 ParserFactory 能否为 .xlsx 文件返回 XlsxParser 实例。
         """
-        # Act
+        # 执行
         parser = ParserFactory.get_parser(str(sample_xlsx_path))
-        # Assert
+        # 断言
         assert isinstance(parser, XlsxParser)
 
     def test_get_parser_unsupported_file_type(self):
         """
-        Tests that the ParserFactory raises an UnsupportedFileType error for unsupported file types.
+        测试 ParserFactory 对不支持的文件类型是否抛出 UnsupportedFileType 错误。
         """
-        # Arrange
+        # 准备
         unsupported_file_path = "test.txt"
-        # Act & Assert
+        # 执行并断言
         with pytest.raises(UnsupportedFileType):
             ParserFactory.get_parser(unsupported_file_path)
 
 
 def test_xlsx_style_extraction_basic_properties(sample_xlsx_path: Path):
-    """Test basic style extraction from XLSX files."""
+    """测试 XLSX 文件的基础样式提取。"""
     parser = XlsxParser()
     sheet = parser.parse(str(sample_xlsx_path))
 
-    # Test that styles are extracted
+    # 测试样式是否被提取
     first_cell = sheet.rows[0].cells[0]
     assert first_cell.style is not None
 
-    # Test font properties
+    # 测试字体属性
     style = first_cell.style
     assert isinstance(style.bold, bool)
     assert isinstance(style.italic, bool)
@@ -132,7 +132,7 @@ def test_xlsx_style_extraction_basic_properties(sample_xlsx_path: Path):
     assert isinstance(style.font_color, str)
     assert style.font_color.startswith('#')
 
-    # Test font size and name
+    # 测试字体大小和名称
     if style.font_size is not None:
         assert isinstance(style.font_size, (int, float))
         assert style.font_size > 0
@@ -143,34 +143,34 @@ def test_xlsx_style_extraction_basic_properties(sample_xlsx_path: Path):
 
 
 def test_xlsx_style_extraction_background_and_alignment(sample_xlsx_path: Path):
-    """Test background color and alignment extraction."""
+    """测试背景色和对齐方式提取。"""
     parser = XlsxParser()
     sheet = parser.parse(str(sample_xlsx_path))
 
     first_cell = sheet.rows[0].cells[0]
     style = first_cell.style
 
-    # Test background color
+    # 测试背景色
     assert isinstance(style.background_color, str)
     assert style.background_color.startswith('#')
 
-    # Test alignment properties
+    # 测试对齐属性
     assert style.text_align in ['left', 'center', 'right', 'justify', 'general']
     assert style.vertical_align in ['top', 'middle', 'bottom', 'center']
 
-    # Test wrap text
+    # 测试自动换行
     assert isinstance(style.wrap_text, bool)
 
 
 def test_xlsx_style_extraction_borders(sample_xlsx_path: Path):
-    """Test border style extraction."""
+    """测试边框样式提取。"""
     parser = XlsxParser()
     sheet = parser.parse(str(sample_xlsx_path))
 
     first_cell = sheet.rows[0].cells[0]
     style = first_cell.style
 
-    # Test border properties
+    # 测试边框属性
     assert isinstance(style.border_top, str)
     assert isinstance(style.border_bottom, str)
     assert isinstance(style.border_left, str)
@@ -180,28 +180,28 @@ def test_xlsx_style_extraction_borders(sample_xlsx_path: Path):
 
 
 def test_xlsx_style_extraction_number_format(sample_xlsx_path: Path):
-    """Test number format extraction."""
+    """测试数字格式提取。"""
     parser = XlsxParser()
     sheet = parser.parse(str(sample_xlsx_path))
 
     first_cell = sheet.rows[0].cells[0]
     style = first_cell.style
 
-    # Test number format
+    # 测试数字格式
     assert isinstance(style.number_format, str)
 
 
 def test_style_fidelity_coverage(sample_xlsx_path: Path):
-    """Test that style extraction covers all major style properties for 95% fidelity."""
+    """测试样式提取是否覆盖所有主要样式属性以实现 95% 还原度。"""
     parser = XlsxParser()
     sheet = parser.parse(str(sample_xlsx_path))
 
-    # Test multiple cells to ensure comprehensive coverage
+    # 测试多个单元格以确保全面覆盖
     for row_idx, row in enumerate(sheet.rows[:3]):  # Test first 3 rows
         for cell_idx, cell in enumerate(row.cells[:3]):  # Test first 3 columns
             style = cell.style
 
-            # Verify all style properties are present and have correct types
+            # 验证所有样式属性都存在且类型正确
             style_properties = [
                 ('bold', bool),
                 ('italic', bool),
@@ -226,17 +226,17 @@ def test_style_fidelity_coverage(sample_xlsx_path: Path):
                     assert isinstance(prop_value, prop_type), \
                         f"Property {prop_name} has wrong type: {type(prop_value)}"
 
-            # Test color format validity
+            # 测试颜色格式有效性
             assert style.font_color.startswith('#'), f"Invalid font color format: {style.font_color}"
             assert style.background_color.startswith('#'), f"Invalid background color format: {style.background_color}"
             assert style.border_color.startswith('#'), f"Invalid border color format: {style.border_color}"
 
 
 def test_indexed_color_mapping():
-    """Test indexed color mapping functionality."""
+    """测试索引色映射功能。"""
     parser = XlsxParser()
 
-    # Test indexed color conversion
+    # 测试索引色转换
     test_colors = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     for index in test_colors:
         color = parser._get_indexed_color(index)
@@ -246,15 +246,15 @@ def test_indexed_color_mapping():
 
 
 def test_border_style_mapping():
-    """Test border style mapping functionality."""
+    """测试边框样式映射功能。"""
     parser = XlsxParser()
 
-    # Create mock border side objects for testing
+    # 创建用于测试的 mock 边框对象
     class MockBorderSide:
         def __init__(self, style):
             self.style = style
 
-    # Test various border styles
+    # 测试多种边框样式
     border_styles = ['thin', 'medium', 'thick', 'double', 'dotted', 'dashed', 'hair']
     for style_name in border_styles:
         mock_border = MockBorderSide(style_name)
@@ -263,7 +263,7 @@ def test_border_style_mapping():
         assert len(css_style) > 0
         assert 'px' in css_style  # Should contain pixel values
 
-    # Test empty border
+    # 测试空边框
     empty_border = MockBorderSide(None)
     css_style = parser._get_border_style(empty_border)
     assert css_style == ""

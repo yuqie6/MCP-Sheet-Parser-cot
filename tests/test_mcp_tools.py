@@ -1,5 +1,5 @@
 """
-Test cases for MCP tools functionality.
+MCP 工具功能测试用例。
 """
 
 import pytest
@@ -23,14 +23,14 @@ from src.models.table_model import Sheet, Row, Cell, Style
 
 @pytest.fixture
 def mock_service():
-    """Create a mock SheetService for testing."""
+    """创建用于测试的 SheetService mock。"""
     service = MagicMock(spec=SheetService)
     return service
 
 
 @pytest.fixture
 def sample_sheet():
-    """Create a sample sheet for testing."""
+    """创建用于测试的示例 sheet。"""
     return Sheet(
         name="TestSheet",
         rows=[
@@ -48,7 +48,7 @@ def sample_sheet():
 
 @pytest.fixture
 def sample_json_data():
-    """Create sample JSON data for testing."""
+    """创建用于测试的示例 JSON 数据。"""
     return {
         "metadata": {
             "name": "TestSheet",
@@ -85,16 +85,16 @@ def sample_json_data():
 
 @pytest.mark.asyncio
 async def test_parse_sheet_to_json(mock_service):
-    """Test parse_sheet_to_json tool."""
-    # Test missing file_path
+    """测试 parse_sheet_to_json 工具。"""
+    # 测试缺少 file_path
     with pytest.raises(ValueError, match="file_path is required"):
         await _handle_parse_sheet_to_json({}, mock_service)
     
-    # Test non-existent file
+    # 测试不存在的文件
     with pytest.raises(FileNotFoundError):
         await _handle_parse_sheet_to_json({"file_path": "nonexistent.xlsx"}, mock_service)
     
-    # Test successful parsing
+    # 测试成功解析
     test_file = "tests/data/sample.xlsx"
     if Path(test_file).exists():
         result = await _handle_parse_sheet_to_json({"file_path": test_file}, mock_service)
@@ -105,15 +105,15 @@ async def test_parse_sheet_to_json(mock_service):
 
 @pytest.mark.asyncio
 async def test_convert_json_to_html(mock_service, sample_json_data):
-    """Test convert_json_to_html tool."""
-    # Test missing parameters
+    """测试 convert_json_to_html 工具。"""
+    # 测试缺少参数
     with pytest.raises(ValueError, match="json_data is required"):
         await _handle_convert_json_to_html({}, mock_service)
     
     with pytest.raises(ValueError, match="output_path is required"):
         await _handle_convert_json_to_html({"json_data": sample_json_data}, mock_service)
     
-    # Test successful conversion
+    # 测试成功转换
     with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp:
         output_path = tmp.name
     
@@ -128,7 +128,7 @@ async def test_convert_json_to_html(mock_service, sample_json_data):
         assert output_path in result[0].text
         assert Path(output_path).exists()
         
-        # Verify HTML content
+        # 验证 HTML 内容
         html_content = Path(output_path).read_text(encoding='utf-8')
         assert "TestSheet" in html_content
         assert "Header1" in html_content
@@ -139,16 +139,16 @@ async def test_convert_json_to_html(mock_service, sample_json_data):
 
 @pytest.mark.asyncio
 async def test_convert_file_to_html(mock_service):
-    """Test convert_file_to_html tool."""
-    # Test missing file_path
+    """测试 convert_file_to_html 工具。"""
+    # 测试缺少 file_path
     with pytest.raises(ValueError, match="file_path is required"):
         await _handle_convert_file_to_html({}, mock_service)
     
-    # Test non-existent file
+    # 测试不存在的文件
     with pytest.raises(FileNotFoundError):
         await _handle_convert_file_to_html({"file_path": "nonexistent.xlsx"}, mock_service)
     
-    # Test successful conversion
+    # 测试成功转换
     test_file = "tests/data/sample.xlsx"
     if Path(test_file).exists():
         result = await _handle_convert_file_to_html({"file_path": test_file}, mock_service)
@@ -158,15 +158,15 @@ async def test_convert_file_to_html(mock_service):
 
 @pytest.mark.asyncio
 async def test_convert_file_to_html_file(mock_service):
-    """Test convert_file_to_html_file tool."""
-    # Test missing parameters
+    """测试 convert_file_to_html_file 工具。"""
+    # 测试缺少参数
     with pytest.raises(ValueError, match="file_path is required"):
         await _handle_convert_file_to_html_file({}, mock_service)
     
     with pytest.raises(ValueError, match="output_path is required"):
         await _handle_convert_file_to_html_file({"file_path": "test.xlsx"}, mock_service)
     
-    # Test successful conversion
+    # 测试成功转换
     test_file = "tests/data/sample.xlsx"
     if Path(test_file).exists():
         with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp:
@@ -187,16 +187,16 @@ async def test_convert_file_to_html_file(mock_service):
 
 @pytest.mark.asyncio
 async def test_get_table_summary(mock_service):
-    """Test get_table_summary tool."""
-    # Test missing file_path
+    """测试 get_table_summary 工具。"""
+    # 测试缺少 file_path
     with pytest.raises(ValueError, match="file_path is required"):
         await _handle_get_table_summary({}, mock_service)
     
-    # Test non-existent file
+    # 测试不存在的文件
     with pytest.raises(FileNotFoundError):
         await _handle_get_table_summary({"file_path": "nonexistent.xlsx"}, mock_service)
     
-    # Test successful summary
+    # 测试成功摘要
     test_file = "tests/data/sample.xlsx"
     if Path(test_file).exists():
         result = await _handle_get_table_summary({"file_path": test_file}, mock_service)
@@ -209,16 +209,16 @@ async def test_get_table_summary(mock_service):
 
 @pytest.mark.asyncio
 async def test_get_sheet_metadata(mock_service):
-    """Test get_sheet_metadata tool."""
-    # Test missing file_path
+    """测试 get_sheet_metadata 工具。"""
+    # 测试缺少 file_path
     with pytest.raises(ValueError, match="file_path is required"):
         await _handle_get_sheet_metadata({}, mock_service)
     
-    # Test non-existent file
+    # 测试不存在的文件
     with pytest.raises(FileNotFoundError):
         await _handle_get_sheet_metadata({"file_path": "nonexistent.xlsx"}, mock_service)
     
-    # Test successful metadata
+    # 测试成功获取元数据
     test_file = "tests/data/sample.xlsx"
     if Path(test_file).exists():
         result = await _handle_get_sheet_metadata({"file_path": test_file}, mock_service)
@@ -231,21 +231,21 @@ async def test_get_sheet_metadata(mock_service):
 
 
 def test_json_to_sheet_conversion(sample_json_data):
-    """Test JSON to Sheet conversion."""
+    """测试 JSON 到 Sheet 的转换。"""
     sheet = _json_to_sheet(sample_json_data)
     
-    # Test basic properties
+    # 测试基本属性
     assert sheet.name == "TestSheet"
     assert len(sheet.rows) == 2
     assert len(sheet.rows[0].cells) == 2
     
-    # Test cell values
+    # 测试单元格值
     assert sheet.rows[0].cells[0].value == "Header1"
     assert sheet.rows[0].cells[1].value == "Header2"
     assert sheet.rows[1].cells[0].value == "Data1"
     assert sheet.rows[1].cells[1].value == "Data2"
     
-    # Test styles
+    # 测试样式
     assert sheet.rows[0].cells[0].style is not None
     assert sheet.rows[0].cells[0].style.bold == True
     assert sheet.rows[0].cells[0].style.font_color == "#FF0000"
@@ -253,7 +253,7 @@ def test_json_to_sheet_conversion(sample_json_data):
 
 
 def test_json_to_sheet_empty_data():
-    """Test JSON to Sheet conversion with empty data."""
+    """测试空数据的 JSON 到 Sheet 转换。"""
     empty_json = {
         "metadata": {"name": "Empty", "rows": 0, "cols": 0},
         "data": [],
