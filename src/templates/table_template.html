@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>{{ sheet.name }}</title>
+<style>
+  table, th, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+  }
+  th, td {
+    padding: 5px;
+    text-align: left;
+  }
+</style>
+</head>
+<body>
+
+<h2>{{ sheet.name }}</h2>
+
+<table>
+  {% for row in sheet.rows %}
+  <tr>
+    {% for cell in row.cells %}
+    <td style="color:{{ cell.style.font_color if cell.style else '#000000' }}; background-color:{{ cell.style.background_color if cell.style else '#FFFFFF' }}; font-weight:{{ 'bold' if cell.style and cell.style.bold else 'normal' }}; font-style:{{ 'italic' if cell.style and cell.style.italic else 'normal' }};" colspan="{{ cell.col_span }}" rowspan="{{ cell.row_span }}">{{ cell.value }}</td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+
+</body>
+</html>
