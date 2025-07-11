@@ -1,9 +1,9 @@
 [project]
 name = "mcp-sheet-parser"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.13"
+description = "An MCP server to parse spreadsheet files into styled HTML."
 dependencies = [
-    "map[cli]>=1.3.0",
+    "mcp[cli]",
+    "openpyxl",
+    "Jinja2",
 ]
