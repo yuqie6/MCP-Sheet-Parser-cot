@@ -87,7 +87,7 @@ def sample_json_data():
 async def test_parse_sheet_to_json(mock_service):
     """测试 parse_sheet_to_json 工具。"""
     # 测试缺少 file_path
-    with pytest.raises(ValueError, match="file_path is required"):
+    with pytest.raises(ValueError, match="必须提供 file_path"):
         await _handle_parse_sheet_to_json({}, mock_service)
     
     # 测试不存在的文件
@@ -99,7 +99,7 @@ async def test_parse_sheet_to_json(mock_service):
     if Path(test_file).exists():
         result = await _handle_parse_sheet_to_json({"file_path": test_file}, mock_service)
         assert len(result) == 1
-        assert "JSON conversion completed successfully" in result[0].text
+        assert "JSON 转换成功" in result[0].text
         assert "JSON Data:" in result[0].text
 
 
@@ -107,10 +107,10 @@ async def test_parse_sheet_to_json(mock_service):
 async def test_convert_json_to_html(mock_service, sample_json_data):
     """测试 convert_json_to_html 工具。"""
     # 测试缺少参数
-    with pytest.raises(ValueError, match="json_data is required"):
+    with pytest.raises(ValueError, match="必须提供 json_data"):
         await _handle_convert_json_to_html({}, mock_service)
-    
-    with pytest.raises(ValueError, match="output_path is required"):
+
+    with pytest.raises(ValueError, match="必须提供 output_path"):
         await _handle_convert_json_to_html({"json_data": sample_json_data}, mock_service)
     
     # 测试成功转换
@@ -124,7 +124,7 @@ async def test_convert_json_to_html(mock_service, sample_json_data):
         }, mock_service)
         
         assert len(result) == 1
-        assert "HTML file generated successfully" in result[0].text
+        assert "HTML 文件生成成功" in result[0].text
         assert output_path in result[0].text
         assert Path(output_path).exists()
         
@@ -141,7 +141,7 @@ async def test_convert_json_to_html(mock_service, sample_json_data):
 async def test_convert_file_to_html(mock_service):
     """测试 convert_file_to_html 工具。"""
     # 测试缺少 file_path
-    with pytest.raises(ValueError, match="file_path is required"):
+    with pytest.raises(ValueError, match="必须提供 file_path"):
         await _handle_convert_file_to_html({}, mock_service)
     
     # 测试不存在的文件
@@ -153,17 +153,17 @@ async def test_convert_file_to_html(mock_service):
     if Path(test_file).exists():
         result = await _handle_convert_file_to_html({"file_path": test_file}, mock_service)
         assert len(result) == 1
-        assert "HTML conversion completed" in result[0].text
+        assert "HTML 转换完成" in result[0].text
 
 
 @pytest.mark.asyncio
 async def test_convert_file_to_html_file(mock_service):
     """测试 convert_file_to_html_file 工具。"""
     # 测试缺少参数
-    with pytest.raises(ValueError, match="file_path is required"):
+    with pytest.raises(ValueError, match="必须提供 file_path"):
         await _handle_convert_file_to_html_file({}, mock_service)
-    
-    with pytest.raises(ValueError, match="output_path is required"):
+
+    with pytest.raises(ValueError, match="必须提供 output_path"):
         await _handle_convert_file_to_html_file({"file_path": "test.xlsx"}, mock_service)
     
     # 测试成功转换
@@ -179,7 +179,7 @@ async def test_convert_file_to_html_file(mock_service):
             }, mock_service)
             
             assert len(result) == 1
-            assert "HTML file conversion completed successfully" in result[0].text
+            assert "HTML 文件转换成功" in result[0].text
             assert Path(output_path).exists()
         finally:
             Path(output_path).unlink(missing_ok=True)
@@ -189,7 +189,7 @@ async def test_convert_file_to_html_file(mock_service):
 async def test_get_table_summary(mock_service):
     """测试 get_table_summary 工具。"""
     # 测试缺少 file_path
-    with pytest.raises(ValueError, match="file_path is required"):
+    with pytest.raises(ValueError, match="必须提供 file_path"):
         await _handle_get_table_summary({}, mock_service)
     
     # 测试不存在的文件
@@ -201,7 +201,7 @@ async def test_get_table_summary(mock_service):
     if Path(test_file).exists():
         result = await _handle_get_table_summary({"file_path": test_file}, mock_service)
         assert len(result) == 1
-        assert "Table Summary for:" in result[0].text
+        assert "表格摘要:" in result[0].text
         assert "Basic Statistics:" in result[0].text
         assert "Sample Data" in result[0].text
         assert "Processing Recommendation:" in result[0].text
@@ -211,7 +211,7 @@ async def test_get_table_summary(mock_service):
 async def test_get_sheet_metadata(mock_service):
     """测试 get_sheet_metadata 工具。"""
     # 测试缺少 file_path
-    with pytest.raises(ValueError, match="file_path is required"):
+    with pytest.raises(ValueError, match="必须提供 file_path"):
         await _handle_get_sheet_metadata({}, mock_service)
     
     # 测试不存在的文件
@@ -223,7 +223,7 @@ async def test_get_sheet_metadata(mock_service):
     if Path(test_file).exists():
         result = await _handle_get_sheet_metadata({"file_path": test_file}, mock_service)
         assert len(result) == 1
-        assert "Sheet Metadata for:" in result[0].text
+        assert "表格元数据:" in result[0].text
         assert "File Information:" in result[0].text
         assert "Structure:" in result[0].text
         assert "Styling:" in result[0].text

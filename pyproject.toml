@@ -11,6 +11,7 @@ dependencies = [
     "xlwt", # Additional support for .xls files
     "pytest",
     "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.2.1",
 ]
 
 [tool.pytest.ini_options]

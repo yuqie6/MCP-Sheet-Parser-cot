@@ -304,3 +304,40 @@ Style (独立的样式对象)
 **Risks and Mitigation:**
 - Risk 1: 重构可能导致开发时间延长 → Mitigation: 使用任务管理工具精确规划，分阶段交付
 - Risk 2: 样式保真度95%目标可能难以达到 → Mitigation: 重点投入样式映射算法研发，建立样式测试基准
+
+---
+
+### Architecture Decision
+[2025-07-12 04:15:30] - 完成进阶功能和性能优化架构设计：实现超链接和注释支持、性能优化器、智能处理建议系统、分页处理机制
+
+**Decision Background:**
+随着项目核心功能的完成，我们需要实现进阶功能以满足甲方对"最大限度还原视觉效果"和"观感专业"的要求。同时，为了处理大文件和提供智能建议，需要建立完整的性能优化体系。这个决策旨在将项目从基础功能提升到专业级解决方案。
+
+**Considered Options:**
+- Option A: 仅实现基础的超链接和注释支持
+  - 优点: 实现简单，风险低
+  - 缺点: 无法满足甲方对专业观感的要求，缺乏智能处理能力
+- Option B: 实现完整的进阶功能体系，包括性能优化和智能建议
+  - 优点: 提供专业级解决方案，智能处理大文件，用户体验优秀
+  - 缺点: 实现复杂度较高，需要更多测试
+- Final Choice: Option B - 完整的进阶功能体系
+
+**Implementation Details:**
+- Affected Modules:
+  - `models/table_model.py` - 扩展Style模型支持hyperlink和comment
+  - `utils/performance.py` - 新增性能优化器模块
+  - `parsers/xlsx_parser.py`, `parsers/xls_parser.py` - 增强解析器支持进阶功能
+  - `templates/optimized_table_template.html` - 升级HTML模板支持超链接和注释
+  - `mcp_server/tools.py` - 新增convert_file_to_html_paginated工具，集成性能分析
+- Migration Strategy:
+  - 向后兼容：新功能不影响现有功能
+  - 渐进增强：现有工具集成性能建议，新增专门的分页工具
+  - 测试驱动：每个新功能都有对应的测试用例
+- Risk Assessment:
+  - 复杂度增加可能影响稳定性 → 通过完整测试覆盖缓解
+  - 性能估算可能不准确 → 通过实际数据验证和调优缓解
+
+**Impact Assessment:**
+- Performance Impact: 智能处理策略显著提升大文件处理能力；分页机制解决超大文件问题；性能监控提供实时反馈
+- Maintainability Impact: 模块化设计保持代码清晰；性能优化器独立模块便于维护；进阶功能可选不影响核心功能
+- Scalability Impact: 性能优化器支持新的处理策略；分页机制支持任意大小文件；进阶功能架构支持未来扩展

@@ -25,15 +25,21 @@ g:/MCP-Sheet-Parser/
 │   │   ├── base_parser.py      # 抽象基类
 │   │   ├── xlsx_parser.py      # .xlsx解析器
 │   │   ├── csv_parser.py       # .csv解析器
-│   │   └── parser_factory.py   # 解析器工厂
+│   │   ├── xls_parser.py       # .xls解析器
+│   │   ├── xlsb_parser.py      # .xlsb解析器
+│   │   └── factory.py          # 解析器工厂
 │   ├── converters/             # 转换器 (实现层)
 │   │   ├── __init__.py
-│   │   └── html_converter.py   # HTML转换器
+│   │   ├── html_converter.py   # HTML转换器
+│   │   └── json_converter.py   # JSON转换器
 │   ├── models/                 # 数据模型 (实现层)
 │   │   ├── __init__.py
 │   │   └── table_model.py      # Sheet/Row/Cell/Style 定义
+│   ├── utils/                  # 工具模块 (实现层)
+│   │   ├── __init__.py
+│   │   └── performance.py      # 性能优化器
 │   ├── templates/              # HTML模板
-│   │   └── table_template.html
+│   │   └── optimized_table_template.html
 │   └── exceptions/             # 自定义异常
 │       ├── __init__.py
 │       └── custom_exceptions.py
@@ -50,10 +56,35 @@ from typing import Any, List, Optional
 
 @dataclass
 class Style:
+    # 字体属性
     bold: bool = False
     italic: bool = False
+    underline: bool = False
     font_color: str = "#000000"
+    font_size: float | None = None
+    font_name: str | None = None
+
+    # 背景和填充
     background_color: str = "#FFFFFF"
+
+    # 文本对齐
+    text_align: str = "left"  # left, center, right, justify
+    vertical_align: str = "top"  # top, middle, bottom
+
+    # 边框属性
+    border_top: str = ""
+    border_bottom: str = ""
+    border_left: str = ""
+    border_right: str = ""
+    border_color: str = "#000000"
+
+    # 文本换行和格式化
+    wrap_text: bool = False
+    number_format: str = ""
+
+    # 进阶功能
+    hyperlink: str | None = None  # 超链接URL
+    comment: str | None = None    # 单元格注释
 
 @dataclass
 class Cell:
@@ -161,8 +192,9 @@ class SheetService:
 
 **专业工具（高级需求）：**
 - `convert_file_to_html_file` - 文件输出模式
-- `get_table_summary` - 预览分析
+- `get_table_summary` - 预览分析（含性能建议）
 - `get_sheet_metadata` - 元数据获取
+- `convert_file_to_html_paginated` - 大文件分页处理
 
 ### 4.2 工作流程模式
 **完美复刻流程：**
@@ -177,7 +209,12 @@ class SheetService:
 
 **预览分析流程：**
 ```
-文件 → get_table_summary → 摘要信息
+文件 → get_table_summary → 摘要信息（含性能建议）
+```
+
+**大文件处理流程：**
+```
+文件 → convert_file_to_html_paginated → 分页HTML文件集合
 ```
 
 ### 4.3 JSON数据格式模式
@@ -196,6 +233,47 @@ class SheetService:
 }
 ```
 
-## 5. 错误处理
+## 5. 性能优化模式
+
+### 5.1 智能处理策略
+```python
+class PerformanceOptimizer:
+    SMALL_FILE_THRESHOLD = 1000      # 小文件：< 1000个单元格
+    MEDIUM_FILE_THRESHOLD = 10000    # 中文件：< 10000个单元格
+    LARGE_FILE_THRESHOLD = 50000     # 大文件：< 50000个单元格
+
+    def get_processing_recommendation(self, total_cells: int) -> str:
+        if total_cells < self.SMALL_FILE_THRESHOLD:
+            return "small_file_direct"
+        elif total_cells < self.MEDIUM_FILE_THRESHOLD:
+            return "medium_file_direct"
+        elif total_cells < self.LARGE_FILE_THRESHOLD:
+            return "large_file_recommend_file_output"
+        else:
+            return "very_large_file_require_pagination"
+```
+
+### 5.2 分页处理模式
+```python
+def calculate_pagination_params(self, sheet: Sheet, max_rows_per_page: int = 1000):
+    total_rows = len(sheet.rows)
+    total_pages = (total_rows + max_rows_per_page - 1) // max_rows_per_page
+
+    return {
+        "total_rows": total_rows,
+        "total_pages": total_pages,
+        "pages": [
+            {
+                "page_number": i + 1,
+                "start_row": i * max_rows_per_page,
+                "end_row": min((i + 1) * max_rows_per_page, total_rows),
+                "row_count": min(max_rows_per_page, total_rows - i * max_rows_per_page)
+            }
+            for i in range(total_pages)
+        ]
+    }
+```
+
+## 6. 错误处理
 - 自定义异常（如 `UnsupportedFormatError`, `ParsingError`）在 `exceptions/custom_exceptions.py` 中定义。
 - `SheetService` 捕获并向上抛出这些异常，由 `mcp_server` 统一处理并返回给用户。
