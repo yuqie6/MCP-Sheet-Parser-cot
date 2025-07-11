@@ -5,11 +5,11 @@ description = "An MCP server to parse spreadsheet files into styled HTML."
 dependencies = [
     "mcp[cli]",
     "openpyxl",
-    "Jinja2",
-    "xlrd",        # For .xls files
-    "pyxlsb",      # For .xlsb files
-    "xlwt",        # Additional support for .xls files
-    "pytest"
+    "jinja2",
+    "xlrd", # For .xls files
+    "pyxlsb", # For .xlsb files
+    "xlwt", # Additional support for .xls files
+    "pytest",
 ]
 
 [tool.pytest.ini_options]
