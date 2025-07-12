@@ -1,202 +1,275 @@
 # MCP Sheet Parser
 
-一个专业的表格文件解析器，支持5种主要格式，提供高质量的样式提取和HTML转换功能。
+一个专门为 AI 助手设计的 Model Context Protocol (MCP) 服务器，让 AI 能够直接处理表格文件。
 
-## 🚀 核心特性
+## 什么是 MCP Sheet Parser
 
-### 📊 多格式支持
-- **XLSX** - Excel 2007+格式，完整样式提取（100%保真度）
-- **XLSM** - Excel宏文件格式，继承XLSX能力（100%保真度）
-- **CSV** - 通用逗号分隔值格式（100%保真度）
-- **XLS** - Excel 97-2003格式，基础样式支持（94%保真度）
-- **XLSB** - Excel二进制格式，专注数据准确性（94.2%保真度）
+这是一个 **MCP 服务器**，为 Claude、GPT 等 AI 助手提供表格文件处理能力。通过 MCP 协议，AI 可以：
 
-### 🎨 样式提取能力
-- **15个样式属性** - 字体、颜色、背景、边框、对齐、格式等
-- **智能颜色处理** - RGB、ARGB、索引、主题颜色支持
-- **增强填充提取** - 实色、图案、渐变填充支持
-- **数字格式映射** - 常见格式的中文描述转换
-- **超链接处理** - 外部链接和内部引用识别
+- 直接读取和解析各种表格文件
+- 将表格转换为 HTML 进行展示
+- 修改表格数据并保存回原文件
 
-### 🔧 解析器架构
-- **统一接口** - BaseParser抽象基类，确保一致性
-- **工厂模式** - ParserFactory统一管理5种解析器
-- **样式验证** - StyleValidator量化评估保真度
-- **错误处理** - 完善的异常处理和日志记录
+**关键特点：** AI 助手可以像使用内置功能一样使用这些表格处理工具。
 
-## 📦 安装和使用
+## MCP 工具
+
+本服务器为 AI 助手提供三个专用工具：
+
+### 1. convert_to_html
+**功能：** 将表格文件转换为 HTML 格式，便于 AI 向用户展示表格内容
+**使用场景：** 当用户要求查看表格文件时，AI 可以转换为 HTML 并展示
+
+### 2. parse_sheet
+**功能：** 将表格文件解析为结构化 JSON 数据，便于 AI 分析和处理
+**使用场景：** 当 AI 需要分析表格数据、进行计算或提取信息时
+
+### 3. apply_changes
+**功能：** 将 AI 处理后的数据写回原表格文件
+**使用场景：** 当用户要求修改表格数据时，AI 可以直接更新文件
+
+### 文件格式支持
+
+| 格式 | 读取 | HTML转换 | JSON解析 | 数据写回 | 备注 |
+|------|------|----------|----------|----------|------|
+| CSV | ✅ | ✅ | ✅ | ✅ | 完全支持 |
+| XLSX | ✅ | ✅ | ✅ | ✅ | 基本样式支持 |
+| XLSM | ✅ | ✅ | ✅ | ✅ | 基本样式支持 |
+| XLS | ✅ | ✅ | ✅ | ❌ | 只读支持 |
+| XLSB | ✅ | ✅ | ✅ | ❌ | 只读支持 |
+
+## 安装和配置
 
 ### 环境要求
-- Python 3.13+
-- uv 包管理器
+- Python 3.8+
+- 建议使用 `uv` 包管理器
 
-### 安装依赖
+### 安装步骤
 ```bash
+# 克隆项目
+git clone <repository-url>
+cd MCP-Sheet-Parser
+
+# 安装依赖
 uv install
+
+# 验证安装
+uv run python -m pytest tests/test_end_to_end.py -v
 ```
+
+### 配置 AI 助手
+
+#### 对于 Claude Desktop
+在 Claude Desktop 的配置文件中添加：
+```json
+{
+  "mcpServers": {
+    "sheet-parser": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "src.mcp_server.server"],
+      "cwd": "/path/to/MCP-Sheet-Parser"
+    }
+  }
+}
+```
+
+#### 手动启动服务器
+```bash
+uv run python -m src.mcp_server.server
+```
+
+## AI 助手使用示例
+
+### 典型对话场景
+
+**用户：** "请帮我查看这个 sales_data.xlsx 文件的内容"
+
+**AI 助手会：**
+1. 使用 `convert_to_html` 工具将文件转换为 HTML
+2. 向用户展示表格内容
+
+**用户：** "请将第二行的销售额改为 5000"
+
+**AI 助手会：**
+1. 使用 `parse_sheet` 工具读取当前数据
+2. 修改指定的数据
+3. 使用 `apply_changes` 工具保存修改
+
+### MCP 工具调用示例
+
+#### convert_to_html 工具
+```json
+{
+  "file_path": "data.xlsx",
+  "output_path": "output.html"
+}
+```
+
+返回：
+```json
+{
+  "status": "success",
+  "output_path": "output.html",
+  "file_size": 1234,
+  "rows_converted": 10,
+  "cells_converted": 40
+}
+```
+
+#### 2. parse_sheet
+解析表格文件为JSON格式。
+
+**输入参数：**
+```json
+{
+  "file_path": "data.csv",
+  "range_string": "A1:D10"  // 可选
+}
+```
+
+**输出示例：**
+```json
+{
+  "sheet_name": "Sheet1",
+  "headers": ["Name", "Age"],
+  "rows": [
+    [{"value": "Alice"}, {"value": "25"}],
+    [{"value": "Bob"}, {"value": "30"}]
+  ],
+  "metadata": {
+    "total_rows": 3,
+    "total_cols": 2
+  }
+}
+```
+
+#### 3. apply_changes
+将修改写回原文件。
+
+**输入参数：**
+```json
+{
+  "file_path": "data.csv",
+  "table_model_json": {
+    "sheet_name": "Sheet1",
+    "headers": ["Name", "Age"],
+    "rows": [
+      [{"value": "Alice"}, {"value": "26"}]
+    ]
+  },
+  "create_backup": true
+}
+```
+
+**输出示例：**
+```json
+{
+  "status": "success",
+  "message": "数据修改已成功应用",
+  "changes_applied": 1,
+  "backup_created": true,
+  "backup_path": "data.csv.backup"
+}
+```
+
+## 限制和注意事项
+
+### 文件大小
+- 大文件（>1000行）处理可能较慢
+- 建议分批处理超大文件
+
+### 样式支持
+- Excel样式支持有限，主要保留基本格式
+- 复杂样式可能丢失
+- 宏和公式不会保留
+
+### 数据类型
+- JSON中所有数据以字符串存储
+- 写回时尝试自动类型转换
+- 特殊格式（如日期）可能需要手动处理
+
+### 错误处理
+- 文件损坏或格式错误会返回错误信息
+- 建议在生产环境中添加额外的验证
+
+## 测试
 
 ### 运行测试
 ```bash
-# 运行所有测试
-uv run python -m pytest
+# 完整测试套件
+uv run python -m pytest tests/ -v
 
-# 运行解析器测试
-uv run python -m pytest tests/test_parsers.py -v
+# 端到端测试
+uv run python -m pytest tests/test_end_to_end.py -v
 
-# 运行样式保真度测试
-uv run python -m pytest tests/test_style_fidelity.py -v
+# 数据写回测试
+uv run python -m pytest tests/test_data_writeback.py -v
 
-# 运行保真度验证脚本
-uv run python scripts/validate_fidelity.py
+# 查看测试覆盖率
+uv run python -m pytest tests/ --cov=src --cov-report=term-missing
 ```
 
-### 基本使用
-```python
-from src.parsers.factory import ParserFactory
+### 测试状态
+- 总测试数：131个
+- 通过率：约95%
+- 代码覆盖率：约57%
 
-# 获取解析器
-parser = ParserFactory.get_parser("sample.xlsx")
-
-# 解析文件
-sheet = parser.parse("sample.xlsx")
-
-# 访问数据
-for row in sheet.rows:
-    for cell in row.cells:
-        print(f"值: {cell.value}, 样式: {cell.style}")
-```
-
-## 🔧 解析器详细信息
-
-### XlsxParser (Excel 2007+)
-- **库依赖**: openpyxl
-- **样式支持**: 完整（字体、颜色、填充、边框、对齐、数字格式、超链接）
-- **保真度**: 100%
-- **特色功能**: 增强颜色提取、填充处理、超链接识别
-
-### XlsmParser (Excel宏文件)
-- **库依赖**: openpyxl (keep_vba=True)
-- **样式支持**: 继承XlsxParser全部能力
-- **保真度**: 100%
-- **特色功能**: 宏信息保留、VBA项目检测
-
-### XlsParser (Excel 97-2003)
-- **库依赖**: xlrd
-- **样式支持**: 基础样式提取
-- **保真度**: 94%
-- **特色功能**: 动态颜色获取、合并单元格处理
-
-### XlsbParser (Excel二进制)
-- **库依赖**: pyxlsb
-- **样式支持**: 基础样式（专注数据准确性）
-- **保真度**: 94.2%
-- **特色功能**: 高性能数据提取、智能日期识别
-
-### CsvParser (逗号分隔值)
-- **库依赖**: Python内置csv
-- **样式支持**: 基础格式
-- **保真度**: 100%
-- **特色功能**: 快速解析、编码自动检测
-
-## 📊 样式保真度验证结果
-
-### 保真度测试结果
-- **XlsxParser**: 100%保真度 ✅
-- **XlsmParser**: 100%保真度 ✅
-- **CsvParser**: 100%保真度 ✅
-- **XlsParser**: 94.0%保真度 ⚠️
-- **XlsbParser**: 94.2%保真度 ⚠️
-- **平均保真度**: 97.64%
-
-### 样式属性权重分配
-- **字体属性** (40%): 字体名称、大小、颜色、粗体、斜体、下划线
-- **背景填充** (25%): 背景颜色、图案填充
-- **对齐方式** (15%): 水平对齐、垂直对齐
-- **边框样式** (15%): 四边边框样式和颜色
-- **其他属性** (5%): 文本换行、数字格式
-
-## 🏗️ 架构设计
-
-### 核心组件
-```
-ParserFactory (工厂模式)
-    ├── XlsxParser (openpyxl)
-    ├── XlsmParser (openpyxl + VBA)
-    ├── XlsParser (xlrd)
-    ├── XlsbParser (pyxlsb)
-    └── CsvParser (内置csv)
-
-StyleValidator (保真度验证)
-    ├── 样式对比算法
-    ├── 权重评分系统
-    └── 质量报告生成
-
-TableModel (数据模型)
-    ├── Sheet (工作表)
-    ├── Row (行)
-    ├── Cell (单元格)
-    └── Style (样式)
-```
-
-### 设计原则
-- **统一接口** - 所有解析器继承BaseParser
-- **工厂模式** - 根据文件扩展名自动选择解析器
-- **样式优先** - 专注于样式保真度而非性能优化
-- **质量保证** - 完整的测试覆盖和验证机制
-
-## 🧪 测试覆盖
-
-### 测试统计
-- **解析器测试**: 27个测试用例（新解析器功能验证）
-- **样式保真度测试**: 13个测试用例（保真度验证系统）
-- **现有测试**: 保留原有测试用例
-- **总通过率**: 100%
-
-### 测试分类
-- **XlsParser测试** (3个): 创建、颜色映射、单元格引用转换
-- **XlsbParser测试** (3个): 创建、值处理、样式提取
-- **XlsmParser测试** (4个): 创建、继承、宏信息、文件类型检查
-- **ParserFactory测试** (7个): 格式支持、解析器获取、信息查询
-- **样式保真度测试** (4个): 颜色、填充、格式、超链接
-- **错误处理测试** (4个): 无效路径、扩展名、异常处理
-- **性能基准测试** (2个): 创建性能、工厂性能
-
-## 📈 项目成果
-
-### 实现的功能
-- **5种格式支持** - CSV、XLSX、XLS、XLSB、XLSM完整实现
-- **样式保真度验证** - 量化评估系统，平均97.64%保真度
-- **统一解析接口** - BaseParser抽象基类，工厂模式管理
-- **完整测试覆盖** - 40个测试用例，100%通过率
-
-### 技术亮点
-- **智能颜色处理** - 支持RGB、ARGB、索引、主题颜色
-- **增强填充提取** - 实色、图案、渐变填充支持
-- **宏文件处理** - XLSM格式的VBA项目保留
-- **容差匹配** - 字体大小容差、颜色相似度算法
-
-### 质量指标
-- **代码质量** - 平均90+分（任务验证评分）
-- **接口一致性** - 所有解析器完全兼容BaseParser
-- **错误处理** - 完善的异常处理和日志记录
-- **文档完整性** - 详细的代码注释和使用说明
-
-## 📁 项目结构
+## 项目结构
 
 ```
 src/
-├── models/
-│   └── table_model.py          # 数据模型定义
-├── parsers/
-│   ├── base_parser.py          # 抽象基类
-│   ├── factory.py              # 解析器工厂
-│   ├── csv_parser.py           # CSV解析器
-│   ├── xlsx_parser.py          # XLSX解析器（增强版）
-│   ├── xls_parser.py           # XLS解析器
-│   ├── xlsb_parser.py          # XLSB解析器
-│   └── xlsm_parser.py          # XLSM解析器
-tests/
-└── test_parsers.py             # 解析器测试
+├── core_service.py          # 核心业务逻辑
+├── models/                  # 数据模型定义
+│   └── table_model.py
+├── parsers/                 # 文件解析器
+│   ├── base_parser.py
+│   ├── csv_parser.py
+│   ├── xlsx_parser.py
+│   └── ...
+├── converters/              # 格式转换器
+│   └── html_converter.py
+└── mcp_server/             # MCP服务器
+    ├── server.py
+    └── tools.py
+
+tests/                      # 测试文件
+├── test_end_to_end.py      # 端到端测试
+├── test_data_writeback.py  # 数据写回测试
+└── ...
 ```
 
+## 开发状态
 
+### 已完成功能
+- ✅ 基本文件解析（CSV, XLSX, XLSM, XLS, XLSB）
+- ✅ HTML转换
+- ✅ JSON格式输出
+- ✅ CSV和XLSX数据写回
+- ✅ 自动备份机制
+- ✅ 基本错误处理
+
+### 待改进功能
+- ⚠️ XLS/XLSB格式写回支持
+- ⚠️ 复杂Excel样式处理
+- ⚠️ 大文件性能优化
+- ⚠️ 更完善的错误处理
+
+### 已知问题
+- 某些Excel样式可能无法完全保留
+- 大文件处理性能有待优化
+- 部分边界情况的错误处理需要完善
+
+## 贡献指南
+
+1. 提交Issue前请先检查现有Issue
+2. 新功能请包含相应测试
+3. 确保测试通过后再提交PR
+4. 遵循现有代码风格
+
+## 许可证
+
+[待定]
+
+---
+
+**注意：** 本项目仍在开发中，建议在生产环境使用前进行充分测试。

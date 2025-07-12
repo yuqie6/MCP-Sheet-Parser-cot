@@ -1,7 +1,7 @@
 """
 XLSX解析器模块
 
-解析Excel XLSX文件并转换为Sheet对象，支持95%样式保真度。
+解析Excel XLSX文件并转换为Sheet对象
 包含完整的样式提取、颜色处理、边框识别等功能。
 """
 
@@ -11,7 +11,7 @@ from src.parsers.base_parser import BaseParser
 
 
 class XlsxParser(BaseParser):
-    """XLSX文件解析器，支持完整的样式提取和95%保真度。"""
+    """XLSX文件解析器，支持完整的样式提取"""
 
     def parse(self, file_path: str) -> Sheet:
         """
@@ -60,7 +60,6 @@ class XlsxParser(BaseParser):
     def _extract_style(self, cell) -> Style:
         """
         从openpyxl单元格中提取全面的样式信息。
-        通过捕获所有主要样式属性实现95%样式保真度。
 
         Args:
             cell: openpyxl单元格对象

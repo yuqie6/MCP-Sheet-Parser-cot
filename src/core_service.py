@@ -168,24 +168,153 @@ class CoreService:
             for field in required_fields:
                 if field not in table_model_json:
                     raise ValueError(f"缺少必需字段: {field}")
-            
-            # 注意：写回功能是复杂的操作，需要谨慎实现
-            # 目前提供基础的验证和反馈
+
+            # 实现真正的数据写回功能
+            file_format = path.suffix.lower()
+            changes_applied = 0
+
+            if file_format == '.csv':
+                changes_applied = self._write_back_csv(path, table_model_json)
+            elif file_format in ['.xlsx', '.xlsm']:
+                changes_applied = self._write_back_xlsx(path, table_model_json)
+            elif file_format == '.xls':
+                # XLS格式比较复杂，暂时不支持写回
+                raise ValueError("XLS格式暂不支持数据写回，请转换为XLSX格式")
+            elif file_format == '.xlsb':
+                # XLSB格式比较复杂，暂时不支持写回
+                raise ValueError("XLSB格式暂不支持数据写回，请转换为XLSX格式")
+            else:
+                raise ValueError(f"不支持的文件格式: {file_format}")
 
             return {
-                "status": "数据验证成功，写回功能开发中",
+                "status": "success",
+                "message": "数据修改已成功应用",
                 "file_path": str(path.absolute()),
                 "backup_path": str(backup_path) if backup_path else None,
                 "backup_created": create_backup,
+                "changes_applied": changes_applied,
                 "sheet_name": table_model_json.get("sheet_name"),
                 "headers_count": len(table_model_json.get("headers", [])),
-                "rows_count": len(table_model_json.get("rows", [])),
-                "note": "写回功能需要复杂的格式转换和样式保持逻辑，建议使用专门的编辑工具"
+                "rows_count": len(table_model_json.get("rows", []))
             }
             
         except Exception as e:
             logger.error(f"应用修改失败: {e}")
             raise
+
+    def _write_back_csv(self, file_path: Path, table_model_json: Dict[str, Any]) -> int:
+        """
+        将修改写回CSV文件。
+
+        Args:
+            file_path: CSV文件路径
+            table_model_json: 包含修改的JSON数据
+
+        Returns:
+            应用的修改数量
+        """
+        import csv
+
+        headers = table_model_json["headers"]
+        rows = table_model_json["rows"]
+
+        # 准备写入的数据
+        csv_rows = []
+
+        # 添加表头
+        csv_rows.append(headers)
+
+        # 添加数据行
+        for row in rows:
+            csv_row = []
+            for cell in row:
+                # 提取单元格值
+                if isinstance(cell, dict) and 'value' in cell:
+                    value = cell['value']
+                else:
+                    value = str(cell) if cell is not None else ""
+                csv_row.append(str(value) if value is not None else "")
+            csv_rows.append(csv_row)
+
+        # 写入CSV文件
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows(csv_rows)
+
+        logger.info(f"CSV文件已更新: {file_path}")
+        return len(rows)  # 返回修改的行数
+
+    def _write_back_xlsx(self, file_path: Path, table_model_json: Dict[str, Any]) -> int:
+        """
+        将修改写回XLSX文件。
+
+        Args:
+            file_path: XLSX文件路径
+            table_model_json: 包含修改的JSON数据
+
+        Returns:
+            应用的修改数量
+        """
+        import openpyxl
+
+        headers = table_model_json["headers"]
+        rows = table_model_json["rows"]
+
+        # 打开现有的工作簿
+        workbook = openpyxl.load_workbook(file_path)
+        worksheet = workbook.active
+
+        # 清除现有数据（保留样式）
+        max_row = worksheet.max_row
+        max_col = worksheet.max_column
+
+        # 清除单元格内容但保留格式
+        for row in range(1, max_row + 1):
+            for col in range(1, max_col + 1):
+                cell = worksheet.cell(row=row, column=col)
+                cell.value = None
+
+        # 写入表头
+        for col_idx, header in enumerate(headers, 1):
+            cell = worksheet.cell(row=1, column=col_idx)
+            cell.value = header
+
+        # 写入数据行
+        changes_count = 0
+        for row_idx, row_data in enumerate(rows, 2):  # 从第2行开始（第1行是表头）
+            for col_idx, cell_data in enumerate(row_data, 1):
+                cell = worksheet.cell(row=row_idx, column=col_idx)
+
+                # 提取单元格值
+                if isinstance(cell_data, dict) and 'value' in cell_data:
+                    value = cell_data['value']
+                else:
+                    value = cell_data
+
+                # 尝试转换数值类型
+                if value is not None and value != "":
+                    try:
+                        # 尝试转换为数字
+                        if isinstance(value, str) and value.replace('.', '').replace('-', '').isdigit():
+                            if '.' in value:
+                                cell.value = float(value)
+                            else:
+                                cell.value = int(value)
+                        else:
+                            cell.value = str(value)
+                    except (ValueError, TypeError):
+                        cell.value = str(value)
+                else:
+                    cell.value = None
+
+                changes_count += 1
+
+        # 保存工作簿
+        workbook.save(file_path)
+        workbook.close()
+
+        logger.info(f"XLSX文件已更新: {file_path}")
+        return changes_count
 
     def _sheet_to_json(self, sheet: Sheet, range_string: Optional[str] = None) -> Dict[str, Any]:
         """

@@ -94,7 +94,7 @@ class ParserFactory:
             "xlsx": {
                 "name": "Excel XLSX",
                 "description": "Excel 2007+格式",
-                "features": ["完整样式提取", "95%保真度", "超链接", "注释", "合并单元格"],
+                "features": ["完整样式提取",  "超链接", "注释", "合并单元格"],
                 "parser_class": "XlsxParser"
             },
             "xls": {
@@ -112,7 +112,7 @@ class ParserFactory:
             "xlsm": {
                 "name": "Excel XLSM",
                 "description": "Excel宏文件格式",
-                "features": ["完整样式提取", "宏信息保留", "95%保真度"],
+                "features": ["完整样式提取", "宏信息保留"],
                 "parser_class": "XlsmParser"
             }
         }

@@ -2,7 +2,7 @@
 MCP 工具定义模块 - 三个核心工具
 
 基于systemPatterns.md设计，实现完整的表格处理闭环：
-1. convert_to_html - 完美HTML转换（95%样式保真度）
+1. convert_to_html - 完美HTML转换
 2. parse_sheet - JSON数据解析（LLM友好格式）
 3. apply_changes - 数据写回（完成编辑闭环）
 """
@@ -31,7 +31,7 @@ def register_tools(server: Server) -> None:
         return [
             Tool(
                 name="convert_to_html",
-                description="将表格文件转换为完美的HTML文件，95%样式保真度。支持CSV、XLSX、XLS、XLSB、XLSM格式。返回HTML文件路径，不传输内容避免上下文爆炸。",
+                description="将表格文件转换为完美的HTML文件，支持CSV、XLSX、XLS、XLSB、XLSM格式。返回HTML文件路径，不传输内容避免上下文爆炸。",
                 inputSchema={
                     "type": "object",
                     "properties": {
