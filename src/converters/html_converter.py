@@ -154,7 +154,31 @@ class HTMLConverter:
             key_parts.append(f"ta:{style.text_align}")
         if style.vertical_align:
             key_parts.append(f"va:{style.vertical_align}")
-        
+
+        # 边框属性
+        if style.border_top:
+            key_parts.append(f"bt:{style.border_top}")
+        if style.border_bottom:
+            key_parts.append(f"bb:{style.border_bottom}")
+        if style.border_left:
+            key_parts.append(f"bl:{style.border_left}")
+        if style.border_right:
+            key_parts.append(f"br:{style.border_right}")
+        if style.border_color and style.border_color != "#000000":
+            key_parts.append(f"bc:{style.border_color}")
+
+        # 文本换行和格式化
+        if style.wrap_text:
+            key_parts.append("wrap")
+        if style.number_format:
+            key_parts.append(f"nf:{style.number_format}")
+
+        # 进阶功能
+        if style.hyperlink:
+            key_parts.append(f"link:{style.hyperlink}")
+        if style.comment:
+            key_parts.append(f"comment:{style.comment}")
+
         return "|".join(key_parts) if key_parts else "default"
     
     def _generate_css(self, styles: Dict[str, Style]) -> str:
@@ -190,31 +214,120 @@ class HTMLConverter:
         # 生成样式类
         for style_id, style in styles.items():
             css_rule = f".{style_id} {{"
-            
+
+            # 字体属性
             if style.font_name:
                 css_rule += f" font-family: {style.font_name};"
             if style.font_size:
                 css_rule += f" font-size: {style.font_size}pt;"
             if style.font_color:
                 css_rule += f" color: {style.font_color};"
-            if style.background_color and style.background_color != "#FFFFFF":
-                css_rule += f" background-color: {style.background_color};"
             if style.bold:
                 css_rule += " font-weight: bold;"
             if style.italic:
                 css_rule += " font-style: italic;"
             if style.underline:
                 css_rule += " text-decoration: underline;"
+
+            # 背景和填充
+            if style.background_color and style.background_color != "#FFFFFF":
+                css_rule += f" background-color: {style.background_color};"
+
+            # 文本对齐
             if style.text_align:
                 css_rule += f" text-align: {style.text_align};"
             if style.vertical_align:
                 css_rule += f" vertical-align: {style.vertical_align};"
-            
+
+            # 边框属性
+            border_styles = self._generate_border_css(style)
+            if border_styles:
+                css_rule += border_styles
+
+            # 文本换行
+            if style.wrap_text:
+                css_rule += " white-space: pre-wrap; word-wrap: break-word;"
+
+            # 数字格式（作为data属性，便于JavaScript处理）
+            if style.number_format:
+                # 将数字格式信息添加为注释，便于调试
+                css_rule += f" /* number-format: {style.number_format} */"
+
             css_rule += " }"
             css_rules.append(css_rule)
         
         return "\n".join(css_rules)
-    
+
+    def _generate_border_css(self, style: Style) -> str:
+        """
+        生成边框CSS样式。
+
+        Args:
+            style: Style对象
+
+        Returns:
+            边框CSS字符串
+        """
+        border_css = ""
+
+        # 边框颜色
+        border_color = style.border_color if style.border_color else "#000000"
+
+        # 处理各个边框
+        if style.border_top:
+            border_width = self._parse_border_style(style.border_top)
+            border_css += f" border-top: {border_width} solid {border_color};"
+
+        if style.border_bottom:
+            border_width = self._parse_border_style(style.border_bottom)
+            border_css += f" border-bottom: {border_width} solid {border_color};"
+
+        if style.border_left:
+            border_width = self._parse_border_style(style.border_left)
+            border_css += f" border-left: {border_width} solid {border_color};"
+
+        if style.border_right:
+            border_width = self._parse_border_style(style.border_right)
+            border_css += f" border-right: {border_width} solid {border_color};"
+
+        return border_css
+
+    def _parse_border_style(self, border_style: str) -> str:
+        """
+        解析边框样式字符串，转换为CSS边框宽度。
+
+        Args:
+            border_style: 边框样式字符串
+
+        Returns:
+            CSS边框宽度
+        """
+        if not border_style:
+            return "1px"
+
+        # 简单的边框样式映射
+        style_map = {
+            "thin": "1px",
+            "medium": "2px",
+            "thick": "3px",
+            "solid": "1px",
+            "dashed": "1px",
+            "dotted": "1px"
+        }
+
+        # 如果是已知样式，返回对应宽度
+        if border_style.lower() in style_map:
+            return style_map[border_style.lower()]
+
+        # 如果包含数字，尝试提取
+        import re
+        match = re.search(r'(\d+)', border_style)
+        if match:
+            return f"{match.group(1)}px"
+
+        # 默认返回1px
+        return "1px"
+
     def _generate_table(self, sheet: Sheet, styles: Dict[str, Style]) -> str:
         """
         生成表格HTML。
@@ -240,19 +353,74 @@ class HTMLConverter:
                         if self._get_style_key(style_obj) == style_key:
                             style_class = f' class="{style_id}"'
                             break
-                
-                # 处理单元格值
-                cell_value = str(cell.value) if cell.value is not None else ""
-                
-                # 生成单元格HTML
-                table_parts.append(f'<td{style_class}>{cell_value}</td>')
+
+                # 生成单元格HTML（支持超链接和注释）
+                cell_html = self._generate_cell_html(cell, style_class)
+                table_parts.append(cell_html)
             
             table_parts.append('</tr>')
         
         table_parts.append('</table>')
         
         return "\n".join(table_parts)
-    
+
+    def _generate_cell_html(self, cell: Cell, style_class: str) -> str:
+        """
+        生成单个单元格的HTML，支持超链接和注释。
+
+        Args:
+            cell: 单元格对象
+            style_class: 样式类字符串
+
+        Returns:
+            单元格HTML字符串
+        """
+        # 处理单元格值并转义HTML
+        cell_value = self._escape_html(str(cell.value) if cell.value is not None else "")
+
+        # 处理超链接
+        if cell.style and cell.style.hyperlink:
+            # 转义超链接URL
+            href = self._escape_html(cell.style.hyperlink)
+            cell_content = f'<a href="{href}">{cell_value}</a>'
+        else:
+            cell_content = cell_value
+
+        # 处理注释（工具提示）
+        title_attr = ""
+        if cell.style and cell.style.comment:
+            # 转义注释内容
+            comment = self._escape_html(cell.style.comment)
+            title_attr = f' title="{comment}"'
+
+        # 处理数字格式（作为data属性）
+        data_attr = ""
+        if cell.style and cell.style.number_format:
+            # 转义数字格式信息
+            number_format = self._escape_html(cell.style.number_format)
+            data_attr = f' data-number-format="{number_format}"'
+
+        return f'<td{style_class}{title_attr}{data_attr}>{cell_content}</td>'
+
+    def _escape_html(self, text: str) -> str:
+        """
+        转义HTML特殊字符，防止XSS攻击。
+
+        Args:
+            text: 原始文本
+
+        Returns:
+            转义后的文本
+        """
+        if not isinstance(text, str):
+            text = str(text)
+
+        return (text.replace('&', '&amp;')
+                   .replace('<', '&lt;')
+                   .replace('>', '&gt;')
+                   .replace('"', '&quot;')
+                   .replace("'", '&#x27;'))
+
     def _get_html_template(self) -> str:
         """
         获取HTML模板。

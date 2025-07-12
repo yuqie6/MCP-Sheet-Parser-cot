@@ -31,7 +31,7 @@ def register_tools(server: Server) -> None:
         return [
             Tool(
                 name="convert_to_html",
-                description="将表格文件转换为完美的HTML文件，支持CSV、XLSX、XLS、XLSB、XLSM格式。返回HTML文件路径，不传输内容避免上下文爆炸。",
+                description="将表格文件转换为完美的HTML文件，支持CSV、XLSX、XLS、XLSB、XLSM格式。支持大文件分页处理。返回HTML文件路径，不传输内容避免上下文爆炸。",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -42,6 +42,14 @@ def register_tools(server: Server) -> None:
                         "output_path": {
                             "type": "string",
                             "description": "输出HTML文件路径。如果未提供，将在源文件同目录生成同名.html文件。"
+                        },
+                        "page_size": {
+                            "type": "integer",
+                            "description": "分页大小（每页行数），用于大文件处理（可选）"
+                        },
+                        "page_number": {
+                            "type": "integer",
+                            "description": "页码（从1开始），用于大文件分页显示（可选，默认为1）"
                         }
                     },
                     "required": ["file_path"]
@@ -135,6 +143,8 @@ async def _handle_convert_to_html(arguments: dict[str, Any], core_service: CoreS
     """处理 convert_to_html 工具调用。"""
     file_path = arguments.get("file_path")
     output_path = arguments.get("output_path")
+    page_size = arguments.get("page_size")
+    page_number = arguments.get("page_number")
 
     if not file_path:
         return [TextContent(
@@ -143,7 +153,7 @@ async def _handle_convert_to_html(arguments: dict[str, Any], core_service: CoreS
         )]
 
     try:
-        result = core_service.convert_to_html(file_path, output_path)
+        result = core_service.convert_to_html(file_path, output_path, page_size, page_number)
         return [TextContent(
             type="text",
             text=json.dumps(result, ensure_ascii=False, indent=2)

@@ -102,13 +102,16 @@ class CoreService:
             logger.error(f"解析表格失败: {e}")
             raise
 
-    def convert_to_html(self, file_path: str, output_path: Optional[str] = None) -> Dict[str, Any]:
+    def convert_to_html(self, file_path: str, output_path: Optional[str] = None,
+                       page_size: Optional[int] = None, page_number: Optional[int] = None) -> Dict[str, Any]:
         """
         将表格文件转换为HTML文件。
 
         Args:
             file_path: 源文件路径
             output_path: 输出HTML文件路径，如果为None则生成默认路径
+            page_size: 分页大小（每页行数），如果为None则不分页
+            page_number: 页码（从1开始），如果为None则显示第1页
 
         Returns:
             转换结果信息
@@ -127,8 +130,19 @@ class CoreService:
             parser = self.parser_factory.get_parser(file_path)
             sheet = parser.parse(file_path)
 
-            # 创建HTML转换器并转换
-            html_converter = HTMLConverter(compact_mode=False)
+            # 检查是否需要分页处理
+            if page_size is not None and page_size > 0:
+                # 使用分页HTML转换器
+                from .converters.paginated_html_converter import PaginatedHTMLConverter
+                html_converter = PaginatedHTMLConverter(
+                    compact_mode=False,
+                    page_size=page_size,
+                    page_number=page_number or 1
+                )
+            else:
+                # 使用标准HTML转换器
+                html_converter = HTMLConverter(compact_mode=False)
+
             result = html_converter.convert_to_file(sheet, output_path)
 
             return result

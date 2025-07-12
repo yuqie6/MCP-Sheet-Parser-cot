@@ -351,3 +351,232 @@ class TestHTMLConverter:
         assert "script" in html  # 内容应该存在
         assert "A & B" in html or "&amp;" in html  # 内容应该存在
         assert "quoted" in html  # 内容应该存在
+
+    def test_generate_html_with_hyperlinks(self):
+        """测试生成包含超链接的HTML。"""
+        # 创建带超链接的样式
+        link_style = Style(hyperlink="https://example.com")
+
+        sheet = Sheet(
+            name="Hyperlink Test",
+            rows=[
+                Row(cells=[
+                    Cell(value="Visit Example", style=link_style),
+                    Cell(value="Normal Text")
+                ])
+            ]
+        )
+
+        converter = HTMLConverter()
+        html = converter._generate_html(sheet)
+
+        # 验证超链接生成
+        assert '<a href="https://example.com">Visit Example</a>' in html
+        assert "Normal Text" in html
+        assert "Hyperlink Test" in html
+
+    def test_generate_html_with_comments(self):
+        """测试生成包含注释的HTML。"""
+        # 创建带注释的样式
+        comment_style = Style(comment="This is a helpful comment")
+
+        sheet = Sheet(
+            name="Comment Test",
+            rows=[
+                Row(cells=[
+                    Cell(value="Hover me", style=comment_style),
+                    Cell(value="No comment")
+                ])
+            ]
+        )
+
+        converter = HTMLConverter()
+        html = converter._generate_html(sheet)
+
+        # 验证注释生成
+        assert 'title="This is a helpful comment"' in html
+        assert "Hover me" in html
+        assert "No comment" in html
+
+    def test_generate_html_with_hyperlinks_and_comments(self):
+        """测试生成同时包含超链接和注释的HTML。"""
+        # 创建同时包含超链接和注释的样式
+        combined_style = Style(
+            hyperlink="https://docs.example.com",
+            comment="Click to visit documentation"
+        )
+
+        sheet = Sheet(
+            name="Combined Test",
+            rows=[
+                Row(cells=[
+                    Cell(value="Documentation", style=combined_style)
+                ])
+            ]
+        )
+
+        converter = HTMLConverter()
+        html = converter._generate_html(sheet)
+
+        # 验证同时包含超链接和注释
+        assert '<a href="https://docs.example.com">Documentation</a>' in html
+        assert 'title="Click to visit documentation"' in html
+
+    def test_html_escaping_security(self):
+        """测试HTML转义安全性。"""
+        # 创建包含恶意内容的样式
+        malicious_style = Style(
+            hyperlink="javascript:alert('xss')",
+            comment="<script>alert('xss')</script>"
+        )
+
+        sheet = Sheet(
+            name="Security Test",
+            rows=[
+                Row(cells=[
+                    Cell(value="<script>alert('hack')</script>", style=malicious_style)
+                ])
+            ]
+        )
+
+        converter = HTMLConverter()
+        html = converter._generate_html(sheet)
+
+        # 验证HTML转义
+        assert "&lt;script&gt;" in html  # 单元格值被转义
+        assert "&quot;" in html or "&#x27;" in html  # 属性值被转义
+        assert "javascript:alert" in html  # 超链接保持原样（由浏览器处理安全性）
+        assert "&lt;script&gt;alert" in html  # 注释被转义
+
+    def test_generate_css_with_borders(self):
+        """测试生成包含边框的CSS。"""
+        # 创建带边框的样式
+        border_style = Style(
+            border_top="thin",
+            border_bottom="medium",
+            border_left="thick",
+            border_right="solid",
+            border_color="#FF0000"
+        )
+
+        sheet = Sheet(
+            name="Border Test",
+            rows=[
+                Row(cells=[
+                    Cell(value="Bordered Cell", style=border_style)
+                ])
+            ]
+        )
+
+        converter = HTMLConverter()
+        html = converter._generate_html(sheet)
+
+        # 验证边框CSS生成
+        assert "border-top: 1px solid #FF0000" in html
+        assert "border-bottom: 2px solid #FF0000" in html
+        assert "border-left: 3px solid #FF0000" in html
+        assert "border-right: 1px solid #FF0000" in html
+
+    def test_generate_css_with_text_wrapping(self):
+        """测试生成包含文本换行的CSS。"""
+        # 创建带文本换行的样式
+        wrap_style = Style(wrap_text=True)
+
+        sheet = Sheet(
+            name="Wrap Test",
+            rows=[
+                Row(cells=[
+                    Cell(value="This is a very long text that should wrap", style=wrap_style)
+                ])
+            ]
+        )
+
+        converter = HTMLConverter()
+        html = converter._generate_html(sheet)
+
+        # 验证文本换行CSS
+        assert "white-space: pre-wrap" in html
+        assert "word-wrap: break-word" in html
+
+    def test_generate_css_with_number_format(self):
+        """测试生成包含数字格式的CSS和HTML。"""
+        # 创建带数字格式的样式
+        number_style = Style(number_format="0.00%")
+
+        sheet = Sheet(
+            name="Number Format Test",
+            rows=[
+                Row(cells=[
+                    Cell(value="85.5", style=number_style)
+                ])
+            ]
+        )
+
+        converter = HTMLConverter()
+        html = converter._generate_html(sheet)
+
+        # 验证数字格式处理
+        assert "number-format: 0.00%" in html  # CSS注释
+        assert 'data-number-format="0.00%"' in html  # HTML data属性
+
+    def test_generate_css_comprehensive_style(self):
+        """测试生成包含所有样式属性的CSS。"""
+        # 创建包含所有样式属性的样式
+        comprehensive_style = Style(
+            # 字体属性
+            bold=True,
+            italic=True,
+            underline=True,
+            font_color="#FF0000",
+            font_size=14.0,
+            font_name="Times New Roman",
+
+            # 背景和对齐
+            background_color="#FFFF00",
+            text_align="center",
+            vertical_align="middle",
+
+            # 边框
+            border_top="thin",
+            border_bottom="medium",
+            border_left="thick",
+            border_right="solid",
+            border_color="#0000FF",
+
+            # 文本和格式
+            wrap_text=True,
+            number_format="$#,##0.00",
+
+            # 进阶功能
+            hyperlink="https://example.com",
+            comment="Comprehensive style test"
+        )
+
+        sheet = Sheet(
+            name="Comprehensive Test",
+            rows=[
+                Row(cells=[
+                    Cell(value="All Styles", style=comprehensive_style)
+                ])
+            ]
+        )
+
+        converter = HTMLConverter()
+        html = converter._generate_html(sheet)
+
+        # 验证所有样式属性
+        assert "font-weight: bold" in html
+        assert "font-style: italic" in html
+        assert "text-decoration: underline" in html
+        assert "color: #FF0000" in html
+        assert "font-size: 14.0pt" in html
+        assert "font-family: Times New Roman" in html
+        assert "background-color: #FFFF00" in html
+        assert "text-align: center" in html
+        assert "vertical-align: middle" in html
+        assert "border-top: 1px solid #0000FF" in html
+        assert "white-space: pre-wrap" in html
+        assert "number-format: $#,##0.00" in html
+        assert 'href="https://example.com"' in html
+        assert 'title="Comprehensive style test"' in html
+        assert 'data-number-format="$#,##0.00"' in html
