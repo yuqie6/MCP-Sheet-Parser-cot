@@ -195,14 +195,8 @@ src/
 │   ├── xls_parser.py           # XLS解析器
 │   ├── xlsb_parser.py          # XLSB解析器
 │   └── xlsm_parser.py          # XLSM解析器
-├── utils/
-│   └── style_validator.py      # 样式保真度验证器
-└── scripts/
-    └── validate_fidelity.py    # 保真度验证脚本
-
 tests/
-├── test_parsers.py             # 解析器测试
-└── test_style_fidelity.py      # 样式保真度测试
+└── test_parsers.py             # 解析器测试
 ```
 
 

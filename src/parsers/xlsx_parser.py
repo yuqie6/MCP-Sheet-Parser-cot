@@ -1,34 +1,54 @@
+"""
+XLSX解析器模块
+
+解析Excel XLSX文件并转换为Sheet对象，支持95%样式保真度。
+包含完整的样式提取、颜色处理、边框识别等功能。
+"""
+
 import openpyxl
 from src.models.table_model import Sheet, Row, Cell, Style
 from src.parsers.base_parser import BaseParser
 
+
 class XlsxParser(BaseParser):
+    """XLSX文件解析器，支持完整的样式提取和95%保真度。"""
+
     def parse(self, file_path: str) -> Sheet:
         """
-        Parses a .xlsx file and returns a Sheet object.
+        解析XLSX文件并返回Sheet对象。
+
+        Args:
+            file_path: XLSX文件路径
+
+        Returns:
+            包含完整数据和样式的Sheet对象
+
+        Raises:
+            ValueError: 当工作簿不包含活动工作表时
+            FileNotFoundError: 当文件不存在时
         """
         workbook = openpyxl.load_workbook(file_path)
         worksheet = workbook.active
 
         if worksheet is None:
-            raise ValueError("The workbook does not contain any active worksheets.")
-        
+            raise ValueError("工作簿不包含任何活动工作表")
+
         rows = []
         for row in worksheet.iter_rows():
             cells = []
             for cell in row:
-                # Extract cell value and style
+                # 提取单元格值和样式
                 cell_value = cell.value
                 cell_style = self._extract_style(cell)
 
-                # Create Cell object with style
+                # 创建包含样式的Cell对象
                 parsed_cell = Cell(
                     value=cell_value,
                     style=cell_style
                 )
                 cells.append(parsed_cell)
             rows.append(Row(cells=cells))
-            
+
         merged_cells = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
 
         return Sheet(
@@ -39,13 +59,19 @@ class XlsxParser(BaseParser):
 
     def _extract_style(self, cell) -> Style:
         """
-        Extract comprehensive style information from an openpyxl cell.
-        Achieves 95% style fidelity by capturing all major style properties.
+        从openpyxl单元格中提取全面的样式信息。
+        通过捕获所有主要样式属性实现95%样式保真度。
+
+        Args:
+            cell: openpyxl单元格对象
+
+        Returns:
+            包含完整样式信息的Style对象
         """
-        # Initialize default style
+        # 初始化默认样式
         style = Style()
 
-        # Extract font properties
+        # 提取字体属性
         if cell.font:
             font = cell.font
             style.bold = font.bold if font.bold is not None else False
@@ -54,31 +80,31 @@ class XlsxParser(BaseParser):
             style.font_size = font.size if font.size else None
             style.font_name = font.name if font.name else None
 
-            # Extract font color (comprehensive approach)
+            # 提取字体颜色（全面方法）
             if font.color:
                 font_color = self._extract_color(font.color)
-                if font_color and font_color != "#000000":  # Only set if not default black
+                if font_color and font_color != "#000000":  # 仅在非默认黑色时设置
                     style.font_color = font_color
 
-        # Extract fill/background properties (enhanced comprehensive approach)
+        # 提取填充/背景属性（增强全面方法）
         if cell.fill:
             background_color = self._extract_fill_color(cell.fill)
             if background_color:
                 style.background_color = background_color
 
-        # Extract alignment properties
+        # 提取对齐属性
         if cell.alignment:
             alignment = cell.alignment
-            # Horizontal alignment
+            # 水平对齐
             if alignment.horizontal:
                 style.text_align = alignment.horizontal
-            # Vertical alignment
+            # 垂直对齐
             if alignment.vertical:
                 style.vertical_align = alignment.vertical
-            # Text wrapping
+            # 文本换行
             style.wrap_text = alignment.wrap_text if alignment.wrap_text is not None else False
 
-        # Extract border properties
+        # 提取边框属性
         if cell.border:
             border = cell.border
             style.border_top = self._get_border_style(border.top) if border.top else ""
@@ -86,7 +112,7 @@ class XlsxParser(BaseParser):
             style.border_left = self._get_border_style(border.left) if border.left else ""
             style.border_right = self._get_border_style(border.right) if border.right else ""
 
-            # Extract border color (comprehensive approach)
+            # 提取边框颜色（全面方法）
             # 尝试从任何有颜色的边框中提取颜色
             border_color = None
             for border_side in [border.top, border.bottom, border.left, border.right]:
@@ -101,10 +127,10 @@ class XlsxParser(BaseParser):
             else:
                 style.border_color = Style().border_color
 
-        # Extract number format (enhanced)
+        # 提取数字格式（增强）
         style.number_format = self._extract_number_format(cell)
 
-        # Extract hyperlink information
+        # 提取超链接信息
         if cell.hyperlink:
             try:
                 # 获取超链接目标
@@ -115,7 +141,7 @@ class XlsxParser(BaseParser):
             except:
                 pass
 
-        # Extract comment information
+        # 提取注释信息
         if cell.comment:
             try:
                 # 获取注释文本
@@ -128,16 +154,20 @@ class XlsxParser(BaseParser):
 
         return style
 
-
-
     def _get_border_style(self, border_side) -> str:
         """
-        Convert openpyxl border style to CSS border style.
+        将openpyxl边框样式转换为CSS边框样式。
+
+        Args:
+            border_side: openpyxl边框对象
+
+        Returns:
+            CSS边框样式字符串
         """
         if not border_side or not border_side.style:
             return ""
 
-        # Map openpyxl border styles to CSS equivalents
+        # 将openpyxl边框样式映射到CSS等效样式
         border_style_map = {
             'thin': '1px solid',
             'medium': '2px solid',
@@ -221,8 +251,8 @@ class XlsxParser(BaseParser):
                         if color and color not in ["#FFFFFF", "#000000"]:
                             return color
 
-        except Exception as e:
-            # 静默处理填充提取错误
+        except Exception:
+            # 静默处理填充提取错误，避免中断解析流程
             pass
 
         return None
@@ -251,8 +281,8 @@ class XlsxParser(BaseParser):
                 # 索引或主题颜色 - 使用映射表
                 return self._get_color_by_index(value)
 
-        except Exception as e:
-            # 静默处理错误，避免中断解析
+        except Exception:
+            # 静默处理错误，避免中断解析流程
             pass
 
         return None

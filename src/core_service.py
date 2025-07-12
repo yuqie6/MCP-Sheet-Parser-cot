@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional
 
 from .parsers.factory import ParserFactory
 from .models.table_model import Sheet
+from .converters.html_converter import HTMLConverter
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +44,26 @@ class CoreService:
             # 获取解析器
             parser = self.parser_factory.get_parser(file_path)
             
-            # TODO: 实现轻量级元数据提取
-            # 这里需要为每个解析器添加 get_metadata 方法
-            
+            # 获取解析器信息
+            parser = self.parser_factory.get_parser(file_path)
+
+            # 快速解析获取基本信息
+            sheet = parser.parse(file_path)
+
             return {
                 "file_path": str(path.absolute()),
                 "file_size": path.stat().st_size,
                 "file_format": path.suffix.lower(),
-                "status": "TODO: 需要实现元数据提取逻辑"
+                "parser_type": type(parser).__name__,
+                "sheet_name": sheet.name,
+                "dimensions": {
+                    "rows": len(sheet.rows),
+                    "cols": len(sheet.rows[0].cells) if sheet.rows else 0,
+                    "total_cells": sum(len(row.cells) for row in sheet.rows)
+                },
+                "has_merged_cells": len(sheet.merged_cells) > 0,
+                "merged_cells_count": len(sheet.merged_cells),
+                "supported_formats": self.parser_factory.get_supported_formats()
             }
             
         except Exception as e:
@@ -79,32 +92,60 @@ class CoreService:
             # 获取解析器并解析
             parser = self.parser_factory.get_parser(file_path)
             sheet = parser.parse(file_path)
-            
-            # TODO: 实现范围选择和工作表选择逻辑
-            # TODO: 将Sheet对象转换为标准化JSON格式
-            
-            return {
-                "sheet_name": sheet.name,
-                "metadata": {
-                    "rows": len(sheet.rows),
-                    "cols": len(sheet.rows[0].cells) if sheet.rows else 0
-                },
-                "data": "TODO: 实现Sheet到JSON的转换",
-                "merged_cells": sheet.merged_cells
-            }
+
+            # 转换为标准化JSON格式
+            json_data = self._sheet_to_json(sheet, range_string)
+
+            return json_data
             
         except Exception as e:
             logger.error(f"解析表格失败: {e}")
             raise
-    
-    def apply_changes(self, file_path: str, table_model_json: Dict[str, Any]) -> Dict[str, Any]:
+
+    def convert_to_html(self, file_path: str, output_path: Optional[str] = None) -> Dict[str, Any]:
+        """
+        将表格文件转换为HTML文件。
+
+        Args:
+            file_path: 源文件路径
+            output_path: 输出HTML文件路径，如果为None则生成默认路径
+
+        Returns:
+            转换结果信息
+        """
+        try:
+            # 验证文件存在
+            path = Path(file_path)
+            if not path.exists():
+                raise FileNotFoundError(f"文件不存在: {file_path}")
+
+            # 生成默认输出路径
+            if output_path is None:
+                output_path = str(path.with_suffix('.html'))
+
+            # 获取解析器并解析
+            parser = self.parser_factory.get_parser(file_path)
+            sheet = parser.parse(file_path)
+
+            # 创建HTML转换器并转换
+            html_converter = HTMLConverter(compact_mode=False)
+            result = html_converter.convert_to_file(sheet, output_path)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"HTML转换失败: {e}")
+            raise
+
+    def apply_changes(self, file_path: str, table_model_json: Dict[str, Any], create_backup: bool = True) -> Dict[str, Any]:
         """
         将TableModel JSON的修改应用回原始文件。
-        
+
         Args:
             file_path: 目标文件路径
             table_model_json: 包含修改的JSON数据
-            
+            create_backup: 是否创建备份文件
+
         Returns:
             操作结果
         """
@@ -113,27 +154,349 @@ class CoreService:
             path = Path(file_path)
             if not path.exists():
                 raise FileNotFoundError(f"文件不存在: {file_path}")
-            
+
+            # 创建备份文件（如果需要）
+            backup_path = None
+            if create_backup:
+                backup_path = path.with_suffix(f"{path.suffix}.backup")
+                import shutil
+                shutil.copy2(path, backup_path)
+                logger.info(f"已创建备份文件: {backup_path}")
+
             # 验证JSON格式
             required_fields = ["sheet_name", "headers", "rows"]
             for field in required_fields:
                 if field not in table_model_json:
                     raise ValueError(f"缺少必需字段: {field}")
             
-            # TODO: 实现将JSON数据写回文件的逻辑
-            # 这是最复杂的部分，需要：
-            # 1. 将JSON转换回Sheet对象
-            # 2. 保持原文件格式
-            # 3. 保持样式和格式
-            # 4. 安全地写回文件
-            
+            # 注意：写回功能是复杂的操作，需要谨慎实现
+            # 目前提供基础的验证和反馈
+
             return {
-                "status": "TODO: 实现数据写回逻辑",
+                "status": "数据验证成功，写回功能开发中",
                 "file_path": str(path.absolute()),
-                "modified_rows": len(table_model_json.get("rows", [])),
-                "backup_created": False  # TODO: 实现备份功能
+                "backup_path": str(backup_path) if backup_path else None,
+                "backup_created": create_backup,
+                "sheet_name": table_model_json.get("sheet_name"),
+                "headers_count": len(table_model_json.get("headers", [])),
+                "rows_count": len(table_model_json.get("rows", [])),
+                "note": "写回功能需要复杂的格式转换和样式保持逻辑，建议使用专门的编辑工具"
             }
             
         except Exception as e:
             logger.error(f"应用修改失败: {e}")
             raise
+
+    def _sheet_to_json(self, sheet: Sheet, range_string: Optional[str] = None) -> Dict[str, Any]:
+        """
+        将Sheet对象转换为标准化的JSON格式。
+
+        Args:
+            sheet: Sheet对象
+            range_string: 可选的范围字符串（如"A1:D10"）
+
+        Returns:
+            标准化的JSON数据
+        """
+        # 计算数据大小
+        total_cells = self._calculate_data_size(sheet)
+
+        # 智能大小检测
+        SMALL_FILE_THRESHOLD = 1000
+        LARGE_FILE_THRESHOLD = 10000
+
+        # 处理范围选择
+        if range_string:
+            try:
+                start_row, start_col, end_row, end_col = self._parse_range_string(range_string)
+                return self._extract_range_data(sheet, start_row, start_col, end_row, end_col)
+            except ValueError as e:
+                logger.warning(f"范围解析失败: {e}, 返回完整数据")
+
+        # 根据文件大小选择处理策略
+        if total_cells >= LARGE_FILE_THRESHOLD:
+            # 大文件：返回摘要
+            return self._generate_summary(sheet)
+        elif total_cells >= SMALL_FILE_THRESHOLD:
+            # 中文件：返回完整数据+建议
+            full_data = self._extract_full_data(sheet)
+            full_data["size_info"] = {
+                "total_cells": total_cells,
+                "processing_mode": "full_with_warning",
+                "recommendation": f"文件较大({total_cells}个单元格)，建议使用范围选择功能获取特定数据"
+            }
+            return full_data
+        else:
+            # 小文件：直接返回完整数据
+            full_data = self._extract_full_data(sheet)
+            full_data["size_info"] = {
+                "total_cells": total_cells,
+                "processing_mode": "full",
+                "recommendation": "文件大小适中，已返回完整数据"
+            }
+            return full_data
+
+    def _style_to_dict(self, style) -> Dict[str, Any]:
+        """
+        将Style对象转换为字典格式。
+
+        Args:
+            style: Style对象
+
+        Returns:
+            样式字典
+        """
+        if not style:
+            return {}
+
+        style_dict = {}
+
+        # 字体属性
+        if style.font_name:
+            style_dict["font_name"] = style.font_name
+        if style.font_size:
+            style_dict["font_size"] = style.font_size
+        if style.font_color:
+            style_dict["font_color"] = style.font_color
+        if style.bold:
+            style_dict["bold"] = style.bold
+        if style.italic:
+            style_dict["italic"] = style.italic
+        if style.underline:
+            style_dict["underline"] = style.underline
+
+        # 背景和对齐
+        if style.background_color:
+            style_dict["background_color"] = style.background_color
+        if style.text_align:
+            style_dict["text_align"] = style.text_align
+        if style.vertical_align:
+            style_dict["vertical_align"] = style.vertical_align
+
+        # 边框
+        if style.border_top:
+            style_dict["border_top"] = style.border_top
+        if style.border_bottom:
+            style_dict["border_bottom"] = style.border_bottom
+        if style.border_left:
+            style_dict["border_left"] = style.border_left
+        if style.border_right:
+            style_dict["border_right"] = style.border_right
+
+        # 其他属性
+        if style.wrap_text:
+            style_dict["wrap_text"] = style.wrap_text
+        if style.number_format:
+            style_dict["number_format"] = style.number_format
+        if style.hyperlink:
+            style_dict["hyperlink"] = style.hyperlink
+        if style.comment:
+            style_dict["comment"] = style.comment
+
+        return style_dict
+
+    def _calculate_data_size(self, sheet: Sheet) -> int:
+        """计算表格的总单元格数。"""
+        return sum(len(row.cells) for row in sheet.rows)
+
+    def _parse_range_string(self, range_string: str) -> tuple[int, int, int, int]:
+        """
+        解析范围字符串，如"A1:D10"或"A1"。
+
+        Returns:
+            (start_row, start_col, end_row, end_col) - 0-based索引
+        """
+        import re
+
+        # 移除空格
+        range_string = range_string.strip().upper()
+
+        # 单个单元格格式：A1
+        single_cell_pattern = r'^([A-Z]+)(\d+)$'
+        # 范围格式：A1:D10
+        range_pattern = r'^([A-Z]+)(\d+):([A-Z]+)(\d+)$'
+
+        def col_to_num(col_str):
+            """将列字母转换为数字（A=0, B=1, ...）"""
+            result = 0
+            for char in col_str:
+                result = result * 26 + (ord(char) - ord('A') + 1)
+            return result - 1
+
+        # 尝试匹配范围格式
+        range_match = re.match(range_pattern, range_string)
+        if range_match:
+            start_col_str, start_row_str, end_col_str, end_row_str = range_match.groups()
+            start_row = int(start_row_str) - 1  # 转换为0-based
+            start_col = col_to_num(start_col_str)
+            end_row = int(end_row_str) - 1
+            end_col = col_to_num(end_col_str)
+            return start_row, start_col, end_row, end_col
+
+        # 尝试匹配单个单元格格式
+        single_match = re.match(single_cell_pattern, range_string)
+        if single_match:
+            col_str, row_str = single_match.groups()
+            row = int(row_str) - 1
+            col = col_to_num(col_str)
+            return row, col, row, col
+
+        raise ValueError(f"无效的范围格式: {range_string}. 支持格式: A1 或 A1:D10")
+
+    def _extract_range_data(self, sheet: Sheet, start_row: int, start_col: int,
+                           end_row: int, end_col: int) -> Dict[str, Any]:
+        """提取指定范围的数据。"""
+        # 验证范围有效性
+        if start_row < 0 or start_col < 0:
+            raise ValueError("范围起始位置不能为负数")
+        if end_row >= len(sheet.rows) or start_row > end_row:
+            raise ValueError(f"行范围无效: {start_row}-{end_row}, 表格只有{len(sheet.rows)}行")
+
+        # 提取范围内的数据
+        range_rows = []
+        headers = []
+
+        for row_idx in range(start_row, min(end_row + 1, len(sheet.rows))):
+            row = sheet.rows[row_idx]
+            row_data = []
+
+            for col_idx in range(start_col, min(end_col + 1, len(row.cells))):
+                if col_idx < len(row.cells):
+                    cell = row.cells[col_idx]
+                    cell_data = {
+                        "value": cell.value,
+                        "style": self._style_to_dict(cell.style) if cell.style else None
+                    }
+                else:
+                    cell_data = {"value": None, "style": None}
+                row_data.append(cell_data)
+
+            if row_idx == start_row:
+                # 第一行作为表头
+                headers = [cell["value"] if cell["value"] is not None else f"Column_{i}"
+                          for i, cell in enumerate(row_data)]
+            else:
+                range_rows.append(row_data)
+
+        return {
+            "sheet_name": sheet.name,
+            "range": f"{chr(65 + start_col)}{start_row + 1}:{chr(65 + end_col)}{end_row + 1}",
+            "metadata": {
+                "parser_type": "新解析器系统",
+                "range_rows": len(range_rows),
+                "range_cols": end_col - start_col + 1,
+                "has_styles": any(any(cell.get("style") for cell in row) for row in range_rows)
+            },
+            "headers": headers,
+            "rows": range_rows,
+            "size_info": {
+                "total_cells": len(range_rows) * (end_col - start_col + 1),
+                "processing_mode": "range_selection",
+                "recommendation": "已返回指定范围的数据"
+            }
+        }
+
+    def _generate_summary(self, sheet: Sheet) -> Dict[str, Any]:
+        """为大文件生成摘要信息。"""
+        total_cells = self._calculate_data_size(sheet)
+
+        # 提取前5行作为样本
+        sample_rows = []
+        headers = []
+
+        for row_idx, row in enumerate(sheet.rows[:5]):
+            row_data = []
+            for cell in row.cells:
+                cell_data = {
+                    "value": cell.value,
+                    "style": self._style_to_dict(cell.style) if cell.style else None
+                }
+                row_data.append(cell_data)
+
+            if row_idx == 0:
+                headers = [cell["value"] if cell["value"] is not None else f"Column_{i}"
+                          for i, cell in enumerate(row_data)]
+            else:
+                sample_rows.append(row_data)
+
+        # 分析数据类型
+        data_types = {}
+        for col_idx, header in enumerate(headers):
+            types_found = set()
+            for row in sheet.rows[1:6]:  # 检查前5行数据
+                if col_idx < len(row.cells) and row.cells[col_idx].value is not None:
+                    value = row.cells[col_idx].value
+                    if isinstance(value, str):
+                        types_found.add("text")
+                    elif isinstance(value, (int, float)):
+                        types_found.add("number")
+                    else:
+                        types_found.add("other")
+            data_types[header] = list(types_found) if types_found else ["unknown"]
+
+        return {
+            "sheet_name": sheet.name,
+            "metadata": {
+                "parser_type": "新解析器系统",
+                "total_rows": len(sheet.rows),
+                "total_cols": len(headers),
+                "total_cells": total_cells,
+                "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows),
+                "data_types": data_types
+            },
+            "sample_data": {
+                "headers": headers,
+                "rows": sample_rows,
+                "note": f"显示前{len(sample_rows)}行数据作为样本"
+            },
+            "size_info": {
+                "total_cells": total_cells,
+                "processing_mode": "summary",
+                "recommendation": f"文件过大({total_cells}个单元格)，建议使用范围选择。例如：A1:J100"
+            },
+            "suggested_ranges": [
+                "A1:J100",  # 前100行，前10列
+                "A1:Z50",   # 前50行，前26列
+                f"A1:{chr(65 + min(25, len(headers) - 1))}200"  # 前200行，实际列数
+            ]
+        }
+
+    def _extract_full_data(self, sheet: Sheet) -> Dict[str, Any]:
+        """提取完整的表格数据。"""
+        # 提取表头（假设第一行是表头）
+        headers = []
+        if sheet.rows:
+            first_row = sheet.rows[0]
+            headers = [cell.value if cell.value is not None else f"Column_{i}"
+                      for i, cell in enumerate(first_row.cells)]
+
+        # 提取数据行
+        data_rows = []
+        for row_idx, row in enumerate(sheet.rows[1:], 1):  # 跳过表头行
+            row_data = []
+            for cell in row.cells:
+                cell_data = {
+                    "value": cell.value,
+                    "style": self._style_to_dict(cell.style) if cell.style else None
+                }
+                row_data.append(cell_data)
+            data_rows.append(row_data)
+
+        return {
+            "sheet_name": sheet.name,
+            "metadata": {
+                "parser_type": "新解析器系统",
+                "total_rows": len(sheet.rows),
+                "total_cols": len(headers),
+                "data_rows": len(data_rows),
+                "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows)
+            },
+            "headers": headers,
+            "rows": data_rows,
+            "merged_cells": sheet.merged_cells,
+            "format_info": {
+                "supports_styles": True,
+                "supports_merged_cells": True,
+                "supports_hyperlinks": True
+            }
+        }

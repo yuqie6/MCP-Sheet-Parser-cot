@@ -1,10 +1,20 @@
+"""
+HTML转换器测试模块 - 简化版
+
+只测试HTMLConverter功能，JSONConverter已在架构简化中移除。
+"""
+
 import pytest
+import tempfile
+import os
+from pathlib import Path
 from src.models.table_model import Sheet, Row, Cell, Style
 from src.converters.html_converter import HTMLConverter
-from src.converters.json_converter import JSONConverter
 
-def test_html_converter():
-    # 1. 准备：创建一个简单的 Sheet 对象
+
+def test_html_converter_basic():
+    """测试基本的HTML转换功能。"""
+    # 创建一个简单的 Sheet 对象
     sheet = Sheet(
         name="Test Sheet",
         rows=[
@@ -13,52 +23,89 @@ def test_html_converter():
         ]
     )
 
-    # 2. 执行：将 Sheet 转换为 HTML 字符串
+    # 执行HTML转换
     converter = HTMLConverter()
-    html_output = converter.convert(sheet)
+    html_output = converter._generate_html(sheet)
 
-    # 3. 断言：检查输出是否为有效的 HTML 表格
+    # 验证HTML结构
     assert '<table>' in html_output
     assert '</table>' in html_output
-
-    # 检查基本表格结构（兼容优化输出）
     assert 'A1' in html_output
     assert 'B1' in html_output
     assert 'A2' in html_output
     assert 'B2' in html_output
-    # 注意：优化后的HTML可能不包含默认的colspan="1"和rowspan="1"
-    # 只检查基本的表格结构
 
 
-def test_json_converter_basic_conversion():
-    """测试基本的 JSON 转换功能。"""
-    # 创建一个简单的 sheet
+def test_html_converter_to_file():
+    """测试HTML转换到文件功能。"""
+    # 创建测试数据
     sheet = Sheet(
-        name="TestSheet",
+        name="File Test",
         rows=[
-            Row(cells=[Cell(value="Header1"), Cell(value="Header2")]),
-            Row(cells=[Cell(value="Data1"), Cell(value="Data2")])
+            Row(cells=[Cell(value='Header1'), Cell(value='Header2')]),
+            Row(cells=[Cell(value='Data1'), Cell(value='Data2')])
         ]
     )
 
-    converter = JSONConverter()
-    json_data = converter.convert(sheet)
+    # 创建临时文件
+    with tempfile.NamedTemporaryFile(suffix='.html', delete=False) as tmp_file:
+        output_path = tmp_file.name
 
-    # 测试元数据
-    assert json_data['metadata']['name'] == "TestSheet"
-    assert json_data['metadata']['rows'] == 2
-    assert json_data['metadata']['cols'] == 2
-    assert json_data['metadata']['has_merged_cells'] == False
+    try:
+        # 执行转换
+        converter = HTMLConverter()
+        result = converter.convert_to_file(sheet, output_path)
 
-    # 测试数据结构
-    assert len(json_data['data']) == 2
-    assert json_data['data'][0]['row'] == 0
-    assert len(json_data['data'][0]['cells']) == 2
-    assert json_data['data'][0]['cells'][0]['value'] == "Header1"
-    assert json_data['data'][0]['cells'][0]['col'] == 0
+        # 验证结果
+        assert result['status'] == 'success'
+        assert result['output_path'] == str(Path(output_path).absolute())
+        assert result['rows_converted'] == 2
+        assert result['cells_converted'] == 4
+        assert os.path.exists(output_path)
+
+        # 验证文件内容
+        with open(output_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            assert '<table>' in content
+            assert 'Header1' in content
+            assert 'Data1' in content
+
+    finally:
+        # 清理临时文件
+        if os.path.exists(output_path):
+            os.unlink(output_path)
 
 
-def test_json_converter_with_styles():
+def test_html_converter_with_styles():
+    """测试带样式的HTML转换。"""
+    # 创建带样式的单元格
+    styled_cell = Cell(
+        value="Styled Text",
+        style=Style(bold=True, font_color="#FF0000", background_color="#FFFF00")
+    )
+    normal_cell = Cell(value="Normal Text")
+
+    sheet = Sheet(
+        name="Styled Sheet",
+        rows=[Row(cells=[styled_cell, normal_cell])]
+    )
+
+    # 执行转换
+    converter = HTMLConverter()
+    html_output = converter._generate_html(sheet)
+
+    # 验证样式相关内容
+    assert 'font-weight: bold' in html_output
+    assert '#FF0000' in html_output
+    assert '#FFFF00' in html_output
+    assert 'Styled Text' in html_output
+    assert 'Normal Text' in html_output
+
+
+# JSONConverter tests removed - module no longer exists in simplified architecture
+
+
+def test_html_converter_optimization():
     """测试带样式单元格的 JSON 转换。"""
     # 创建一个带样式单元格的 sheet
     styled_cell = Cell(value="Styled", style=Style(bold=True, font_color="#FF0000"))

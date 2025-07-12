@@ -10,15 +10,12 @@ import os
 from pathlib import Path
 from src.parsers.factory import ParserFactory
 from src.converters.html_converter import HTMLConverter
-from src.converters.json_converter import JSONConverter
-from src.services.sheet_service import SheetService
+from src.core_service import CoreService
 from src.mcp_server.tools import (
-    _handle_parse_sheet_to_json,
-    _handle_convert_json_to_html,
-    _handle_convert_file_to_html,
-    _handle_get_table_summary
+    _handle_convert_to_html,
+    _handle_parse_sheet,
+    _handle_apply_changes
 )
-from src.utils.performance import PerformanceOptimizer
 
 
 class TestEndToEndWorkflows:
@@ -33,13 +30,22 @@ class TestEndToEndWorkflows:
         
         # 2. 转换为HTML
         html_converter = HTMLConverter()
-        html_content = html_converter.convert(sheet)
-        
-        # 3. 验证结果
-        assert isinstance(html_content, str)
-        assert "<table>" in html_content
-        assert "</table>" in html_content
-        assert len(html_content) > 100  # 确保有实际内容
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp:
+            output_path = tmp.name
+
+        try:
+            result = html_converter.convert_to_file(sheet, output_path)
+
+            # 3. 验证结果
+            assert result["status"] == "success"
+            assert Path(output_path).exists()
+
+            html_content = Path(output_path).read_text(encoding='utf-8')
+            assert "<table>" in html_content
+            assert "</table>" in html_content
+            assert len(html_content) > 100  # 确保有实际内容
+        finally:
+            Path(output_path).unlink(missing_ok=True)
     
     def test_xlsx_to_html_workflow(self):
         """测试XLSX到HTML的完整工作流程。"""
@@ -50,82 +56,27 @@ class TestEndToEndWorkflows:
         
         # 2. 转换为HTML
         html_converter = HTMLConverter()
-        html_content = html_converter.convert(sheet)
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp:
+            output_path = tmp.name
+
+        try:
+            result = html_converter.convert_to_file(sheet, output_path)
+            html_content = Path(output_path).read_text(encoding='utf-8')
         
-        # 3. 验证结果
-        assert isinstance(html_content, str)
-        assert "<table>" in html_content
-        assert "ID" in html_content
-        assert "Name" in html_content
-        assert "Value" in html_content
+            # 3. 验证结果
+            assert isinstance(html_content, str)
+            assert "<table>" in html_content
+            assert "ID" in html_content
+            assert "Name" in html_content
+            assert "Value" in html_content
+        finally:
+            Path(output_path).unlink(missing_ok=True)
     
-    def test_json_roundtrip_workflow(self):
-        """测试JSON往返转换工作流程。"""
-        # 1. 解析文件到Sheet
-        parser_factory = ParserFactory()
-        parser = parser_factory.get_parser("tests/data/sample.xlsx")
-        original_sheet = parser.parse("tests/data/sample.xlsx")
-        
-        # 2. 转换为JSON
-        json_converter = JSONConverter()
-        json_data = json_converter.convert(original_sheet)
-        
-        # 3. 从JSON重建Sheet
-        from src.mcp_server.tools import _json_to_sheet
-        reconstructed_sheet = _json_to_sheet(json_data)
-        
-        # 4. 验证数据完整性
-        assert reconstructed_sheet.name == original_sheet.name
-        assert len(reconstructed_sheet.rows) == len(original_sheet.rows)
-        
-        # 验证第一行数据
-        original_first_row = [cell.value for cell in original_sheet.rows[0].cells]
-        reconstructed_first_row = [cell.value for cell in reconstructed_sheet.rows[0].cells]
-        assert original_first_row == reconstructed_first_row
+
     
-    def test_performance_optimization_workflow(self):
-        """测试性能优化工作流程。"""
-        # 1. 创建性能优化器
-        optimizer = PerformanceOptimizer()
-        optimizer.start_timing()
-        
-        # 2. 解析文件
-        parser_factory = ParserFactory()
-        parser = parser_factory.get_parser("tests/data/sample.xlsx")
-        sheet = parser.parse("tests/data/sample.xlsx")
-        
-        # 3. 分析性能
-        metrics = optimizer.analyze_sheet_performance(sheet)
-        
-        # 4. 验证性能指标
-        assert metrics.rows > 0
-        assert metrics.cols > 0
-        assert metrics.total_cells > 0
-        assert metrics.estimated_html_size > 0
-        assert metrics.estimated_json_size > 0
-        assert metrics.processing_time >= 0
-        assert metrics.recommendation in [
-            "small_file_direct", "medium_file_direct", 
-            "medium_file_with_warning", "large_file_recommend_file_output",
-            "very_large_file_require_pagination"
-        ]
+
     
-    def test_service_layer_integration(self):
-        """测试服务层集成。"""
-        # 1. 创建服务
-        parser_factory = ParserFactory()
-        html_converter = HTMLConverter()
-        service = SheetService(parser_factory, html_converter)
-        
-        # 2. 测试CSV处理
-        csv_html = service.convert_to_html("tests/data/sample.csv")
-        assert "<table>" in csv_html
-        assert len(csv_html) > 100
-        
-        # 3. 测试XLSX处理
-        xlsx_html = service.convert_to_html("tests/data/sample.xlsx")
-        assert "<table>" in xlsx_html
-        assert len(xlsx_html) > 100
+
 
 
 class TestMCPToolsIntegration:
