@@ -9,43 +9,36 @@
 
 ## 2. 系统架构
 
-### 2.1 目录结构
+### 2.1 目录结构 - 简化版
 ```
 g:/MCP-Sheet-Parser/
 ├── src/
-│   ├── main.py                 # MCP服务器入口
+│   ├── main.py                 # MCP服务器入口（在根目录）
+│   ├── core_service.py         # 核心业务服务（简化版）
 │   ├── mcp_server/             # MCP服务器实现 (接口层)
 │   │   ├── __init__.py
-│   │   └── tools.py            # 工具定义
-│   ├── services/               # 业务逻辑层
-│   │   ├── __init__.py
-│   │   └── sheet_service.py    # 核心业务服务
+│   │   ├── server.py           # 服务器主逻辑
+│   │   └── tools.py            # 3个核心工具定义
 │   ├── parsers/                # 解析器 (实现层)
 │   │   ├── __init__.py
 │   │   ├── base_parser.py      # 抽象基类
 │   │   ├── xlsx_parser.py      # .xlsx解析器
 │   │   ├── csv_parser.py       # .csv解析器
-│   │   ├── xls_parser.py       # .xls解析器
-│   │   ├── xlsb_parser.py      # .xlsb解析器
 │   │   └── factory.py          # 解析器工厂
-│   ├── converters/             # 转换器 (实现层)
-│   │   ├── __init__.py
-│   │   ├── html_converter.py   # HTML转换器
-│   │   └── json_converter.py   # JSON转换器
 │   ├── models/                 # 数据模型 (实现层)
 │   │   ├── __init__.py
 │   │   └── table_model.py      # Sheet/Row/Cell/Style 定义
-│   ├── utils/                  # 工具模块 (实现层)
-│   │   ├── __init__.py
-│   │   └── performance.py      # 性能优化器
-│   ├── templates/              # HTML模板
-│   │   └── optimized_table_template.html
 │   └── exceptions/             # 自定义异常
 │       ├── __init__.py
 │       └── custom_exceptions.py
 ├── tests/
 └── memory-bank/
 ```
+
+**简化说明：**
+- 移除了复杂的services、converters、utils、templates目录
+- 用单一的core_service.py替代多层服务架构
+- 专注于3个核心工具，避免过度工程化
 
 ### 2.2 类与接口定义
 
@@ -182,39 +175,43 @@ class SheetService:
 ## 3. 数据流
 `File Input` → `SheetService` → `ParserFactory` → `Specific Parser` → `Sheet Model` → `HTMLConverter` → `HTML Output`
 
-## 4. MCP工具架构模式
+## 4. MCP工具架构模式 - 简化版
 
-### 4.1 工具分层设计
-**核心工具（90%使用场景）：**
-- `parse_sheet_to_json` - 数据获取和分析
-- `convert_json_to_html` - 完美复刻生成
-- `convert_file_to_html` - 智能直接转换
+### 4.1 三个核心工具设计
+1. **`convert_to_html`** - 完美HTML转换
+   - 直接文件到HTML，返回路径
+   - 后台处理，不占用LLM上下文
+   - 95%样式保真度
 
-**专业工具（高级需求）：**
-- `convert_file_to_html_file` - 文件输出模式
-- `get_table_summary` - 预览分析（含性能建议）
-- `get_sheet_metadata` - 元数据获取
-- `convert_file_to_html_paginated` - 大文件分页处理
+2. **`parse_sheet`** - JSON数据解析
+   - 支持范围选择和工作表选择
+   - 智能大小检测，大文件返回摘要
+   - LLM友好的JSON格式
+
+3. **`apply_changes`** - 数据写回
+   - 完成编辑闭环
+   - 自动备份机制
+   - 保持文件格式和样式
 
 ### 4.2 工作流程模式
-**完美复刻流程：**
+**HTML转换流程：**
 ```
-文件 → parse_sheet_to_json → LLM分析 → convert_json_to_html → 完美HTML文件
-```
-
-**快速转换流程：**
-```
-文件 → convert_file_to_html → 智能HTML输出
+文件 → convert_to_html → HTML文件路径
 ```
 
-**预览分析流程：**
+**数据分析流程：**
 ```
-文件 → get_table_summary → 摘要信息（含性能建议）
+文件 → parse_sheet → JSON数据 → LLM分析
+```
+
+**数据编辑流程：**
+```
+文件 → parse_sheet → JSON → LLM编辑 → apply_changes → 写回文件
 ```
 
 **大文件处理流程：**
 ```
-文件 → convert_file_to_html_paginated → 分页HTML文件集合
+文件 → parse_sheet → 摘要+建议 → parse_sheet(range) → 详细数据
 ```
 
 ### 4.3 JSON数据格式模式

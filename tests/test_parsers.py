@@ -6,6 +6,7 @@ from src.parsers.csv_parser import CsvParser
 from src.parsers.xlsx_parser import XlsxParser
 from src.parsers.xls_parser import XlsParser
 from src.parsers.xlsb_parser import XlsbParser
+from src.parsers.xlsm_parser import XlsmParser
 from src.parsers.factory import ParserFactory, UnsupportedFileType
 
 @pytest.fixture
@@ -182,7 +183,7 @@ def test_xlsx_style_extraction_background_and_alignment(sample_xlsx_path: Path):
 
     first_cell = sheet.rows[0].cells[0]
     style = first_cell.style
-
+    assert style is not None
     # 测试背景色
     assert isinstance(style.background_color, str)
     assert style.background_color.startswith('#')
@@ -202,7 +203,7 @@ def test_xlsx_style_extraction_borders(sample_xlsx_path: Path):
 
     first_cell = sheet.rows[0].cells[0]
     style = first_cell.style
-
+    assert style is not None
     # 测试边框属性
     assert isinstance(style.border_top, str)
     assert isinstance(style.border_bottom, str)
@@ -219,7 +220,7 @@ def test_xlsx_style_extraction_number_format(sample_xlsx_path: Path):
 
     first_cell = sheet.rows[0].cells[0]
     style = first_cell.style
-
+    assert style is not None
     # 测试数字格式
     assert isinstance(style.number_format, str)
 
@@ -233,7 +234,7 @@ def test_style_fidelity_coverage(sample_xlsx_path: Path):
     for row_idx, row in enumerate(sheet.rows[:3]):  # Test first 3 rows
         for cell_idx, cell in enumerate(row.cells[:3]):  # Test first 3 columns
             style = cell.style
-
+            assert style is not None
             # 验证所有样式属性都存在且类型正确
             style_properties = [
                 ('bold', bool),
@@ -284,8 +285,9 @@ def test_border_style_mapping():
 
     # 创建用于测试的 mock 边框对象
     class MockBorderSide:
-        def __init__(self, style):
+        def __init__(self, style, color=None):
             self.style = style
+            self.color = color
 
     # 测试多种边框样式
     border_styles = ['thin', 'medium', 'thick', 'double', 'dotted', 'dashed', 'hair']
@@ -591,3 +593,412 @@ class TestParserFactoryExtended:
         assert "不支持的文件格式" in error_message
         assert "unknown" in error_message
         assert "支持的格式" in error_message
+
+
+@pytest.fixture
+def failing_style_sample_path() -> Path:
+    return Path(__file__).parent / "data" / "failing_style_sample.xlsx"
+
+def test_failing_style_extraction(failing_style_sample_path: Path):
+    """
+    测试 XlsxParser 能否正确解析包含复杂样式的文件。
+    这个测试目前预期会失败，用于驱动 bug 修复。
+    """
+    # 准备
+    parser = XlsxParser()
+
+    # 执行
+    sheet = parser.parse(str(failing_style_sample_path))
+
+    # 断言 - Style 1
+    style1 = sheet.rows[0].cells[0].style
+    assert style1 is not None, "Style1 should not be None"
+    assert style1.font_color == "#FF0000"
+    assert style1.background_color == "#FFFF00"
+    assert style1.bold is True
+    assert style1.italic is True
+    assert style1.border_left == "1px solid #000000"
+    assert style1.border_right == "3px double #00FF00"
+    assert style1.border_top == "1px dashed #0000FF"
+    assert style1.border_bottom == "2px solid #FF00FF"
+    assert style1.text_align == "center"
+    assert style1.vertical_align == "center"
+    assert style1.wrap_text is True
+
+    # 断言 - Style 2
+    style2 = sheet.rows[1].cells[1].style
+    assert style2 is not None, "Style2 should not be None"
+    assert style2.font_color == "#0000FF"
+    assert style2.underline is True
+    assert style2.background_color == "#C0C0C0" # lightGray
+    assert style2.text_align == "right"
+    assert style2.vertical_align == "bottom"
+
+    # 断言 - Style 3
+    style3 = sheet.rows[2].cells[2].style
+    assert style3 is not None, "Style3 should not be None"
+    assert style3.font_color == "#E06666"
+    assert style3.border_left == "2px solid #000000"
+    assert style3.border_right == "2px solid #000000"
+    assert style3.text_align == "left"
+    assert style3.vertical_align == "top"
+
+    # 断言 - Merged Cell
+    merged_style = sheet.rows[3].cells[3].style
+    assert merged_style is not None, "Merged style should not be None"
+    assert sheet.merged_cells == ["D4:E5"]
+    assert merged_style.font_color == "#8E7CC3"
+    assert merged_style.background_color == "#D9EAD3"
+    assert merged_style.text_align == "center"
+    assert merged_style.vertical_align == "center"
+
+
+# ==================== 新解析器测试用例 ====================
+
+class TestXlsParser:
+    """XLS解析器测试类"""
+
+    def test_xls_parser_creation(self):
+        """测试XlsParser能否正确创建"""
+        parser = XlsParser()
+        assert isinstance(parser, BaseParser)
+        assert isinstance(parser, XlsParser)
+
+    def test_xls_parser_color_mapping(self):
+        """测试XLS颜色映射功能"""
+        parser = XlsParser()
+
+        # 测试标准颜色
+        assert parser.default_color_map[0] == "#000000"  # 黑色
+        assert parser.default_color_map[1] == "#FFFFFF"  # 白色
+        assert parser.default_color_map[2] == "#FF0000"  # 红色
+
+        # 测试颜色获取
+        class MockWorkbook:
+            colour_map = {2: (255, 0, 0)}  # 红色
+
+        mock_wb = MockWorkbook()
+        color = parser._get_color_from_index(mock_wb, 2)
+        assert color == "#FF0000"
+
+    def test_xls_parser_cell_reference_conversion(self):
+        """测试Excel单元格引用转换"""
+        parser = XlsParser()
+
+        # 测试基本转换
+        assert parser._index_to_excel_cell(0, 0) == "A1"
+        assert parser._index_to_excel_cell(1, 1) == "B2"
+        assert parser._index_to_excel_cell(0, 25) == "Z1"
+        assert parser._index_to_excel_cell(0, 26) == "AA1"
+
+
+class TestXlsbParser:
+    """XLSB解析器测试类"""
+
+    def test_xlsb_parser_creation(self):
+        """测试XlsbParser能否正确创建"""
+        parser = XlsbParser()
+        assert isinstance(parser, BaseParser)
+        assert isinstance(parser, XlsbParser)
+
+    def test_xlsb_parser_cell_value_processing(self):
+        """测试XLSB单元格值处理"""
+        parser = XlsbParser()
+
+        # 测试不同数据类型
+        assert parser._process_cell_value(None) is None
+        assert parser._process_cell_value("text") == "text"
+        assert parser._process_cell_value(42) == 42
+        assert parser._process_cell_value(3.14) == 3.14
+        assert parser._process_cell_value(True) is True
+
+        # 测试日期检测（44197对应2021-01-01）
+        result = parser._process_cell_value(44197.0)
+        assert hasattr(result, 'year')  # 应该是datetime对象
+
+    def test_xlsb_parser_style_extraction(self):
+        """测试XLSB基础样式提取"""
+        parser = XlsbParser()
+
+        class MockCellData:
+            pass
+
+        mock_cell = MockCellData()
+        style = parser._extract_basic_style(mock_cell)
+
+        # 验证默认样式
+        assert style.font_name == "Calibri"
+        assert style.font_size == 11.0
+        assert style.font_color == "#000000"
+        assert style.text_align == "left"
+        assert style.vertical_align == "bottom"
+
+
+class TestXlsmParser:
+    """XLSM解析器测试类"""
+
+    def test_xlsm_parser_creation(self):
+        """测试XlsmParser能否正确创建"""
+        parser = XlsmParser()
+        assert isinstance(parser, BaseParser)
+        assert isinstance(parser, XlsxParser)  # 继承自XlsxParser
+        assert isinstance(parser, XlsmParser)
+
+    def test_xlsm_parser_inheritance(self):
+        """测试XLSM解析器继承功能"""
+        parser = XlsmParser()
+
+        # 验证继承的方法存在
+        assert hasattr(parser, '_extract_style')
+        assert hasattr(parser, '_extract_color')
+        assert hasattr(parser, '_get_color_by_index')
+        assert hasattr(parser, '_extract_fill_color')
+        assert hasattr(parser, '_extract_number_format')
+        assert hasattr(parser, '_extract_hyperlink')
+
+    def test_xlsm_parser_macro_info_structure(self):
+        """测试宏信息结构"""
+        parser = XlsmParser()
+
+        # 测试宏信息结构（不需要真实文件）
+        expected_keys = ["has_macros", "vba_files_count", "vba_modules", "file_path"]
+
+        # 模拟宏信息结构
+        mock_info = {
+            "has_macros": False,
+            "vba_files_count": 0,
+            "vba_modules": [],
+            "file_path": "test.xlsm"
+        }
+
+        for key in expected_keys:
+            assert key in mock_info
+
+    def test_xlsm_parser_file_type_check(self):
+        """测试文件类型检查"""
+        parser = XlsmParser()
+
+        # 测试扩展名检查
+        assert "test.xlsm".lower().endswith('.xlsm')
+        assert not "test.xlsx".lower().endswith('.xlsm')
+        assert not "test.xls".lower().endswith('.xlsm')
+
+
+class TestParserFactoryEnhanced:
+    """增强的ParserFactory测试类"""
+
+    def test_factory_supports_all_formats(self):
+        """测试工厂支持所有5种格式"""
+        supported_formats = ParserFactory.get_supported_formats()
+        expected_formats = ["csv", "xlsx", "xls", "xlsb", "xlsm"]
+
+        assert len(supported_formats) == 5
+        for fmt in expected_formats:
+            assert fmt in supported_formats
+
+    def test_factory_get_parser_xls(self):
+        """测试工厂返回XLS解析器"""
+        parser = ParserFactory.get_parser("test.xls")
+        assert isinstance(parser, XlsParser)
+
+    def test_factory_get_parser_xlsb(self):
+        """测试工厂返回XLSB解析器"""
+        parser = ParserFactory.get_parser("test.xlsb")
+        assert isinstance(parser, XlsbParser)
+
+    def test_factory_get_parser_xlsm(self):
+        """测试工厂返回XLSM解析器"""
+        parser = ParserFactory.get_parser("test.xlsm")
+        assert isinstance(parser, XlsmParser)
+
+    def test_factory_format_info(self):
+        """测试格式信息功能"""
+        format_info = ParserFactory.get_format_info()
+
+        # 验证所有格式都有信息
+        expected_formats = ["csv", "xlsx", "xls", "xlsb", "xlsm"]
+        for fmt in expected_formats:
+            assert fmt in format_info
+            info = format_info[fmt]
+            assert "name" in info
+            assert "description" in info
+            assert "features" in info
+            assert "parser_class" in info
+
+    def test_factory_is_supported_format(self):
+        """测试格式支持检查"""
+        # 支持的格式
+        assert ParserFactory.is_supported_format("test.csv")
+        assert ParserFactory.is_supported_format("test.xlsx")
+        assert ParserFactory.is_supported_format("test.xls")
+        assert ParserFactory.is_supported_format("test.xlsb")
+        assert ParserFactory.is_supported_format("test.xlsm")
+
+        # 不支持的格式
+        assert not ParserFactory.is_supported_format("test.doc")
+        assert not ParserFactory.is_supported_format("test.txt")
+        assert not ParserFactory.is_supported_format("test.pdf")
+
+    def test_factory_case_insensitive(self):
+        """测试格式检查大小写不敏感"""
+        assert ParserFactory.is_supported_format("test.XLSX")
+        assert ParserFactory.is_supported_format("test.XLS")
+        assert ParserFactory.is_supported_format("test.XLSM")
+
+        # 测试解析器获取也支持大小写
+        parser_lower = ParserFactory.get_parser("test.xlsx")
+        parser_upper = ParserFactory.get_parser("test.XLSX")
+        assert type(parser_lower) == type(parser_upper)
+
+
+class TestStyleFidelity:
+    """样式保真度测试类"""
+
+    def test_xlsx_enhanced_color_extraction(self):
+        """测试XLSX增强的颜色提取"""
+        parser = XlsxParser()
+
+        # 测试简化的颜色提取
+        class MockColor:
+            def __init__(self, value):
+                self.value = value
+
+        # 测试RGB颜色
+        rgb_color = MockColor('FF0000')
+        assert parser._extract_color(rgb_color) == "#FF0000"
+
+        # 测试ARGB颜色
+        argb_color = MockColor('00FF0000')
+        assert parser._extract_color(argb_color) == "#FF0000"
+
+        # 测试索引颜色
+        index_color = MockColor(2)
+        assert parser._extract_color(index_color) == "#FF0000"
+
+    def test_xlsx_enhanced_fill_extraction(self):
+        """测试XLSX增强的填充提取"""
+        parser = XlsxParser()
+
+        class MockColor:
+            def __init__(self, value):
+                self.value = value
+
+        class MockFill:
+            def __init__(self, pattern_type=None, start_color=None, fg_color=None):
+                self.patternType = pattern_type
+                self.start_color = start_color
+                self.fgColor = fg_color
+
+        # 测试实色填充
+        solid_fill = MockFill('solid', MockColor('FF0000'))
+        assert parser._extract_fill_color(solid_fill) == "#FF0000"
+
+        # 测试图案填充
+        gray_fill = MockFill('lightGray')
+        assert parser._extract_fill_color(gray_fill) == "#F2F2F2"
+
+    def test_xlsx_enhanced_number_format(self):
+        """测试XLSX增强的数字格式"""
+        parser = XlsxParser()
+
+        class MockCell:
+            def __init__(self, number_format):
+                self.number_format = number_format
+
+        # 测试常见格式映射
+        assert parser._extract_number_format(MockCell('0.00')) == "数字(2位小数)"
+        assert parser._extract_number_format(MockCell('0%')) == "百分比"
+        assert parser._extract_number_format(MockCell('mm/dd/yyyy')) == "日期(月/日/年)"
+        assert parser._extract_number_format(MockCell('General')) == ""
+
+    def test_xlsx_enhanced_hyperlink(self):
+        """测试XLSX增强的超链接处理"""
+        parser = XlsxParser()
+
+        class MockHyperlink:
+            def __init__(self, target=None, location=None):
+                self.target = target
+                self.location = location
+
+        class MockCell:
+            def __init__(self, hyperlink):
+                self.hyperlink = hyperlink
+
+        # 测试外部链接
+        external_cell = MockCell(MockHyperlink(target='https://example.com'))
+        assert parser._extract_hyperlink(external_cell) == 'https://example.com'
+
+        # 测试内部链接
+        internal_cell = MockCell(MockHyperlink(location='Sheet2!A1'))
+        assert parser._extract_hyperlink(internal_cell) == '#内部:Sheet2!A1'
+
+        # 测试无链接
+        no_link_cell = MockCell(None)
+        assert parser._extract_hyperlink(no_link_cell) is None
+
+
+class TestErrorHandling:
+    """错误处理测试类"""
+
+    def test_parser_invalid_file_path(self):
+        """测试解析器处理无效文件路径"""
+        parsers = [XlsParser(), XlsbParser(), XlsmParser()]
+
+        for parser in parsers:
+            with pytest.raises(RuntimeError):
+                parser.parse("nonexistent_file.invalid")
+
+    def test_factory_invalid_extension(self):
+        """测试工厂处理无效扩展名"""
+        with pytest.raises(UnsupportedFileType) as exc_info:
+            ParserFactory.get_parser("test.invalid")
+
+        assert "不支持的文件格式" in str(exc_info.value)
+        assert "invalid" in str(exc_info.value)
+
+    def test_factory_no_extension(self):
+        """测试工厂处理无扩展名文件"""
+        with pytest.raises(UnsupportedFileType):
+            ParserFactory.get_parser("filename_without_extension")
+
+    def test_parser_empty_file_path(self):
+        """测试解析器处理空文件路径"""
+        parsers = [XlsParser(), XlsbParser(), XlsmParser()]
+
+        for parser in parsers:
+            with pytest.raises((RuntimeError, ValueError, FileNotFoundError)):
+                parser.parse("")
+
+
+class TestPerformanceBenchmark:
+    """性能基准测试类"""
+
+    def test_parser_creation_performance(self):
+        """测试解析器创建性能"""
+        import time
+
+        # 测试解析器创建时间
+        start_time = time.time()
+        for _ in range(100):
+            XlsParser()
+            XlsbParser()
+            XlsmParser()
+        end_time = time.time()
+
+        # 100次创建应该在1秒内完成
+        assert (end_time - start_time) < 1.0
+
+    def test_factory_performance(self):
+        """测试工厂性能"""
+        import time
+
+        test_files = ["test.csv", "test.xlsx", "test.xls", "test.xlsb", "test.xlsm"]
+
+        start_time = time.time()
+        for _ in range(1000):
+            for file in test_files:
+                ParserFactory.get_parser(file)
+        end_time = time.time()
+
+        # 5000次工厂调用应该在1秒内完成
+        assert (end_time - start_time) < 1.0

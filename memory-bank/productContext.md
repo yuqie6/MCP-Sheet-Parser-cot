@@ -13,15 +13,15 @@
 ## 2. 核心功能需求
 
 ### 2.1 文件格式支持
-**已支持的格式：**
+**核心支持格式：**
 - `.xlsx` - 现代Excel格式（主要格式）
 - `.csv` - 通用文本格式（简单格式）
-- `.xls` - 传统Excel格式（已实现）
-- `.xlsb` - Excel二进制格式（已实现）
-
-**可选支持的格式（后期扩展）：**
+- `.xls` - 传统Excel格式
+- `.xlsb` - Excel二进制格式
 - `.xlsm` - Excel宏格式
-- `.et`, `.ett`, `.ets` - WPS格式
+
+**已放弃格式：**
+- `.et`, `.ett`, `.ets` - WPS格式（实现复杂度过高，已放弃）
 
 ### 2.2 解析能力
 **核心解析功能：**
@@ -48,35 +48,32 @@
 - 提供紧凑HTML模式（减少输出大小）
 - 智能处理建议（大文件时推荐文件输出）
 
-## 3. MCP工具接口设计
+## 3. MCP工具接口设计 - 简化版
 
-### 3.1 核心工具（90%使用场景）
-1. **`parse_sheet_to_json`** - 解析为JSON格式，LLM友好
-   - 返回结构化JSON数据给LLM分析
-   - 包含完整数据、样式、合并信息
-   - Token友好，紧凑格式
+### 3.1 三个核心工具（完整闭环）
+1. **`convert_to_html`** - 完美表格到HTML转换
+   - **输入**: 表格文件路径
+   - **输出**: HTML文件路径（默认同目录，支持自定义）
+   - **核心价值**: 95%样式保真度，完美视觉还原
+   - **LLM交互**: 只返回路径，不传输HTML内容（避免上下文爆炸）
 
-2. **`convert_json_to_html`** - JSON到完美HTML文件转换
-   - 接收JSON数据，生成完美HTML文件
-   - 95%样式保真度目标
-   - 返回HTML文件路径
+2. **`parse_sheet`** - 解析为TableModel JSON格式
+   - **输入**: 文件路径 + 可选工作表名 + 可选范围（如"A1:D10"）
+   - **输出**: 标准化TableModel JSON数据
+   - **核心价值**: 为LLM提供可分析编辑的结构化数据
+   - **智能处理**: 小文件直接返回，大文件返回摘要+建议选择范围
 
-3. **`convert_file_to_html`** - 智能直接转换
-   - 小文件返回HTML内容，大文件返回建议
-   - 智能判断处理策略
-   - 包含性能建议
+3. **`apply_changes`** - 将修改应用回原始文件
+   - **输入**: 原文件路径 + 修改后的TableModel JSON
+   - **输出**: 操作结果（成功/失败信息）
+   - **核心价值**: 完成"读-编辑-写"完整闭环
+   - **安全保障**: 自动备份原文件，支持回档
 
-### 3.2 专业工具（高级需求）
-4. **`convert_file_to_html_file`** - 直接生成HTML文件
-5. **`get_table_summary`** - 表格概览预览（含性能分析）
-6. **`get_sheet_metadata`** - 文件元数据
-7. **`convert_file_to_html_paginated`** - 大文件分页处理（新增）
-
-### 3.3 工作流程设计
-**完美复刻流程：** 文件 → `parse_sheet_to_json` → LLM分析 → `convert_json_to_html` → 完美HTML文件
-**快速转换流程：** 文件 → `convert_file_to_html` → 智能HTML输出
-**预览分析流程：** 文件 → `get_table_summary` → 摘要信息（含性能建议）
-**大文件处理流程：** 文件 → `convert_file_to_html_paginated` → 分页HTML文件集合
+### 3.2 工作流程设计
+**完美转换流程：** 文件 → `convert_to_html` → HTML文件路径
+**数据分析流程：** 文件 → `parse_sheet` → LLM分析JSON数据
+**数据编辑流程：** 文件 → `parse_sheet` → LLM编辑 → `apply_changes` → 写回文件
+**大文件处理：** 文件 → `parse_sheet` → 摘要信息 → 选择范围 → `parse_sheet(range)` → 详细数据
 
 ## 4. 技术规范
 

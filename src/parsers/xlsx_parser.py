@@ -60,11 +60,10 @@ class XlsxParser(BaseParser):
                 if font_color and font_color != "#000000":  # Only set if not default black
                     style.font_color = font_color
 
-        # Extract fill/background properties (comprehensive approach)
-        if cell.fill and cell.fill.start_color:
-            background_color = self._extract_color(cell.fill.start_color)
-            # 特殊处理：00000000 ARGB 通常表示透明/自动背景，应视为白色
-            if background_color and background_color not in ["#FFFFFF", "#000000"]:
+        # Extract fill/background properties (enhanced comprehensive approach)
+        if cell.fill:
+            background_color = self._extract_fill_color(cell.fill)
+            if background_color:
                 style.background_color = background_color
 
         # Extract alignment properties
@@ -99,12 +98,11 @@ class XlsxParser(BaseParser):
 
             if border_color:
                 style.border_color = border_color
+            else:
+                style.border_color = Style().border_color
 
-        # Extract number format
-        if cell.number_format and cell.number_format != 'General':
-            style.number_format = cell.number_format
-        else:
-            style.number_format = ""
+        # Extract number format (enhanced)
+        style.number_format = self._extract_number_format(cell)
 
         # Extract hyperlink information
         if cell.hyperlink:
@@ -130,52 +128,7 @@ class XlsxParser(BaseParser):
 
         return style
 
-    def _get_indexed_color(self, index: int) -> str:
-        """
-        Convert indexed color to hex color.
-        Handles the standard Excel color palette.
-        """
-        # Standard Excel indexed colors (corrected mapping)
-        # In Excel, index 64 is often used for automatic/default colors
-        indexed_colors = {
-            0: "#000000",  # Black
-            1: "#FFFFFF",  # White
-            2: "#FF0000",  # Red
-            3: "#00FF00",  # Green
-            4: "#0000FF",  # Blue
-            5: "#FFFF00",  # Yellow
-            6: "#FF00FF",  # Magenta
-            7: "#00FFFF",  # Cyan
-            8: "#000000",  # Black
-            9: "#FFFFFF",  # White
-            10: "#FF0000", # Red
-            64: "#FFFFFF", # Automatic/Default (usually white for background)
-            # Add more as needed
-        }
-        return indexed_colors.get(index, "#FFFFFF")  # Default to white instead of black
 
-    def _get_indexed_color_for_font(self, index: int) -> str:
-        """
-        Convert indexed color to hex color specifically for font colors.
-        Font colors have different defaults than background colors.
-        """
-        # Standard Excel indexed colors for fonts
-        indexed_colors = {
-            0: "#000000",  # Black
-            1: "#FFFFFF",  # White
-            2: "#FF0000",  # Red
-            3: "#00FF00",  # Green
-            4: "#0000FF",  # Blue
-            5: "#FFFF00",  # Yellow
-            6: "#FF00FF",  # Magenta
-            7: "#00FFFF",  # Cyan
-            8: "#000000",  # Black
-            9: "#FFFFFF",  # White
-            10: "#FF0000", # Red
-            64: "#000000", # Automatic/Default (usually black for font)
-            # Add more as needed
-        }
-        return indexed_colors.get(index, "#000000")  # Default to black for fonts
 
     def _get_border_style(self, border_side) -> str:
         """
@@ -188,7 +141,7 @@ class XlsxParser(BaseParser):
         border_style_map = {
             'thin': '1px solid',
             'medium': '2px solid',
-            'thick': '3px solid',
+            'thick': '2px solid',
             'double': '3px double',
             'dotted': '1px dotted',
             'dashed': '1px dashed',
@@ -200,12 +153,83 @@ class XlsxParser(BaseParser):
             'mediumDashDotDot': '2px dashed',
             'slantDashDot': '1px dashed'
         }
+        
+        # 如果样式不在我们的映射中，也视为空
+        style_str = border_style_map.get(border_side.style)
+        if not style_str:
+            return ""
+        
+        color = None
+        if border_side.color:
+            color = self._extract_color(border_side.color)
 
-        return border_style_map.get(border_side.style, '1px solid')
+        # 如果没有提取到有效颜色，使用默认黑色
+        final_color = color if color else "#000000"
+        
+        return f"{style_str} {final_color}"
+
+    def _extract_fill_color(self, fill) -> str | None:
+        """
+        增强的填充颜色提取，支持多种填充类型。
+
+        Args:
+            fill: openpyxl填充对象
+
+        Returns:
+            提取的背景颜色，如果无有效颜色则返回None
+        """
+        if not fill:
+            return None
+
+        try:
+            # 1. 实色填充 (PatternFill with solid pattern)
+            if hasattr(fill, 'patternType') and fill.patternType:
+                if fill.patternType == 'solid' and hasattr(fill, 'start_color') and fill.start_color:
+                    color = self._extract_color(fill.start_color)
+                    # 过滤掉默认的白色和黑色背景
+                    if color and color not in ["#FFFFFF", "#000000"]:
+                        return color
+
+                # 2. 图案填充 (其他pattern类型)
+                elif fill.patternType in ['lightGray', 'mediumGray', 'darkGray']:
+                    pattern_colors = {
+                        'lightGray': "#F2F2F2",
+                        'mediumGray': "#D9D9D9",
+                        'darkGray': "#BFBFBF"
+                    }
+                    return pattern_colors.get(fill.patternType)
+
+                # 3. 其他图案填充，尝试提取前景色
+                elif hasattr(fill, 'fgColor') and fill.fgColor:
+                    color = self._extract_color(fill.fgColor)
+                    if color and color not in ["#FFFFFF", "#000000"]:
+                        return color
+
+            # 4. 渐变填充 (GradientFill)
+            if hasattr(fill, 'type') and fill.type == 'gradient':
+                # 对于渐变，取第一个停止点的颜色作为主色
+                if hasattr(fill, 'stop') and fill.stop:
+                    # stop可能是列表或单个值
+                    if isinstance(fill.stop, (list, tuple)) and len(fill.stop) > 0:
+                        first_stop = fill.stop[0]
+                        if hasattr(first_stop, 'color') and first_stop.color:
+                            color = self._extract_color(first_stop.color)
+                            if color and color not in ["#FFFFFF", "#000000"]:
+                                return color
+                    elif hasattr(fill.stop, 'color'):
+                        color = self._extract_color(fill.stop.color)
+                        if color and color not in ["#FFFFFF", "#000000"]:
+                            return color
+
+        except Exception as e:
+            # 静默处理填充提取错误
+            pass
+
+        return None
 
     def _extract_color(self, color_obj) -> str | None:
         """
-        从 openpyxl 颜色对象中提取颜色值，支持所有颜色类型。
+        简化的颜色提取方法，使用openpyxl的统一value接口。
 
         Args:
             color_obj: openpyxl 颜色对象
@@ -217,53 +241,136 @@ class XlsxParser(BaseParser):
             return None
 
         try:
-            # 1. RGB 颜色（最常见）
-            if hasattr(color_obj, 'rgb') and color_obj.rgb is not None:
-                # 检查是否是有效的 RGB 字符串
-                if isinstance(color_obj.rgb, str):
-                    rgb_value = color_obj.rgb
-                    # 处理 ARGB 格式（8位）和 RGB 格式（6位）
-                    if len(rgb_value) == 8:  # ARGB
-                        return f"#{rgb_value[2:]}"  # 去掉前两位 Alpha 通道
-                    elif len(rgb_value) == 6:  # RGB
-                        return f"#{rgb_value}"
+            # 使用openpyxl的统一value接口
+            value = color_obj.value
 
-            # 2. 索引颜色
-            if hasattr(color_obj, 'indexed') and color_obj.indexed is not None:
-                # 确保 indexed 是一个有效的整数
-                if isinstance(color_obj.indexed, int):
-                    return self._get_indexed_color(color_obj.indexed)
-
-            # 3. 主题颜色
-            if hasattr(color_obj, 'theme') and color_obj.theme is not None:
-                # 主题颜色的基本映射（可以根据需要扩展）
-                theme_colors = {
-                    0: "#FFFFFF",  # 背景1
-                    1: "#000000",  # 文本1
-                    2: "#E7E6E6",  # 背景2
-                    3: "#44546A",  # 文本2
-                    4: "#5B9BD5",  # 强调1
-                    5: "#70AD47",  # 强调2
-                    6: "#FFC000",  # 强调3
-                    7: "#264478",  # 强调4
-                    8: "#7030A0",  # 强调5
-                    9: "#0F243E",  # 强调6
-                }
-                base_color = theme_colors.get(color_obj.theme, "#000000")
-
-                # 处理色调变化（tint）
-                if hasattr(color_obj, 'tint') and color_obj.tint:
-                    # 简化的色调处理，实际应该更复杂
-                    return base_color
-
-                return base_color
-
-            # 4. 自动颜色
-            if hasattr(color_obj, 'auto') and color_obj.auto:
-                return None  # 使用默认颜色
+            if isinstance(value, str) and len(value) >= 6:
+                # RGB/ARGB格式 - 取最后6位作为RGB
+                return f"#{value[-6:]}"
+            elif isinstance(value, int):
+                # 索引或主题颜色 - 使用映射表
+                return self._get_color_by_index(value)
 
         except Exception as e:
-            # 记录错误但不中断处理
-            print(f"颜色提取失败: {e}")
+            # 静默处理错误，避免中断解析
+            pass
+
+        return None
+
+    def _get_color_by_index(self, index: int) -> str:
+        """
+        统一的索引颜色映射，支持标准索引和主题颜色。
+
+        Args:
+            index: 颜色索引或主题索引
+
+        Returns:
+            十六进制颜色字符串
+        """
+        # 合并的颜色映射表（索引颜色 + 主题颜色）
+        color_map = {
+            # 标准索引颜色
+            0: "#000000",   # 黑色
+            1: "#FFFFFF",   # 白色
+            2: "#FF0000",   # 红色
+            3: "#00FF00",   # 绿色
+            4: "#0000FF",   # 蓝色
+            5: "#FFFF00",   # 黄色
+            6: "#FF00FF",   # 洋红
+            7: "#00FFFF",   # 青色
+            8: "#000000",   # 黑色
+            9: "#FFFFFF",   # 白色
+            10: "#FF0000",  # 红色
+            64: "#000000",  # 自动颜色（通常是黑色）
+
+            # 主题颜色（索引0-9对应主题颜色）
+            # 注意：这里可能与标准索引有重叠，以主题颜色为准
+            # 0: "#FFFFFF",  # 背景1（与索引0重叠）
+            # 1: "#000000",  # 文本1（与索引1重叠）
+            # 2: "#E7E6E6",  # 背景2
+            # 3: "#44546A",  # 文本2
+            # 4: "#5B9BD5",  # 强调1
+            # 5: "#70AD47",  # 强调2
+            # 6: "#FFC000",  # 强调3
+            # 7: "#264478",  # 强调4
+            # 8: "#7030A0",  # 强调5
+            # 9: "#0F243E",  # 强调6
+        }
+
+        return color_map.get(index, "#000000")  # 默认黑色
+
+    def _extract_number_format(self, cell) -> str:
+        """
+        增强的数字格式提取。
+
+        Args:
+            cell: openpyxl单元格对象
+
+        Returns:
+            数字格式字符串
+        """
+        try:
+            if cell.number_format and cell.number_format != 'General':
+                # 标准化一些常见的数字格式
+                format_str = cell.number_format
+
+                # 处理一些特殊格式
+                format_mappings = {
+                    '0.00': '数字(2位小数)',
+                    '0%': '百分比',
+                    '0.00%': '百分比(2位小数)',
+                    'mm/dd/yyyy': '日期(月/日/年)',
+                    'dd/mm/yyyy': '日期(日/月/年)',
+                    'yyyy-mm-dd': '日期(年-月-日)',
+                    '$#,##0.00': '货币',
+                    '¥#,##0.00': '人民币',
+                    '#,##0': '千分位数字'
+                }
+
+                # 如果是常见格式，返回中文描述，否则返回原格式
+                return format_mappings.get(format_str, format_str) or ""
+        except:
+            pass
+
+        return ""
+
+    def _extract_hyperlink(self, cell) -> str | None:
+        """
+        增强的超链接提取。
+
+        Args:
+            cell: openpyxl单元格对象
+
+        Returns:
+            超链接URL或None
+        """
+        if not cell.hyperlink:
+            return None
+
+        try:
+            # 1. 外部链接 (target属性)
+            if hasattr(cell.hyperlink, 'target') and cell.hyperlink.target:
+                target = cell.hyperlink.target
+                # 确保是有效的URL格式
+                if isinstance(target, str) and (
+                    target.startswith(('http://', 'https://', 'ftp://', 'mailto:')) or
+                    target.startswith('file://') or
+                    '.' in target  # 可能是文件路径或域名
+                ):
+                    return target
+
+            # 2. 内部链接 (location属性)
+            if hasattr(cell.hyperlink, 'location') and cell.hyperlink.location:
+                location = cell.hyperlink.location
+                if isinstance(location, str):
+                    # 内部链接通常是工作表引用，添加前缀标识
+                    return f"#内部:{location}"
+
+            # 3. 其他类型的超链接
+            if hasattr(cell.hyperlink, 'display') and cell.hyperlink.display:
+                return str(cell.hyperlink.display)
+
+        except Exception:
+            pass
 
         return None

@@ -12,6 +12,7 @@ dependencies = [
     "pytest",
     "pytest-asyncio>=1.0.0",
     "pytest-cov>=6.2.1",
+    "xlutils>=2.0.0",
 ]
 
 [tool.pytest.ini_options]
