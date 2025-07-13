@@ -155,16 +155,18 @@ class StreamingTableReader:
     def _get_headers(self) -> List[str]:
         """从第一行获取表头。"""
         if self._headers_cache is None:
+            first_row = None
             if self._lazy_sheet:
                 first_row = self._lazy_sheet.get_row(0)
-            else:
+            elif self._regular_sheet and self._regular_sheet.rows:
                 first_row = self._regular_sheet.rows[0]
-            
-            self._headers_cache = [
-                cell.value if cell.value is not None else f"Column_{i}"
-                for i, cell in enumerate(first_row.cells)
-            ]
-        
+            if first_row is not None:
+                self._headers_cache = [
+                    cell.value if cell.value is not None else f"Column_{i}"
+                    for i, cell in enumerate(first_row.cells)
+                ]
+            else:
+                self._headers_cache = []
         return self._headers_cache
     
     def _get_total_rows(self) -> int:
@@ -172,21 +174,24 @@ class StreamingTableReader:
         if self._total_rows_cache is None:
             if self._lazy_sheet:
                 self._total_rows_cache = self._lazy_sheet.get_total_rows()
-            else:
+            elif self._regular_sheet and self._regular_sheet.rows is not None:
                 self._total_rows_cache = len(self._regular_sheet.rows)
-        
+            else:
+                self._total_rows_cache = 0
         return self._total_rows_cache
     
     def _get_chunk_rows(self, start_row: int, chunk_size: int, column_indices: Optional[List[int]] = None) -> List[Row]:
         """获取一块数据行，支持可选的列过滤。"""
+        rows: List[Row] = []
         if self._lazy_sheet:
             # 使用懒加载工作表进行流式读取
             rows = list(self._lazy_sheet.iter_rows(start_row, chunk_size))
-        else:
+        elif self._regular_sheet and self._regular_sheet.rows is not None:
             # 使用常规工作表
             end_row = min(start_row + chunk_size, len(self._regular_sheet.rows))
             rows = self._regular_sheet.rows[start_row:end_row]
-        
+        # else rows remains empty
+
         # 应用列过滤
         if column_indices:
             filtered_rows = []
@@ -197,7 +202,7 @@ class StreamingTableReader:
                 ]
                 filtered_rows.append(Row(cells=filtered_cells))
             return filtered_rows
-        
+
         return rows
     
     def _apply_column_filter(self, headers: List[str], filter_config: ChunkFilter, 

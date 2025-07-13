@@ -47,11 +47,19 @@ class XlsmParser(XlsxParser):
             # 记录宏文件信息（用于调试和日志）
             self._log_macro_info(workbook, file_path)
             
-            # 解析数据和样式（完全复用XlsxParser的逻辑）
+            # 解析数据和样式（使用与XlsxParser相同的完整性逻辑）
+            # 获取工作表的实际尺寸，确保包含所有数据和样式
+            max_row = worksheet.max_row or 0
+            max_col = worksheet.max_column or 0
+
             rows = []
-            for row in worksheet.iter_rows():
+            # 使用坐标访问方式确保完整的表格结构
+            for row_idx in range(1, max_row + 1):
                 cells = []
-                for cell in row:
+                for col_idx in range(1, max_col + 1):
+                    # 直接通过坐标访问单元格，确保包含空单元格
+                    cell = worksheet.cell(row=row_idx, column=col_idx)
+
                     # 提取单元格值和样式
                     cell_value = cell.value
                     cell_style = extract_style(cell)

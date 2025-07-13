@@ -27,7 +27,10 @@ class XlsxRowProvider:
         if self._worksheet_title_cache is None:
             workbook = openpyxl.load_workbook(self.file_path, read_only=True)
             worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
-            self._worksheet_title_cache = worksheet.title
+            if worksheet is not None:
+                self._worksheet_title_cache = worksheet.title
+            else:
+                self._worksheet_title_cache = ""
             workbook.close()
         return self._worksheet_title_cache
     
@@ -37,7 +40,10 @@ class XlsxRowProvider:
             # Read merged cells from non-read-only workbook (required for merged_cells access)
             workbook = openpyxl.load_workbook(self.file_path)
             worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
-            self._merged_cells_cache = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
+            if worksheet is not None and hasattr(worksheet, "merged_cells"):
+                self._merged_cells_cache = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
+            else:
+                self._merged_cells_cache = []
             workbook.close()
         return self._merged_cells_cache
     
@@ -51,42 +57,61 @@ class XlsxRowProvider:
         return Row(cells=cells)
 
     def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
-        """Yield rows on demand using openpyxl.iter_rows with read_only=True."""
+        """Yield rows on demand with complete row structure."""
         workbook = openpyxl.load_workbook(self.file_path, read_only=True)
         worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
-        
         try:
-            # Use openpyxl's iter_rows with values_only=False to get cell objects with styles
-            row_count = 0
-            for row_cells in worksheet.iter_rows(values_only=False):
-                # Skip rows before start_row
-                if row_count < start_row:
-                    row_count += 1
-                    continue
-                
-                # Stop if we've reached max_rows
-                if max_rows is not None and (row_count - start_row) >= max_rows:
-                    break
-                
-                yield self._parse_row(row_cells)
-                row_count += 1
-        
+            if worksheet is not None:
+                # 获取工作表的完整尺寸
+                max_row = worksheet.max_row or 0
+                max_col = worksheet.max_column or 0
+
+                # 计算实际的行范围
+                end_row = max_row
+                if max_rows is not None:
+                    end_row = min(start_row + max_rows, max_row)
+
+                # 使用坐标访问确保完整的行结构
+                for row_idx in range(start_row + 1, end_row + 1):  # openpyxl使用1基索引
+                    cells = []
+                    for col_idx in range(1, max_col + 1):
+                        cell = worksheet.cell(row=row_idx, column=col_idx)
+                        cells.append(cell)
+                    yield self._parse_row(tuple(cells))
+        except Exception as e:
+            # 确保在出现异常时也能正确关闭工作簿
+            workbook.close()
+            raise RuntimeError(f"流式读取XLSX文件失败: {str(e)}") from e
         finally:
             workbook.close()
     
     def get_row(self, row_index: int) -> Row:
-        """Get a specific row by index."""
+        """Get a specific row by index with complete structure."""
         workbook = openpyxl.load_workbook(self.file_path, read_only=True)
         worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
-        
         try:
-            # Get specific row using worksheet.iter_rows
-            for i, row_cells in enumerate(worksheet.iter_rows(values_only=False)):
-                if i == row_index:
-                    return self._parse_row(row_cells)
-            
+            if worksheet is not None:
+                max_row = worksheet.max_row or 0
+                max_col = worksheet.max_column or 0
+
+                if row_index >= max_row:
+                    raise IndexError(f"Row index {row_index} out of range (max: {max_row-1})")
+
+                # 使用坐标访问获取完整的行
+                cells = []
+                for col_idx in range(1, max_col + 1):
+                    cell = worksheet.cell(row=row_index + 1, column=col_idx)  # openpyxl使用1基索引
+                    cells.append(cell)
+                return self._parse_row(tuple(cells))
             raise IndexError(f"Row index {row_index} out of range")
-        
+        except IndexError:
+            # 重新抛出索引错误
+            workbook.close()
+            raise
+        except Exception as e:
+            # 处理其他异常
+            workbook.close()
+            raise RuntimeError(f"获取XLSX行数据失败: {str(e)}") from e
         finally:
             workbook.close()
     
@@ -95,13 +120,14 @@ class XlsxRowProvider:
         if self._total_rows_cache is None:
             workbook = openpyxl.load_workbook(self.file_path, read_only=True)
             worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
-            
             try:
                 # Count rows using worksheet.max_row property
-                self._total_rows_cache = worksheet.max_row or 0
+                if worksheet is not None and hasattr(worksheet, "max_row"):
+                    self._total_rows_cache = worksheet.max_row or 0
+                else:
+                    self._total_rows_cache = 0
             finally:
                 workbook.close()
-        
         return self._total_rows_cache
 
 
@@ -138,10 +164,25 @@ class XlsxParser(BaseParser):
         if worksheet is None:
             raise ValueError("工作簿不包含任何活动工作表")
 
+        # 获取工作表的实际尺寸，确保包含所有数据和样式
+        max_row = worksheet.max_row or 0
+        max_col = worksheet.max_column or 0
+
+        # 性能警告：对于大型稀疏表格
+        total_cells = max_row * max_col
+        if total_cells > 100000:  # 10万个单元格
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"解析大型表格 ({max_row}x{max_col}={total_cells:,}个单元格)，可能消耗较多内存")
+
         rows = []
-        for row in worksheet.iter_rows():
+        # 使用坐标访问方式确保完整的表格结构
+        for row_idx in range(1, max_row + 1):
             cells = []
-            for cell in row:
+            for col_idx in range(1, max_col + 1):
+                # 直接通过坐标访问单元格，确保包含空单元格
+                cell = worksheet.cell(row=row_idx, column=col_idx)
+
                 # 提取单元格值和样式
                 cell_value = cell.value
                 cell_style = extract_style(cell)

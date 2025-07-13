@@ -1,136 +1,239 @@
-# MCP-Sheet-Parser-Cot
+# MCP 表格解析器
 
-![PyPI - Version](https://img.shields.io/pypi/v/MCP-Sheet-Parser-Cot)
-![PyPI - License](https://img.shields.io/pypi/l/MCP-Sheet-Parser-Cot)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/MCP-Sheet-Parser-Cot)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
-一个为AI智能体设计的高保真电子表格解析与HTML转换器 (MCP工具)。
+一个专为 **模型上下文协议 (MCP) 服务器** 设计的高保真表格解析器和HTML转换器。该工具使llm能够无缝读取、分析和修改表格文件、转化为html，并完整保留样式。
 
-**MCP-Sheet-Parser-Cot** 是一个功能强大的高保真电子表格解析器与转换器，旨在作为一个标准的模型上下文协议（MCP）服务器工具运行。它赋予了AI大语言模型（LLM）以编程方式读取、理解甚至修改多种电子表格文件（包括 `.xlsx`, `.xls`, `.csv` 等）的能力。
+## 🚀 什么是 MCP 表格解析器？
 
-## 核心特性
+MCP 表格解析器是一个 **模型上下文协议服务器**，为AI助手提供强大的表格处理能力。它充当AI模型与表格文件之间的桥梁，提供三个核心工具：
 
-- **高保真解析**: 精确解析 `.xlsx`, `.xls`, `.csv` 等多种格式的电子表格，保留单元格的原始数据类型、样式（字体、颜色、边框、对齐方式）和合并单元格结构。
-- **结构化数据模型**: 将复杂的电子表格数据转换为一个标准化的、易于AI理解的 `TableModel` JSON结构。
-- **HTML 转换**: 将 `TableModel` 渲染为高度还原的HTML，方便在Web界面中进行预览和展示。
-- **数据回写**: 支持将AI修改后的 `TableModel` 数据安全地回写到原始电子表格文件中。
-- **MCP兼容**: 作为标准的MCP (Model Context Protocol) 服务器运行，使AI智能体能通过工具调用来操作电子表格。
+- **`parse_sheet`** - 将任何表格解析为AI友好的JSON格式
+- **`convert_to_html`** - 生成保留样式的高保真HTML
+- **`apply_changes`** - 将修改后的数据写回原始文件
 
-## 架构概览
+## ✨ 核心特性
 
-- **分层设计**: 采用 `MCP Server` -> `Core Service` -> `Parsers` 的分层架构。
-  - **MCP Server (`src/mcp_server`)**: 对外暴露工具接口。
-  - **Core Service (`src/core_service.py`)**: 核心业务逻辑，调度不同格式的解析器。
-  - **Parsers (`src/parsers`)**: 每种文件格式对应一个独立的解析器，易于扩展。
-- **核心数据模型**: 所有操作都围绕 `TableModel` (`src/models/table_model.py`) 进行，实现数据在不同模块间的解耦和标准化。
+### 🎯 **高保真解析**
+- **多格式支持**: Excel (.xlsx, .xlsm, .xls, .xlsb)、CSV等多种格式
+- **完整样式保留**: 字体、颜色、边框、对齐方式、背景色
+- **结构完整性**: 合并单元格、公式和数据类型保持不变
+- **大文件处理**: 自动流式处理以优化性能
 
-## 安装
+### 🤖 **AI优化设计**
+- **LLM友好的JSON**: 清洁、结构化的数据格式，完美适配AI处理
+- **智能摘要**: 大型表格的自动数据摘要
+- **灵活范围选择**: 解析特定单元格、范围或整个工作表
+- **多工作表支持**: 处理包含多个工作表的复杂工作簿
 
+### 🔧 **生产就绪**
+- **MCP协议兼容**: 完全兼容Claude Desktop和其他MCP客户端
+- **错误处理**: 强大的错误报告和恢复机制
+- **性能优化**: 高效的内存使用和处理
+- **备份支持**: 修改前自动创建文件备份
+
+## 🛠️ 安装
+
+### 前置要求
+- Python 3.8 或更高版本
+- [uv](https://docs.astral.sh/uv/) (推荐的包管理器)
+- Claude Desktop 或其他兼容MCP的客户端，比如Cherry stdio
+
+### 从源码安装
 ```bash
-pip install MCP-Sheet-Parser-Cot
-```
-*注意：包尚未发布，此命令将在发布后可用。*
-
-## 使用方法
-
-### 作为MCP服务器运行
-安装包后，通过以下命令启动服务器：
-```bash
-mcp-sheet-parser
-# 或者指定端口
-mcp-sheet-parser --port 8080
+git clone https://github.com/yuqie6/MCP-Sheet-Parser.git
+cd MCP-Sheet-Parser
+uv sync
 ```
 
-### 工具调用示例 (Tool Call Examples)
+## 🚀 快速开始
 
-以下示例展示了如何通过 `curl` 与运行中的MCP服务器进行交互。
+### 1. 配置 Claude Desktop
 
-#### 1. `parse_sheet`: 解析电子表格为 TableModel
+将此服务器添加到您的 Claude Desktop 配置文件中：
 
-```bash
-# Request
-curl -X POST http://127.0.0.1:8000/parse_sheet -H "Content-Type: application/json" -d '{
-  "file_path": "tests/test_data/complex_styles.xlsx",
-  "sheet_name": "Sheet1"
-}'
-```
-**响应**: 返回一个包含工作表结构、样式和数据的 `TableModel` JSON 对象。
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
 
-#### 2. `convert_to_html`: 将 TableModel 转换为HTML
-为了演示，我们将上一步 `parse_sheet` 的输出作为 `convert_to_html` 的输入。
-
-```bash
-# Request
-# 注意: 'table_model' 的内容是上一步 'parse_sheet' 响应的完整JSON
-curl -X POST http://127.0.0.1:8000/convert_to_html -H "Content-Type: application/json" -d '{
-  "table_model": {
-    "sheet_name": "Sheet1",
-    "headers": [
-        {"value": "ID", "style": {"font": {"bold": true}}},
-        {"value": "Name", "style": {"font": {"bold": true}}},
-        {"value": "Value", "style": {"font": {"bold": true}}}
-    ],
-    "rows": [
-        [
-            {"value": 1, "style": {}},
-            {"value": "Item A", "style": {}},
-            {"value": 100, "style": {"fill": {"fgColor": "FFFF00"}}}
-        ],
-        [
-            {"value": 2, "style": {}},
-            {"value": "Item B", "style": {}},
-            {"value": 200, "style": {"font": {"color": "FF0000"}}}
-        ]
-    ],
-    "styles": [],
-    "merged_cells": []
-  }
-}'
-```
-**响应**: 返回一个HTML字符串，用于在浏览器中显示表格。
-
-#### 3. `apply_changes`: 将修改后的 TableModel 回写到文件
-
-```bash
-# Request
-# 假设我们修改了 Item A 的值为 150
-curl -X POST http://127.0.0.1:8000/apply_changes -H "Content-Type: application/json" -d '{
-  "file_path": "tests/test_data/complex_styles.xlsx",
-  "table_model": {
-    "sheet_name": "Sheet1",
-    "headers": [
-        {"value": "ID", "style": {"font": {"bold": true}}},
-        {"value": "Name", "style": {"font": {"bold": true}}},
-        {"value": "Value", "style": {"font": {"bold": true}}}
-    ],
-    "rows": [
-        [
-            {"value": 1, "style": {}},
-            {"value": "Item A", "style": {}},
-            {"value": 150, "style": {"fill": {"fgColor": "FFFF00"}}}
-        ],
-        [
-            {"value": 2, "style": {}},
-            {"value": "Item B", "style": {}},
-            {"value": 200, "style": {"font": {"color": "FF0000"}}}
-        ]
-    ],
-    "styles": [],
-    "merged_cells": []
-  }
-}'
-```
-**响应**: `{"success": true, "message": "Changes applied successfully."}`
-
-## AI 助手配置
-将此服务集成到 AI 助手（如 Claude Desktop）的 `mcpServers` 配置中：
 ```json
 {
-  "sheetParser": {
-    "command": "mcp-sheet-parser"
+  "mcpServers": {
+    "sheet-parser": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "path/MCP-Sheet-Parser-cot",
+        "run",
+        "main.py"
+      ]
+    }
   }
 }
 ```
 
-## 许可证
-本项目采用 [MIT](LICENSE) 许可证。
+> **注意**: 请将 `path/MCP-Sheet-Parser-cot` 替换为您的实际项目目录路径。
+
+### 2. 其他配置选项
+
+#### 直接使用 Python (如果没有安装 uv):
+```json
+{
+  "mcpServers": {
+    "sheet-parser": {
+      "command": "python",
+      "args": ["/path/to/MCP-Sheet-Parser/main.py"],
+      "cwd": "/path/to/MCP-Sheet-Parser"
+    }
+  }
+}
+```
+
+#### 使用虚拟环境:
+```json
+{
+  "mcpServers": {
+    "sheet-parser": {
+      "command": "/path/to/MCP-Sheet-Parser/.venv/bin/python",
+      "args": ["main.py"],
+      "cwd": "/path/to/MCP-Sheet-Parser"
+    }
+  }
+}
+```
+
+### 3. 在 Claude Desktop 中开始使用
+
+配置完成后，重启 Claude Desktop，您就可以让 Claude 处理表格了：
+
+> "请解析 `/path/to/sales.xlsx` 中的销售数据并显示摘要"
+
+> "将预算表格转换为HTML，并突出显示超过10,000元的单元格"
+
+> "更新库存表格，将所有数量增加10%"
+
+## 🔧 可用工具
+
+### `parse_sheet`
+将表格文件解析为AI友好的JSON格式。
+
+**参数:**
+- `file_path` (必需): 表格文件的路径
+- `sheet_name` (可选): 要解析的特定工作表
+- `range_string` (可选): 单元格范围，如 "A1:D10"
+
+**示例:**
+```json
+{
+  "file_path": "/path/to/data.xlsx",
+  "sheet_name": "销售数据",
+  "range_string": "A1:E100"
+}
+```
+
+### `convert_to_html`
+将表格文件转换为保留样式的高保真HTML。
+
+**参数:**
+- `file_path` (必需): 表格文件的路径
+- `output_path` (可选): HTML文件的保存位置
+- `page_size` (可选): 大文件的每页行数
+- `page_number` (可选): 要生成的特定页面
+
+**示例:**
+```json
+{
+  "file_path": "/path/to/report.xlsx",
+  "output_path": "/path/to/report.html",
+  "page_size": 50
+}
+```
+
+### `apply_changes`
+将修改后的数据写回原始表格文件。
+
+**参数:**
+- `file_path` (必需): 目标文件的路径
+- `table_model_json` (必需): 从 `parse_sheet` 获取的修改后数据
+- `create_backup` (可选): 写入前创建备份 (默认: true)
+
+**示例:**
+```json
+{
+  "file_path": "/path/to/data.xlsx",
+  "table_model_json": { /* 修改后的数据 */ },
+  "create_backup": true
+}
+```
+
+## 🏗️ 架构
+
+```
+Claude Desktop (MCP 客户端)
+           ↓
+    JSON-RPC over stdin/stdout
+           ↓
+    MCP 表格解析服务器
+           ↓
+      核心服务层
+           ↓
+    格式特定解析器
+    (XLSX, XLS, CSV, XLSB, XLSM)
+```
+
+## 🧪 开发
+
+### 设置开发环境
+```bash
+git clone https://github.com/yuqie6/MCP-Sheet-Parser.git
+cd MCP-Sheet-Parser
+uv sync --dev
+```
+
+### 运行测试
+```bash
+# 使用 uv (推荐)
+uv run pytest tests/ -v
+
+# 或使用传统方法
+python -m pytest tests/ -v
+```
+
+### 本地运行服务器
+```bash
+# 使用 uv
+uv run main.py
+
+# 或直接使用 Python
+python main.py
+```
+
+### 代码结构
+```
+src/
+├── mcp_server/          # MCP 协议实现
+├── core_service.py      # 业务逻辑层
+├── parsers/            # 格式特定解析器
+├── converters/         # HTML 转换
+├── models/             # 数据模型和工具定义
+└── utils/              # 工具函数
+```
+
+## 🤝 贡献
+
+1. Fork 本仓库
+2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交您的更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 开启 Pull Request
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
+
+## 🙏 致谢
+
+- 为 [MCP](https://modelcontextprotocol.io/) 而构建
+- 专为与 Claude Desktop 无缝协作而设计
+- 受到腾讯犀牛鸟计划，改善 llm 表格集成需求的启发

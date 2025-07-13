@@ -28,52 +28,8 @@ class CoreService:
     def __init__(self):
         self.parser_factory = ParserFactory()
     
-    def get_sheet_info(self, file_path: str) -> Dict[str, Any]:
-        """
-        获取表格文件的元数据信息，不加载完整数据。
-        
-        Args:
-            file_path: 文件路径
-            
-        Returns:
-            包含元数据的字典
-        """
-        try:
-            # 验证文件存在
-            path = Path(file_path)
-            if not path.exists():
-                raise FileNotFoundError(f"文件不存在: {file_path}")
-            
-            # 获取解析器
-            parser = self.parser_factory.get_parser(file_path)
-            
-            # 获取解析器信息
-            parser = self.parser_factory.get_parser(file_path)
 
-            # 快速解析获取基本信息
-            sheet = parser.parse(file_path)
-
-            return {
-                "file_path": str(path.absolute()),
-                "file_size": path.stat().st_size,
-                "file_format": path.suffix.lower(),
-                "parser_type": type(parser).__name__,
-                "sheet_name": sheet.name,
-                "dimensions": {
-                    "rows": len(sheet.rows),
-                    "cols": len(sheet.rows[0].cells) if sheet.rows else 0,
-                    "total_cells": sum(len(row.cells) for row in sheet.rows)
-                },
-                "has_merged_cells": len(sheet.merged_cells) > 0,
-                "merged_cells_count": len(sheet.merged_cells),
-                "supported_formats": self.parser_factory.get_supported_formats()
-            }
-            
-        except Exception as e:
-            logger.error(f"获取表格信息失败: {e}")
-            raise
-    
-    def parse_sheet(self, file_path: str, sheet_name: Optional[str] = None, 
+    def parse_sheet(self, file_path: str, sheet_name: Optional[str] = None,
                    range_string: Optional[str] = None, 
                    enable_streaming: bool = True, 
                    streaming_threshold: int = config.STREAMING_THRESHOLD_CELLS) -> Dict[str, Any]:
