@@ -6,7 +6,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
-from src.models.table_model import Sheet, LazySheet, StreamingCapable
+from src.models.table_model import Sheet, LazySheet
 
 
 class BaseParser(ABC):

@@ -7,7 +7,7 @@ Provides a centralized configuration system for caching behavior.
 import os
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

@@ -8,9 +8,8 @@ combining in-memory LRU cache with optional disk-based persistence.
 import hashlib
 import time
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 from pathlib import Path
-import pandas as pd
 
 from .config import get_cache_config, CacheConfig
 from .lru_cache import LRURowBlockCache

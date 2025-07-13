@@ -7,7 +7,7 @@ XLSX解析器模块
 
 import openpyxl
 from typing import Iterator, Optional
-from src.models.table_model import Sheet, Row, Cell, Style, LazySheet, LazyRowProvider
+from src.models.table_model import Sheet, Row, Cell, LazySheet
 from src.parsers.base_parser import BaseParser
 from src.utils.style_parser import extract_style
 
@@ -43,7 +43,6 @@ class XlsxRowProvider:
     
     def _parse_row(self, row_cells: tuple) -> Row:
         """Parse a tuple of openpyxl cells into a Row object."""
-        parser = XlsxParser()
         cells = []
         for cell in row_cells:
             cell_value = cell.value

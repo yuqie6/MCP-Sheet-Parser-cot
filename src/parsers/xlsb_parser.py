@@ -118,7 +118,7 @@ class XlsbParser(BaseParser):
                         # 额外验证：检查年份是否合理
                         if 1900 <= date_value.year <= 2099:
                             return date_value
-                except:
+                except (ValueError, TypeError, OverflowError):
                     # 如果转换失败，当作普通数字处理
                     pass
             

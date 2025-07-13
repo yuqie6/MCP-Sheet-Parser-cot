@@ -2,6 +2,8 @@
 name = "MCP-Sheet-Parser-Cot"
 version = "0.1.0"
 description = "一个为AI智能体设计的高保真电子表格解析与HTML转换器 (MCP工具)。"
+readme = "README.md"
+license = { file = "LICENSE" }
 dependencies = [
     "mcp[cli]",
     "openpyxl",
@@ -17,6 +19,18 @@ dependencies = [
     "pandas>=1.3.0", # For parquet support
     "pyarrow>=10.0.0", # For parquet format
 ]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest-benchmark",
+    "beautifulsoup4"
+]
+
+
+[project.scripts]
+mcp-sheet-parser = "src.mcp_server.server:main"
 
 [tool.pytest.ini_options]
 pythonpath = [

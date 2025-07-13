@@ -137,7 +137,7 @@ class ParserFactory:
         try:
             file_extension = file_path.split('.')[-1].lower()
             return file_extension in ParserFactory._parsers
-        except:
+        except IndexError:
             return False
     
     @staticmethod
@@ -154,7 +154,7 @@ class ParserFactory:
         try:
             parser = ParserFactory.get_parser(file_path)
             return parser.supports_streaming()
-        except:
+        except UnsupportedFileType:
             return False
     
     @staticmethod

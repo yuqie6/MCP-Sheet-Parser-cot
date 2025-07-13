@@ -8,8 +8,9 @@ XLSM本质上是带宏的XLSX，样式提取与XLSX完全相同。
 import logging
 import openpyxl
 from typing import Optional
-from src.models.table_model import Sheet, Row, Cell, Style, LazySheet
+from src.models.table_model import Sheet, Row, Cell, LazySheet
 from src.parsers.xlsx_parser import XlsxParser
+from src.utils.style_parser import extract_style
 
 logger = logging.getLogger(__name__)
 

@@ -7,10 +7,11 @@ HTML转换器模块
 import logging
 from pathlib import Path
 from typing import Dict, Any, Set, Tuple
-from src.models.table_model import Sheet, Row, Cell, Style
+from src.models.table_model import Sheet, Cell, Style
 from src.utils.range_parser import parse_range_string
 
 logger = logging.getLogger(__name__)
+
 
 
 class HTMLConverter:
@@ -362,6 +363,9 @@ class HTMLConverter:
 
         table_parts = ['<table>']
         
+        # Pre-compute a reverse map from style_key to style_id for efficiency
+        style_key_to_id_map = {self._get_style_key(style_obj): style_id for style_id, style_obj in styles.items()}
+
         for r_idx, row in enumerate(sheet.rows):
             table_parts.append('<tr>')
             
@@ -373,11 +377,9 @@ class HTMLConverter:
                 style_class = ""
                 if cell.style:
                     style_key = self._get_style_key(cell.style)
-                    # This is inefficient, but we'll optimize later if needed
-                    for style_id, style_obj in styles.items():
-                        if self._get_style_key(style_obj) == style_key:
-                            style_class = f' class="{style_id}"'
-                            break
+                    style_id = style_key_to_id_map.get(style_key)
+                    if style_id:
+                        style_class = f' class="{style_id}"'
                 
                 span_attrs = ""
                 if (r_idx, c_idx) in merged_cells_map:

@@ -5,7 +5,7 @@
 统一的接口来分块读取大文件，支持可选过滤。
 """
 
-from typing import Iterator, Optional, List, Dict, Any, Union, Tuple
+from typing import Iterator, Optional, List, Dict, Any, Tuple
 from pathlib import Path
 from dataclasses import dataclass
 import re

@@ -10,7 +10,6 @@ MCP 工具定义模块 - 三个核心工具
 import logging
 import json
 from typing import Any
-from pathlib import Path
 
 from mcp.server import Server
 from mcp.types import Tool, TextContent

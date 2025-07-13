@@ -134,7 +134,7 @@ class XlsParser(BaseParser):
                                       ['d', 'm', 'y', 'h', 's', '/']):
                                     logger.debug(f"将单元格 ({row_idx}, {col_idx}) 的值 '{cell_value}'（格式：'{format_str}'）作为日期处理。")
                                     return xlrd.xldate.xldate_as_datetime(cell_value, worksheet.book.datemode)
-                except:
+                except (ValueError, TypeError, IndexError):
                     # 如果日期检测失败，当作普通数字处理
                     pass
 

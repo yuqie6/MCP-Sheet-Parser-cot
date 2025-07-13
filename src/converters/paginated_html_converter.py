@@ -5,11 +5,9 @@
 """
 
 import logging
-from typing import Dict, Any, List, Optional
-from pathlib import Path
 
 from .html_converter import HTMLConverter
-from ..models.table_model import Sheet, Row, Cell
+from ..models.table_model import Sheet
 
 logger = logging.getLogger(__name__)
 

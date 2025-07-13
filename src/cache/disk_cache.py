@@ -5,7 +5,6 @@ This module provides on-disk caching capabilities for retrieved data
 to reduce fetching overhead for repeated requests.
 """
 
-import os
 import pickle
 from typing import Any
 from pathlib import Path

@@ -57,7 +57,7 @@ def extract_style(cell) -> Style:
                 style.comment = str(cell.comment.text)
             elif hasattr(cell.comment, 'content'):
                 style.comment = str(cell.comment.content)
-        except:
+        except (AttributeError, TypeError):
             pass
     return style
 
@@ -147,7 +147,7 @@ def extract_number_format(cell) -> str:
             format_mappings = {
             }
             return format_mappings.get(format_str, format_str) or ""
-    except:
+    except (AttributeError, ValueError):
         pass
     return ""
 
