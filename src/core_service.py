@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from .utils.range_parser import parse_range_string
 from .parsers.factory import ParserFactory
 from .models.table_model import Sheet
 from .converters.html_converter import HTMLConverter
@@ -409,7 +410,7 @@ class CoreService:
         # 处理范围选择
         if range_string:
             try:
-                start_row, start_col, end_row, end_col = self._parse_range_string(range_string)
+                start_row, start_col, end_row, end_col = parse_range_string(range_string)
                 return self._extract_range_data(sheet, start_row, start_col, end_row, end_col)
             except ValueError as e:
                 logger.warning(f"范围解析失败: {e}, 返回完整数据")
@@ -500,49 +501,6 @@ class CoreService:
         """计算表格的总单元格数。"""
         return sum(len(row.cells) for row in sheet.rows)
 
-    def _parse_range_string(self, range_string: str) -> tuple[int, int, int, int]:
-        """
-        解析范围字符串，如"A1:D10"或"A1"。
-
-        Returns:
-            (start_row, start_col, end_row, end_col) - 0-based索引
-        """
-        import re
-
-        # 移除空格
-        range_string = range_string.strip().upper()
-
-        # 单个单元格格式：A1
-        single_cell_pattern = r'^([A-Z]+)(\d+)$'
-        # 范围格式：A1:D10
-        range_pattern = r'^([A-Z]+)(\d+):([A-Z]+)(\d+)$'
-
-        def col_to_num(col_str):
-            """将列字母转换为数字（A=0, B=1, ...）"""
-            result = 0
-            for char in col_str:
-                result = result * 26 + (ord(char) - ord('A') + 1)
-            return result - 1
-
-        # 尝试匹配范围格式
-        range_match = re.match(range_pattern, range_string)
-        if range_match:
-            start_col_str, start_row_str, end_col_str, end_row_str = range_match.groups()
-            start_row = int(start_row_str) - 1  # 转换为0-based
-            start_col = col_to_num(start_col_str)
-            end_row = int(end_row_str) - 1
-            end_col = col_to_num(end_col_str)
-            return start_row, start_col, end_row, end_col
-
-        # 尝试匹配单个单元格格式
-        single_match = re.match(single_cell_pattern, range_string)
-        if single_match:
-            col_str, row_str = single_match.groups()
-            row = int(row_str) - 1
-            col = col_to_num(col_str)
-            return row, col, row, col
-
-        raise ValueError(f"无效的范围格式: {range_string}. 支持格式: A1 或 A1:D10")
 
     def _extract_range_data(self, sheet: Sheet, start_row: int, start_col: int,
                            end_row: int, end_col: int) -> Dict[str, Any]:

@@ -6,8 +6,9 @@ HTML转换器模块
 
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Set, Tuple
 from src.models.table_model import Sheet, Row, Cell, Style
+from src.utils.range_parser import parse_range_string
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class HTMLConverter:
             key_parts.append(f"bl:{style.border_left}")
         if style.border_right:
             key_parts.append(f"br:{style.border_right}")
-        if style.border_color and style.border_color != "#000000":
+        if style.border_color:
             key_parts.append(f"bc:{style.border_color}")
 
         # 文本换行和格式化
@@ -230,7 +231,7 @@ class HTMLConverter:
                 css_rule += " text-decoration: underline;"
 
             # 背景和填充
-            if style.background_color and style.background_color != "#FFFFFF":
+            if style.background_color:
                 css_rule += f" background-color: {style.background_color};"
 
             # 文本对齐
@@ -339,23 +340,55 @@ class HTMLConverter:
         Returns:
             表格HTML字符串
         """
+        
+        # 处理合并单元格
+        occupied_cells: Set[Tuple[int, int]] = set()
+        merged_cells_map: Dict[Tuple[int, int], Dict[str, int]] = {}
+
+        for merged_range in sheet.merged_cells:
+            try:
+                start_row, start_col, end_row, end_col = parse_range_string(merged_range)
+                row_span = end_row - start_row + 1
+                col_span = end_col - start_col + 1
+                
+                if row_span > 1 or col_span > 1:
+                    merged_cells_map[(start_row, start_col)] = {"rowspan": row_span, "colspan": col_span}
+                    for r in range(start_row, end_row + 1):
+                        for c in range(start_col, end_col + 1):
+                            if (r, c) != (start_row, start_col):
+                                occupied_cells.add((r, c))
+            except ValueError as e:
+                logger.warning(f"无法解析合并单元格范围 '{merged_range}': {e}")
+
         table_parts = ['<table>']
         
-        for row in sheet.rows:
+        for r_idx, row in enumerate(sheet.rows):
             table_parts.append('<tr>')
             
-            for cell in row.cells:
+            for c_idx, cell in enumerate(row.cells):
+                if (r_idx, c_idx) in occupied_cells:
+                    continue
+
                 # 确定样式类
                 style_class = ""
                 if cell.style:
                     style_key = self._get_style_key(cell.style)
+                    # This is inefficient, but we'll optimize later if needed
                     for style_id, style_obj in styles.items():
                         if self._get_style_key(style_obj) == style_key:
                             style_class = f' class="{style_id}"'
                             break
+                
+                span_attrs = ""
+                if (r_idx, c_idx) in merged_cells_map:
+                    spans = merged_cells_map[(r_idx, c_idx)]
+                    if spans["rowspan"] > 1:
+                        span_attrs += f' rowspan="{spans["rowspan"]}"'
+                    if spans["colspan"] > 1:
+                        span_attrs += f' colspan="{spans["colspan"]}"'
 
                 # 生成单元格HTML（支持超链接和注释）
-                cell_html = self._generate_cell_html(cell, style_class)
+                cell_html = self._generate_cell_html(cell, style_class, span_attrs)
                 table_parts.append(cell_html)
             
             table_parts.append('</tr>')
@@ -364,7 +397,7 @@ class HTMLConverter:
         
         return "\n".join(table_parts)
 
-    def _generate_cell_html(self, cell: Cell, style_class: str) -> str:
+    def _generate_cell_html(self, cell: Cell, style_class: str, span_attrs: str) -> str:
         """
         生成单个单元格的HTML，支持超链接和注释。
 
@@ -400,7 +433,7 @@ class HTMLConverter:
             number_format = self._escape_html(cell.style.number_format)
             data_attr = f' data-number-format="{number_format}"'
 
-        return f'<td{style_class}{title_attr}{data_attr}>{cell_content}</td>'
+        return f'<td{style_class}{span_attrs}{title_attr}{data_attr}>{cell_content}</td>'
 
     def _escape_html(self, text: str) -> str:
         """

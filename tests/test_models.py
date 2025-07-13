@@ -22,17 +22,17 @@ class TestStyle:
         assert style.underline is False
         assert style.font_size is None
         assert style.font_name is None
-        assert style.font_color == "#000000"  # 实际默认值
-        assert style.background_color == "#FFFFFF"  # 实际默认值
-        assert style.text_align == "left"  # 实际默认值
-        assert style.vertical_align == "top"  # 实际默认值
+        assert style.font_color is None
+        assert style.background_color is None
+        assert style.text_align is None
+        assert style.vertical_align is None
         assert style.wrap_text is False
-        assert style.border_top == ""
-        assert style.border_bottom == ""
-        assert style.border_left == ""
-        assert style.border_right == ""
-        assert style.border_color == "#000000"  # 实际默认值
-        assert style.number_format == ""  # 实际默认值
+        assert style.border_top is None
+        assert style.border_bottom is None
+        assert style.border_left is None
+        assert style.border_right is None
+        assert style.border_color is None
+        assert style.number_format is None
         assert style.hyperlink is None
         assert style.comment is None
     

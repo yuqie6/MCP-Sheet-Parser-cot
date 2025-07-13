@@ -67,7 +67,7 @@ class XlsbParser(BaseParser):
                                     cell_style = self._extract_basic_style(cell_data)
                                 else:
                                     cell_value = None
-                                    cell_style = Style()
+                                    cell_style = None
                                 
                                 # 创建Cell对象
                                 cell = Cell(
@@ -132,44 +132,9 @@ class XlsbParser(BaseParser):
             # 其他类型转换为字符串
             return str(value)
     
-    def _extract_basic_style(self, cell_data) -> Style:
-        """
-        从XLSB单元格提取基础样式信息。
-        
-        注意：XLSB格式的样式信息非常有限，主要提供默认样式。
-        
-        Args:
-            cell_data: pyxlsb单元格对象
-            
-        Returns:
-            Style对象（主要为默认值）
-        """
-        style = Style()
-        
-        # XLSB格式中样式信息获取较为困难
-        # pyxlsb库主要专注于数据提取，样式支持有限
-        # 这里提供基础的样式框架，可以根据需要扩展
-        
-        try:
-            # 检查是否有基础的格式信息
-            # 注意：pyxlsb库的样式支持非常有限
-            # 大多数样式属性需要设置为默认值
-            
-            # 设置默认字体
-            style.font_name = "Calibri"
-            style.font_size = 11.0
-            style.font_color = "#000000"
-            
-            # 设置默认对齐
-            style.text_align = "left"
-            style.vertical_align = "bottom"
-            
-            # 其他样式属性保持默认值（None或False）
-            
-        except Exception as e:
-            logger.debug(f"提取XLSB样式失败: {e}")
-        
-        return style
+    def _extract_basic_style(self, cell_data) -> Optional[Style]:
+        """pyxlsb库不支持样式提取。此方法始终返回None。"""
+        return None
     
     def _get_sheet_names(self, workbook) -> list[str]:
         """

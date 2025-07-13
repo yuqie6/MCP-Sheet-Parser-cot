@@ -53,7 +53,7 @@ class XlsmParser(XlsxParser):
                 for cell in row:
                     # 提取单元格值和样式
                     cell_value = cell.value
-                    cell_style = self._extract_style(cell)
+                    cell_style = extract_style(cell)
 
                     # 创建Cell对象
                     parsed_cell = Cell(

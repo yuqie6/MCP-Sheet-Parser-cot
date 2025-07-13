@@ -43,31 +43,31 @@ class Style:
     bold: bool = False
     italic: bool = False
     underline: bool = False
-    font_color: str = "#000000"
-    font_size: float | None = None
-    font_name: str | None = None
+    font_color: Optional[str] = None
+    font_size: Optional[float] = None
+    font_name: Optional[str] = None
 
     # Background and fill
-    background_color: str = "#FFFFFF"
+    background_color: Optional[str] = None
 
     # Text alignment
-    text_align: str = "left"  # Options: left, center, right, justify
-    vertical_align: str = "top"  # Options: top, middle, bottom
+    text_align: Optional[str] = None  # Options: left, center, right, justify
+    vertical_align: Optional[str] = None  # Options: top, middle, bottom
 
     # Border properties
-    border_top: str = ""
-    border_bottom: str = ""
-    border_left: str = ""
-    border_right: str = ""
-    border_color: str = "#000000"
+    border_top: Optional[str] = None
+    border_bottom: Optional[str] = None
+    border_left: Optional[str] = None
+    border_right: Optional[str] = None
+    border_color: Optional[str] = None
 
     # Text wrapping and formatting
     wrap_text: bool = False
-    number_format: str = ""
+    number_format: Optional[str] = None
 
     # Advanced features
-    hyperlink: str | None = None  # URL of the hyperlink
-    comment: str | None = None    # Cell comment text
+    hyperlink: Optional[str] = None  # URL of the hyperlink
+    comment: Optional[str] = None    # Cell comment text
 
 
 @dataclass

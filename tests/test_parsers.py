@@ -278,17 +278,13 @@ class TestXlsxParser:
 
             # 检查是否有样式信息
             has_styles = any(
-                cell.style is not None
+                cell.style and (cell.style.font_color or cell.style.background_color)
                 for row in sheet.rows
                 for cell in row.cells
             )
 
-            # 验证样式提取的内部方法
-            if has_styles:
-                # 测试样式提取方法的存在
-                assert hasattr(parser, '_extract_style')
-                assert hasattr(parser, '_extract_color')
-                assert hasattr(parser, '_extract_number_format')
+            # 验证样式提取
+            assert has_styles, "样本文件中应提取到样式"
 
     def test_xlsx_range_parsing(self):
         """测试XLSX范围解析功能。"""
@@ -304,22 +300,14 @@ class TestXlsxParser:
             assert len(sheet.rows) >= 0
 
     def test_xlsx_internal_methods(self):
-        """测试XLSX解析器的内部方法。"""
+        """测试XLSX解析器的内部方法（现已移除）。"""
         parser = XlsxParser()
-
-        # 测试范围解析方法，注意XlsxParser的内部方法现在不可用
-        # 需要通过CoreService或其他方式进行测试
-        # start_row, start_col, end_row, end_col = parser._parse_range("A1:C3")
-        # assert start_row == 1
-        # assert start_col == 1
-        # assert end_row == 3
-        # assert end_col == 3
-
-        # 测试列字母转数字
-        assert parser._column_letter_to_number("A") == 1
-        assert parser._column_letter_to_number("B") == 2
-        assert parser._column_letter_to_number("Z") == 26
-        assert parser._column_letter_to_number("AA") == 27
+        
+        # 验证内部方法已被移除
+        assert not hasattr(parser, '_parse_range')
+        assert not hasattr(parser, '_column_letter_to_number')
+        assert not hasattr(parser, '_extract_style')
+        assert not hasattr(parser, '_extract_color')
 
 
 class TestOtherParsers:

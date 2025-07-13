@@ -132,6 +132,7 @@ class XlsParser(BaseParser):
                                 format_str = format_info.format_str.lower()
                                 if any(date_indicator in format_str for date_indicator in
                                       ['d', 'm', 'y', 'h', 's', '/']):
+                                    logger.debug(f"将单元格 ({row_idx}, {col_idx}) 的值 '{cell_value}'（格式：'{format_str}'）作为日期处理。")
                                     return xlrd.xldate.xldate_as_datetime(cell_value, worksheet.book.datemode)
                 except:
                     # 如果日期检测失败，当作普通数字处理
@@ -194,15 +195,18 @@ class XlsParser(BaseParser):
                     style.font_name = font.name
                 
                 # 字体颜色
-                if hasattr(font, 'colour_index') and font.colour_index:
+                if font.colour_index:
                     style.font_color = self._get_color_from_index(workbook, font.colour_index)
             
             # 提取背景颜色
             if hasattr(xf, 'background') and xf.background:
                 if hasattr(xf.background, 'pattern_colour_index'):
-                    bg_color = self._get_color_from_index(workbook, xf.background.pattern_colour_index)
-                    if bg_color and bg_color != "#FFFFFF":
-                        style.background_color = bg_color
+                    bg_color_index = xf.background.pattern_colour_index
+                    # 64是默认/自动颜色，通常是白色，我们将其视为空
+                    if bg_color_index != 64:
+                        bg_color = self._get_color_from_index(workbook, bg_color_index)
+                        if bg_color:
+                            style.background_color = bg_color
             
             # 提取对齐方式
             if hasattr(xf, 'alignment'):
@@ -241,20 +245,22 @@ class XlsParser(BaseParser):
                 if border:
                     # 简化的边框处理
                     if border.top_line_style:
-                        style.border_top = "solid"
+                        style.border_top = "1px solid"
                     if border.bottom_line_style:
-                        style.border_bottom = "solid"
+                        style.border_bottom = "1px solid"
                     if border.left_line_style:
-                        style.border_left = "solid"
+                        style.border_left = "1px solid"
                     if border.right_line_style:
-                        style.border_right = "solid"
+                        style.border_right = "1px solid"
                     
                     # 边框颜色（使用第一个有效的边框颜色）
                     for color_idx in [border.top_colour_index, border.bottom_colour_index,
                                     border.left_colour_index, border.right_colour_index]:
-                        if color_idx and color_idx != 0:
-                            style.border_color = self._get_color_from_index(workbook, color_idx)
-                            break
+                        if color_idx and color_idx != 64: # 64是默认颜色
+                            border_color = self._get_color_from_index(workbook, color_idx)
+                            if border_color:
+                                style.border_color = border_color
+                                break
             
         except Exception as e:
             logger.warning(f"提取样式失败 ({row_idx}, {col_idx}): {e}")

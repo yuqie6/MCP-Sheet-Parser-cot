@@ -107,7 +107,7 @@ class TestHTMLConverter:
         sheet = Sheet(
             name="Merged Test",
             rows=[
-                Row(cells=[Cell(value="Merged"), Cell(value="B1")]),
+                Row(cells=[Cell(value="Merged A1:B1"), Cell(value="B1")]),
                 Row(cells=[Cell(value="A2"), Cell(value="B2")])
             ],
             merged_cells=["A1:B1"]
@@ -116,9 +116,13 @@ class TestHTMLConverter:
         converter = HTMLConverter()
         html = converter._generate_html(sheet)
 
-        assert "Merged" in html
-        # 合并单元格信息可能在HTML注释中或者以其他形式存在
-        assert "Merged Test" in html  # 至少表名应该存在
+        assert 'colspan="2"' in html
+        # The cell that is covered by the span should not be rendered
+        assert '<td>B1</td>' not in html
+        # But other cells should be present
+        assert '<td>A2</td>' in html
+        assert '<td>B2</td>' in html
+        assert "Merged A1:B1" in html
     
     def test_convert_to_file_success(self):
         """测试成功转换到文件。"""
