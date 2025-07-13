@@ -1,10 +1,5 @@
 # MCP-Sheet-Parser: AI 原生表格处理服务
 
-<p align="center">
-  <a href="https://claude.ai">
-    <img src="https://raw.githubusercontent.com/user-attachments/assets/dd33663a-8f9f-4a94-b1f4-30740a33a39e" alt="MCP-Sheet-Parser Logo" width="150">
-  </a>
-</p>
 
 <p align="center">
   <strong>一个专为 AI 助力量身打造的高性能、高保真 MCP 服务，赋予 AI 精确读写、修改、转换复杂表格文件的能力。</strong>
@@ -20,6 +15,15 @@
 ---
 
 **MCP-Sheet-Parser** 是一个完整的表格处理解决方案，旨在解决 AI 助手在处理电子表格时的核心痛点。它通过提供一套标准化的工具接口，让 AI 能够像人类专家一样，无缝地处理 `CSV`, `XLSX`, `XLS` 等多种主流表格格式，并实现了对复杂样式的精确解析与回写。
+
+MCP-Sheet-Parser-Cot 是一个功能强大的高保真电子表格解析器与转换器，旨在作为一个标准的模型上下文协议（MCP）服务器工具运行。它赋予了AI大语言模型（LLM）以编程方式读取、理解甚至修改多种电子表格文件（包括 XLSX, XLS, CSV 等）的能力。
+
+**核心特性包括：**
+*   **广泛的格式支持**：覆盖主流的Excel和CSV文件格式。
+*   **高保真样式还原**：精确映射字体、颜色、背景、对齐、边框等样式到HTML。
+*   **复杂结构处理**：正确处理合并单元格、超链接和单元格注释。
+*   **为AI设计的闭环工具链**：提供 `convert_to_html` (查看)、`parse_sheet` (理解) 和 `apply_changes` (修改) 的完整交互闭环。
+*   **大文件优化**：内置分页和范围选择功能，高效处理大型数据集。
 
 ## 核心功能
 

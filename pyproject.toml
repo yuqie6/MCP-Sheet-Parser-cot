@@ -1,7 +1,7 @@
 [project]
-name = "mcp-sheet-parser"
+name = "MCP-Sheet-Parser-Cot"
 version = "0.1.0"
-description = "An MCP server to parse spreadsheet files into styled HTML."
+description = "一个为AI智能体设计的高保真电子表格解析与HTML转换器 (MCP工具)。"
 dependencies = [
     "mcp[cli]",
     "openpyxl",
