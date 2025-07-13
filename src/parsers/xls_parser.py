@@ -7,7 +7,8 @@ XLS格式解析器模块
 import logging
 import xlrd
 import xlrd.xldate
-from src.models.table_model import Sheet, Row, Cell, Style
+from typing import Optional
+from src.models.table_model import Sheet, Row, Cell, Style, LazySheet
 from src.parsers.base_parser import BaseParser
 
 logger = logging.getLogger(__name__)
@@ -339,3 +340,14 @@ class XlsParser(BaseParser):
         
         # 行号从1开始
         return f"{col_str}{row + 1}"
+    
+    def supports_streaming(self) -> bool:
+        """XLS parser has limited streaming support due to xlrd limitations."""
+        return False  # xlrd doesn't support true streaming, but we could implement chunked reading
+    
+    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> Optional[LazySheet]:
+        """
+        XLS format has limited streaming support due to xlrd library limitations.
+        Consider using chunked reading for large files.
+        """
+        return None  # Not implemented due to xlrd limitations

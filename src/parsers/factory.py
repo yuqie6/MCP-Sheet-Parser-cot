@@ -88,32 +88,37 @@ class ParserFactory:
             "csv": {
                 "name": "CSV",
                 "description": "通用逗号分隔值文件",
-                "features": ["数据提取", "基础格式"],
-                "parser_class": "CsvParser"
+                "features": ["数据提取", "基础格式", "流式读取"],
+                "parser_class": "CsvParser",
+                "supports_streaming": True
             },
             "xlsx": {
                 "name": "Excel XLSX",
                 "description": "Excel 2007+格式",
-                "features": ["完整样式提取",  "超链接", "注释", "合并单元格"],
-                "parser_class": "XlsxParser"
+                "features": ["完整样式提取",  "超链接", "注释", "合并单元格", "流式读取"],
+                "parser_class": "XlsxParser",
+                "supports_streaming": True
             },
             "xls": {
                 "name": "Excel XLS",
                 "description": "Excel 97-2003格式",
                 "features": ["基础样式提取", "动态颜色获取", "合并单元格"],
-                "parser_class": "XlsParser"
+                "parser_class": "XlsParser",
+                "supports_streaming": False
             },
             "xlsb": {
                 "name": "Excel XLSB",
                 "description": "Excel二进制格式",
                 "features": ["数据准确性", "基础样式", "高性能"],
-                "parser_class": "XlsbParser"
+                "parser_class": "XlsbParser",
+                "supports_streaming": False
             },
             "xlsm": {
                 "name": "Excel XLSM",
                 "description": "Excel宏文件格式",
-                "features": ["完整样式提取", "宏信息保留"],
-                "parser_class": "XlsmParser"
+                "features": ["完整样式提取", "宏信息保留", "流式读取"],
+                "parser_class": "XlsmParser",
+                "supports_streaming": True
             }
         }
 
@@ -133,3 +138,52 @@ class ParserFactory:
             return file_extension in ParserFactory._parsers
         except:
             return False
+    
+    @staticmethod
+    def supports_streaming(file_path: str) -> bool:
+        """
+        检查指定文件格式是否支持流式读取。
+        
+        Args:
+            file_path: 文件路径
+            
+        Returns:
+            如果格式支持流式读取则返回True，否则返回False
+        """
+        try:
+            parser = ParserFactory.get_parser(file_path)
+            return parser.supports_streaming()
+        except:
+            return False
+    
+    @staticmethod
+    def get_streaming_formats() -> list[str]:
+        """
+        获取所有支持流式读取的文件格式列表。
+        
+        Returns:
+            支持流式读取的文件格式列表
+        """
+        streaming_formats = []
+        for format_ext, parser in ParserFactory._parsers.items():
+            if parser.supports_streaming():
+                streaming_formats.append(format_ext)
+        return streaming_formats
+    
+    @staticmethod
+    def create_lazy_sheet(file_path: str, sheet_name: str = None):
+        """
+        为支持流式读取的文件创建懒加载工作表。
+        
+        Args:
+            file_path: 文件路径
+            sheet_name: 工作表名称（可选）
+            
+        Returns:
+            LazySheet对象，如果不支持流式读取则返回None
+            
+        Raises:
+            UnsupportedFileType: 当文件格式不支持时
+        """
+        parser = ParserFactory.get_parser(file_path)
+        return parser.create_lazy_sheet(file_path, sheet_name)

@@ -15,6 +15,8 @@ from typing import Any, Dict, Optional
 from .parsers.factory import ParserFactory
 from .models.table_model import Sheet
 from .converters.html_converter import HTMLConverter
+from .streaming import StreamingTableReader, ChunkFilter
+from .cache import CacheManager, get_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,9 @@ class CoreService:
             raise
     
     def parse_sheet(self, file_path: str, sheet_name: Optional[str] = None, 
-                   range_string: Optional[str] = None) -> Dict[str, Any]:
+                   range_string: Optional[str] = None, 
+                   enable_streaming: bool = True, 
+                   streaming_threshold: int = 10000) -> Dict[str, Any]:
         """
         解析表格文件为标准化的JSON格式。
         
@@ -79,6 +83,8 @@ class CoreService:
             file_path: 文件路径
             sheet_name: 工作表名称（可选）
             range_string: 单元格范围（可选）
+            enable_streaming: 是否启用自动流式读取（默认True）
+            streaming_threshold: 流式读取的单元格数量阈值（默认10000）
             
         Returns:
             标准化的TableModel JSON
@@ -89,13 +95,29 @@ class CoreService:
             if not path.exists():
                 raise FileNotFoundError(f"文件不存在: {file_path}")
             
-            # 获取解析器并解析
+            # 尝试从缓存获取数据
+            cache_manager = get_cache_manager()
+            cached_data = cache_manager.get(file_path, range_string, sheet_name)
+            if cached_data is not None:
+                logger.info(f"从缓存获取数据: {file_path}")
+                return cached_data['data']
+            
+            # 获取解析器
             parser = self.parser_factory.get_parser(file_path)
-            sheet = parser.parse(file_path)
-
-            # 转换为标准化JSON格式
-            json_data = self._sheet_to_json(sheet, range_string)
-
+            
+            # 检查是否应该使用流式读取
+            if enable_streaming and self._should_use_streaming(file_path, streaming_threshold):
+                json_data = self._parse_sheet_streaming(file_path, sheet_name, range_string)
+            else:
+                # 使用传统方法
+                sheet = parser.parse(file_path)
+                # 转换为标准化JSON格式
+                json_data = self._sheet_to_json(sheet, range_string)
+            
+            # 缓存解析结果
+            cache_manager.set(file_path, json_data, range_string, sheet_name)
+            logger.debug(f"数据已缓存: {file_path}")
+            
             return json_data
             
         except Exception as e:
@@ -642,4 +664,182 @@ class CoreService:
                 "supports_merged_cells": True,
                 "supports_hyperlinks": True
             }
+        }
+
+    def _should_use_streaming(self, file_path: str, threshold: int) -> bool:
+        """
+        判断是否应该使用流式读取。
+        
+        Args:
+            file_path: 文件路径
+            threshold: 单元格数量阈值
+            
+        Returns:
+            如果应该使用流式读取则返回True
+        """
+        try:
+            # 检查解析器是否支持流式读取
+            if not self.parser_factory.supports_streaming(file_path):
+                return False
+            
+            # 快速估算文件大小
+            path = Path(file_path)
+            file_size = path.stat().st_size
+            
+            # 基于文件大小的简单启发式判断
+            # 大于10MB的文件通常值得流式读取
+            if file_size > 10 * 1024 * 1024:  # 10MB
+                return True
+            
+            # 对于较小的文件，可以先快速解析一小部分来估算总大小
+            try:
+                with StreamingTableReader(file_path) as reader:
+                    info = reader.get_info()
+                    total_cells = info['total_rows'] * info['total_columns']
+                    return total_cells >= threshold
+            except Exception as e:
+                logger.warning(f"无法估算文件大小: {e}")
+                return False
+                
+        except Exception as e:
+            logger.warning(f"检查流式读取支持时出错: {e}")
+            return False
+    
+    def _parse_sheet_streaming(self, file_path: str, sheet_name: Optional[str] = None, 
+                              range_string: Optional[str] = None) -> Dict[str, Any]:
+        """
+        使用流式读取器解析表格文件。
+        
+        Args:
+            file_path: 文件路径
+            sheet_name: 工作表名称（可选）
+            range_string: 单元格范围（可选）
+            
+        Returns:
+            标准化的TableModel JSON
+        """
+        try:
+            with StreamingTableReader(file_path) as reader:
+                # 获取文件信息
+                file_info = reader.get_info()
+                
+                # 设置过滤配置
+                filter_config = None
+                if range_string:
+                    filter_config = ChunkFilter(range_string=range_string)
+                
+                # 检查是否为大文件，如果是则返回摘要
+                total_cells = file_info['total_rows'] * file_info['total_columns']
+                LARGE_FILE_THRESHOLD = 50000  # 大文件阈值
+                
+                if total_cells > LARGE_FILE_THRESHOLD and not range_string:
+                    # 返回摘要信息
+                    return self._generate_streaming_summary(reader, file_info)
+                
+                # 读取数据块
+                all_rows = []
+                headers = []
+                
+                for chunk in reader.iter_chunks(rows=1000, filter_config=filter_config):
+                    if not headers:
+                        headers = chunk.headers
+                    
+                    # 转换行格式
+                    for row in chunk.rows:
+                        row_data = []
+                        for cell in row.cells:
+                            cell_data = {
+                                "value": cell.value,
+                                "style": self._style_to_dict(cell.style) if cell.style else None
+                            }
+                            row_data.append(cell_data)
+                        all_rows.append(row_data)
+                
+                # 构建返回数据
+                return {
+                    "sheet_name": Path(file_path).stem,
+                    "metadata": {
+                        "parser_type": file_info['parser_type'],
+                        "total_rows": file_info['total_rows'],
+                        "total_cols": file_info['total_columns'],
+                        "data_rows": len(all_rows),
+                        "processing_mode": "streaming",
+                        "supports_streaming": True
+                    },
+                    "headers": headers,
+                    "rows": all_rows,
+                    "size_info": {
+                        "total_cells": total_cells,
+                        "processing_mode": "streaming",
+                        "recommendation": "使用流式读取处理大文件",
+                        "estimated_memory_usage": file_info['estimated_memory_usage']
+                    }
+                }
+                
+        except Exception as e:
+            logger.error(f"流式解析失败: {e}")
+            # 回退到传统方法
+            parser = self.parser_factory.get_parser(file_path)
+            sheet = parser.parse(file_path)
+            return self._sheet_to_json(sheet, range_string)
+    
+    def _generate_streaming_summary(self, reader: StreamingTableReader, file_info: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        为大文件生成流式摘要信息。
+        
+        Args:
+            reader: 流式读取器
+            file_info: 文件信息
+            
+        Returns:
+            摘要数据
+        """
+        # 读取前几行作为样本
+        sample_rows = []
+        headers = []
+        
+        filter_config = ChunkFilter(start_row=0, max_rows=5)
+        
+        for chunk in reader.iter_chunks(rows=5, filter_config=filter_config):
+            headers = chunk.headers
+            
+            for row in chunk.rows[1:]:  # 跳过表头行
+                row_data = []
+                for cell in row.cells:
+                    cell_data = {
+                        "value": cell.value,
+                        "style": self._style_to_dict(cell.style) if cell.style else None
+                    }
+                    row_data.append(cell_data)
+                sample_rows.append(row_data)
+            break  # 只需要第一个块
+        
+        total_cells = file_info['total_rows'] * file_info['total_columns']
+        
+        return {
+            "sheet_name": Path(reader.file_path).stem,
+            "metadata": {
+                "parser_type": file_info['parser_type'],
+                "total_rows": file_info['total_rows'],
+                "total_cols": file_info['total_columns'],
+                "total_cells": total_cells,
+                "processing_mode": "streaming_summary",
+                "supports_streaming": True
+            },
+            "sample_data": {
+                "headers": headers,
+                "rows": sample_rows,
+                "note": f"显示前{len(sample_rows)}行数据作为样本（流式读取）"
+            },
+            "size_info": {
+                "total_cells": total_cells,
+                "processing_mode": "streaming_summary",
+                "recommendation": f"文件过大({total_cells}个单元格)，建议使用范围选择。例如：A1:J100",
+                "estimated_memory_usage": file_info['estimated_memory_usage']
+            },
+            "suggested_ranges": [
+                "A1:J100",  # 前100行，前10列
+                "A1:Z50",   # 前50行，前26列
+                f"A1:{chr(65 + min(25, len(headers) - 1))}200"  # 前200行，实际列数
+            ]
         }

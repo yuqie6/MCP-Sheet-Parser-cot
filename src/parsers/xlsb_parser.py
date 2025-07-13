@@ -7,8 +7,9 @@ XLSB格式的样式信息相对有限，主要专注于数据准确性。
 
 import logging
 from datetime import datetime
+from typing import Optional
 from pyxlsb import open_workbook, convert_date
-from src.models.table_model import Sheet, Row, Cell, Style
+from src.models.table_model import Sheet, Row, Cell, Style, LazySheet
 from src.parsers.base_parser import BaseParser
 
 logger = logging.getLogger(__name__)
@@ -205,3 +206,14 @@ class XlsbParser(BaseParser):
                     normalized_row[cell.c] = cell.v
         
         return normalized_row
+    
+    def supports_streaming(self) -> bool:
+        """XLSB parser has limited streaming support due to pyxlsb limitations."""
+        return False  # pyxlsb has some streaming capabilities but limited style support
+    
+    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> Optional[LazySheet]:
+        """
+        XLSB format has limited streaming support.
+        pyxlsb supports streaming but with very limited style information.
+        """
+        return None  # Not implemented due to limited style support in streaming mode

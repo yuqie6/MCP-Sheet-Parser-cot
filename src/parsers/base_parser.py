@@ -5,7 +5,8 @@
 """
 
 from abc import ABC, abstractmethod
-from src.models.table_model import Sheet
+from typing import Optional
+from src.models.table_model import Sheet, LazySheet, StreamingCapable
 
 
 class BaseParser(ABC):
@@ -26,3 +27,20 @@ class BaseParser(ABC):
             RuntimeError: 当解析失败时
         """
         pass
+    
+    def supports_streaming(self) -> bool:
+        """Check if this parser supports streaming."""
+        return False
+    
+    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> Optional[LazySheet]:
+        """
+        Create a lazy sheet that can stream data on demand.
+        
+        Args:
+            file_path: 要解析的文件路径
+            sheet_name: 工作表名称（可选）
+            
+        Returns:
+            LazySheet对象，如果不支持流式读取则返回None
+        """
+        return None

@@ -7,7 +7,8 @@ XLSM本质上是带宏的XLSX，样式提取与XLSX完全相同。
 
 import logging
 import openpyxl
-from src.models.table_model import Sheet, Row, Cell, Style
+from typing import Optional
+from src.models.table_model import Sheet, Row, Cell, Style, LazySheet
 from src.parsers.xlsx_parser import XlsxParser
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,30 @@ class XlsmParser(XlsxParser):
             logger.warning(f"获取宏信息失败: {e}")
         
         return macro_info
+    
+    def supports_streaming(self) -> bool:
+        """XLSM parser supports streaming (inherits from XLSX)."""
+        return True
+    
+    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> LazySheet:
+        """
+        Create a lazy sheet for XLSM that can stream data on demand.
+        XLSM files are processed the same as XLSX files for streaming.
+        
+        Args:
+            file_path: XLSM文件路径
+            sheet_name: 工作表名称（可选）
+            
+        Returns:
+            LazySheet对象
+        """
+        # Use the same streaming implementation as XLSX
+        from .xlsx_parser import XlsxRowProvider
+        
+        provider = XlsxRowProvider(file_path, sheet_name)
+        name = provider._get_worksheet_info()
+        merged_cells = provider._get_merged_cells()
+        return LazySheet(name=name, provider=provider, merged_cells=merged_cells)
     
     def is_macro_enabled_file(self, file_path: str) -> bool:
         """

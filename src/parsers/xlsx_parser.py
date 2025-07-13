@@ -2,12 +2,107 @@
 XLSX解析器模块
 
 解析Excel XLSX文件并转换为Sheet对象
-包含完整的样式提取、颜色处理、边框识别等功能。
+包含完整的样式提取、颜色处理、边框识别等功能，支持流式读取。
 """
 
 import openpyxl
-from src.models.table_model import Sheet, Row, Cell, Style
+from typing import Iterator, Optional
+from src.models.table_model import Sheet, Row, Cell, Style, LazySheet, LazyRowProvider
 from src.parsers.base_parser import BaseParser
+
+
+class XlsxRowProvider:
+    """Lazy row provider for XLSX files using openpyxl streaming with read_only=True."""
+    
+    def __init__(self, file_path: str, sheet_name: Optional[str] = None):
+        self.file_path = file_path
+        self.sheet_name = sheet_name
+        self._total_rows_cache: Optional[int] = None
+        self._merged_cells_cache: Optional[list[str]] = None
+        self._worksheet_title_cache: Optional[str] = None
+    
+    def _get_worksheet_info(self):
+        """Get worksheet info without reading all data."""
+        if self._worksheet_title_cache is None:
+            workbook = openpyxl.load_workbook(self.file_path, read_only=True)
+            worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+            self._worksheet_title_cache = worksheet.title
+            workbook.close()
+        return self._worksheet_title_cache
+    
+    def _get_merged_cells(self) -> list[str]:
+        """Get merged cells info."""
+        if self._merged_cells_cache is None:
+            # Read merged cells from non-read-only workbook (required for merged_cells access)
+            workbook = openpyxl.load_workbook(self.file_path)
+            worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+            self._merged_cells_cache = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
+            workbook.close()
+        return self._merged_cells_cache
+    
+    def _parse_row(self, row_cells: tuple) -> Row:
+        """Parse a tuple of openpyxl cells into a Row object."""
+        parser = XlsxParser()
+        cells = []
+        for cell in row_cells:
+            cell_value = cell.value
+            cell_style = parser._extract_style(cell) if cell else None
+            cells.append(Cell(value=cell_value, style=cell_style))
+        return Row(cells=cells)
+
+    def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
+        """Yield rows on demand using openpyxl.iter_rows with read_only=True."""
+        workbook = openpyxl.load_workbook(self.file_path, read_only=True)
+        worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+        
+        try:
+            # Use openpyxl's iter_rows with values_only=False to get cell objects with styles
+            row_count = 0
+            for row_cells in worksheet.iter_rows(values_only=False):
+                # Skip rows before start_row
+                if row_count < start_row:
+                    row_count += 1
+                    continue
+                
+                # Stop if we've reached max_rows
+                if max_rows is not None and (row_count - start_row) >= max_rows:
+                    break
+                
+                yield self._parse_row(row_cells)
+                row_count += 1
+        
+        finally:
+            workbook.close()
+    
+    def get_row(self, row_index: int) -> Row:
+        """Get a specific row by index."""
+        workbook = openpyxl.load_workbook(self.file_path, read_only=True)
+        worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+        
+        try:
+            # Get specific row using worksheet.iter_rows
+            for i, row_cells in enumerate(worksheet.iter_rows(values_only=False)):
+                if i == row_index:
+                    return self._parse_row(row_cells)
+            
+            raise IndexError(f"Row index {row_index} out of range")
+        
+        finally:
+            workbook.close()
+    
+    def get_total_rows(self) -> int:
+        """Get total number of rows without loading all data."""
+        if self._total_rows_cache is None:
+            workbook = openpyxl.load_workbook(self.file_path, read_only=True)
+            worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+            
+            try:
+                # Count rows using worksheet.max_row property
+                self._total_rows_cache = worksheet.max_row or 0
+            finally:
+                workbook.close()
+        
+        return self._total_rows_cache
 
 
 class XlsxParser(BaseParser):
@@ -403,3 +498,23 @@ class XlsxParser(BaseParser):
             pass
 
         return None
+    
+    def supports_streaming(self) -> bool:
+        """XLSX parser supports streaming."""
+        return True
+    
+    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> LazySheet:
+        """
+        Create a lazy sheet for XLSX that can stream data on demand.
+        
+        Args:
+            file_path: XLSX文件路径
+            sheet_name: 工作表名称（可选）
+            
+        Returns:
+            LazySheet对象
+        """
+        provider = XlsxRowProvider(file_path, sheet_name)
+        name = provider._get_worksheet_info()
+        merged_cells = provider._get_merged_cells()
+        return LazySheet(name=name, provider=provider, merged_cells=merged_cells)
