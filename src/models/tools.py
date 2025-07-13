@@ -31,25 +31,25 @@ def register_tools(server: Server) -> None:
         return [
             Tool(
                 name="convert_to_html",
-                description="将表格文件转换为完美的HTML文件，支持CSV、XLSX、XLS、XLSB、XLSM格式。支持大文件分页处理。返回HTML文件路径，不传输内容避免上下文爆炸。",
+                description="将表格文件（如 CSV, XLSX, XLS 等）转换为高保真 HTML，保留大部分样式。对于大型文件，会自动进行分页以优化性能和阅读体验。返回包含HTML文件路径和转换摘要的JSON对象。",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "源表格文件的绝对路径。支持.csv、.xlsx、.xls、.xlsb、.xlsm格式。"
+                            "description": "源表格文件的绝对路径，支持 .csv, .xlsx, .xls, .xlsb, .xlsm 格式。"
                         },
                         "output_path": {
                             "type": "string",
-                            "description": "输出HTML文件路径。如果未提供，将在源文件同目录生成同名.html文件。"
+                            "description": "输出HTML文件的路径。如果留空，将在源文件目录中生成一个同名的 .html 文件。"
                         },
                         "page_size": {
                             "type": "integer",
-                            "description": "分页大小（每页行数），用于大文件处理（可选）"
+                            "description": "【可选】分页时每页显示的行数。默认为100行。用于控制大型文件转换后HTML的单页大小。"
                         },
                         "page_number": {
                             "type": "integer",
-                            "description": "页码（从1开始），用于大文件分页显示（可选，默认为1）"
+                            "description": "【可选】要查看的页码，从1开始。默认为1。用于浏览大型文件的特定页面。"
                         }
                     },
                     "required": ["file_path"]
@@ -57,21 +57,21 @@ def register_tools(server: Server) -> None:
             ),
             Tool(
                 name="parse_sheet",
-                description="将表格文件解析为LLM友好的TableModel JSON格式。支持范围选择和工作表选择，智能大小检测，大文件返回摘要。平均样式保真度97.64%。",
+                description="将表格文件的指定工作表和范围解析为结构化的 TableModel JSON 对象。这个JSON格式对大型语言模型（LLM）非常友好，方便进行数据分析和修改。对于大型工作表，会自动返回摘要信息以避免过多的输出。",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "目标表格文件的绝对路径。支持CSV、XLSX、XLS、XLSB、XLSM格式。"
+                            "description": "目标表格文件的绝对路径，支持 .csv, .xlsx, .xls, .xlsb, .xlsm 格式。"
                         },
                         "sheet_name": {
                             "type": "string",
-                            "description": "要解析的工作表名称。如果未提供，使用第一个工作表。"
+                            "description": "【可选】要解析的工作表的名称。如果留空，将自动使用活动工作表或第一个工作表。"
                         },
                         "range_string": {
                             "type": "string",
-                            "description": "要解析的单元格范围，如'A1:D10'。如果未提供，解析整个工作表。大文件时建议指定范围。"
+                            "description": "【可选】要解析的单元格范围，格式如 'A1:D10'。如果留空，将解析整个工作表。建议在处理大文件时指定此参数以提高效率。"
                         }
                     },
                     "required": ["file_path"]
@@ -79,17 +79,17 @@ def register_tools(server: Server) -> None:
             ),
             Tool(
                 name="apply_changes",
-                description="将修改后的TableModel JSON数据写回原始文件，完成编辑闭环。自动备份原文件，保持文件格式和样式。",
+                description="将通过 `parse_sheet` 获取并已修改的 TableModel JSON 数据写回到原始表格文件中。此工具能够完成数据的闭环操作，同时保留原始文件的格式和大部分样式。默认会自动创建文件备份。",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "要写回的目标文件绝对路径。"
+                            "description": "需要写回数据的目标文件的绝对路径。"
                         },
                         "table_model_json": {
                             "type": "object",
-                            "description": "修改后的TableModel JSON数据，来自parse_sheet工具的输出。",
+                            "description": "从 `parse_sheet` 工具获取并修改后的 TableModel JSON 数据。",
                             "properties": {
                                 "sheet_name": {"type": "string"},
                                 "headers": {
@@ -108,13 +108,14 @@ def register_tools(server: Server) -> None:
                         },
                         "create_backup": {
                             "type": "boolean",
-                            "description": "是否创建备份文件。默认为true。"
+                            "description": "【可选】是否在写入前创建原始文件的备份。默认为 `true`，以防意外覆盖。"
                         }
                     },
                     "required": ["file_path", "table_model_json"]
                 }
             )
         ]
+
 
     @server.call_tool()
     async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
@@ -142,6 +143,11 @@ def register_tools(server: Server) -> None:
 async def _handle_convert_to_html(arguments: dict[str, Any], core_service: CoreService) -> list[TextContent]:
     """处理 convert_to_html 工具调用。"""
     file_path = arguments.get("file_path")
+    if not isinstance(file_path, str):
+        return [TextContent(
+            type="text",
+            text="错误: 必须提供有效的 file_path 参数"
+        )]
     output_path = arguments.get("output_path")
     page_size = arguments.get("page_size")
     page_number = arguments.get("page_number")
@@ -168,6 +174,11 @@ async def _handle_convert_to_html(arguments: dict[str, Any], core_service: CoreS
 async def _handle_parse_sheet(arguments: dict[str, Any], core_service: CoreService) -> list[TextContent]:
     """处理 parse_sheet 工具调用。"""
     file_path = arguments.get("file_path")
+    if not isinstance(file_path, str):
+        return [TextContent(
+            type="text",
+            text="错误: 必须提供有效的 file_path 参数"
+        )]
     sheet_name = arguments.get("sheet_name")
     range_string = arguments.get("range_string")
 
@@ -193,7 +204,18 @@ async def _handle_parse_sheet(arguments: dict[str, Any], core_service: CoreServi
 async def _handle_apply_changes(arguments: dict[str, Any], core_service: CoreService) -> list[TextContent]:
     """处理 apply_changes 工具调用。"""
     file_path = arguments.get("file_path")
+    if not isinstance(file_path, str):
+        return [TextContent(
+            type="text",
+            text="错误: 必须提供有效的 file_path 参数"
+        )]
+    
     table_model_json = arguments.get("table_model_json")
+    if not isinstance(table_model_json, dict):
+        return [TextContent(
+            type="text",
+            text="错误: 必须提供有效的 table_model_json 参数"
+        )]
     create_backup = arguments.get("create_backup", True)
 
     try:

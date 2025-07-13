@@ -7,7 +7,7 @@ MCP服务器测试模块
 import pytest
 from unittest.mock import Mock, patch
 from src.mcp_server.server import create_server
-from src.mcp_server.tools import (
+from src.models.tools import (
     _handle_convert_to_html,
     _handle_parse_sheet,
     _handle_apply_changes

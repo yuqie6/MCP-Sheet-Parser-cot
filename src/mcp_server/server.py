@@ -12,7 +12,7 @@ import logging
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from .tools import register_tools
+from ..models.tools import register_tools
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)

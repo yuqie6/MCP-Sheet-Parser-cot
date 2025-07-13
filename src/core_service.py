@@ -16,7 +16,8 @@ from .parsers.factory import ParserFactory
 from .models.table_model import Sheet
 from .converters.html_converter import HTMLConverter
 from .streaming import StreamingTableReader, ChunkFilter
-from .cache import CacheManager, get_cache_manager
+from .config import config
+from .cache import get_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class CoreService:
     def parse_sheet(self, file_path: str, sheet_name: Optional[str] = None, 
                    range_string: Optional[str] = None, 
                    enable_streaming: bool = True, 
-                   streaming_threshold: int = 10000) -> Dict[str, Any]:
+                   streaming_threshold: int = config.STREAMING_THRESHOLD_CELLS) -> Dict[str, Any]:
         """
         解析表格文件为标准化的JSON格式。
         
@@ -214,13 +215,12 @@ class CoreService:
             elif file_format in ['.xlsx', '.xlsm']:
                 changes_applied = self._write_back_xlsx(path, table_model_json)
             elif file_format == '.xls':
-                # XLS格式比较复杂，暂时不支持写回
-                raise ValueError("XLS格式暂不支持数据写回，请转换为XLSX格式")
+                changes_applied = self._write_back_xls(path, table_model_json)
             elif file_format == '.xlsb':
                 # XLSB格式比较复杂，暂时不支持写回
-                raise ValueError("XLSB格式暂不支持数据写回，请转换为XLSX格式")
+                raise RuntimeError("XLSB格式暂不支持数据写回，请转换为XLSX格式进行编辑")
             else:
-                raise ValueError(f"不支持的文件格式: {file_format}")
+                raise RuntimeError(f"不支持的文件格式: {file_format}")
 
             return {
                 "status": "success",
@@ -279,6 +279,42 @@ class CoreService:
 
         logger.info(f"CSV文件已更新: {file_path}")
         return len(rows)  # 返回修改的行数
+
+    def _write_back_xls(self, file_path: Path, table_model_json: Dict[str, Any]) -> int:
+        """
+        将修改写回XLS文件。
+
+        Args:
+            file_path: XLS文件路径
+            table_model_json: 包含修改的JSON数据
+
+        Returns:
+            应用的修改数量
+        """
+        import xlwt
+
+        workbook = xlwt.Workbook(encoding='utf-8')
+        sheet_name = table_model_json.get("sheet_name", "Sheet1")
+        worksheet = workbook.add_sheet(sheet_name)
+
+        headers = table_model_json.get("headers", [])
+        rows = table_model_json.get("rows", [])
+
+        # 写入表头
+        for col_idx, header in enumerate(headers):
+            worksheet.write(0, col_idx, header)
+
+        # 写入数据行
+        changes_count = 0
+        for row_idx, row_data in enumerate(rows, 1):
+            for col_idx, cell_data in enumerate(row_data):
+                value = cell_data.get('value') if isinstance(cell_data, dict) else cell_data
+                worksheet.write(row_idx, col_idx, value)
+                changes_count += 1
+
+        workbook.save(str(file_path))
+        logger.info(f"XLS文件已更新: {file_path}")
+        return changes_count
 
     def _write_back_xlsx(self, file_path: Path, table_model_json: Dict[str, Any]) -> int:
         """
@@ -367,8 +403,8 @@ class CoreService:
         total_cells = self._calculate_data_size(sheet)
 
         # 智能大小检测
-        SMALL_FILE_THRESHOLD = 1000
-        LARGE_FILE_THRESHOLD = 10000
+        SMALL_FILE_THRESHOLD = config.SMALL_FILE_THRESHOLD_CELLS
+        LARGE_FILE_THRESHOLD = config.LARGE_FILE_THRESHOLD_CELLS
 
         # 处理范围选择
         if range_string:
@@ -688,7 +724,7 @@ class CoreService:
             
             # 基于文件大小的简单启发式判断
             # 大于10MB的文件通常值得流式读取
-            if file_size > 10 * 1024 * 1024:  # 10MB
+            if file_size > config.STREAMING_FILE_SIZE_MB * 1024 * 1024:  # 10MB
                 return True
             
             # 对于较小的文件，可以先快速解析一小部分来估算总大小
@@ -730,7 +766,7 @@ class CoreService:
                 
                 # 检查是否为大文件，如果是则返回摘要
                 total_cells = file_info['total_rows'] * file_info['total_columns']
-                LARGE_FILE_THRESHOLD = 50000  # 大文件阈值
+                LARGE_FILE_THRESHOLD = config.STREAMING_SUMMARY_THRESHOLD_CELLS  # 大文件阈值
                 
                 if total_cells > LARGE_FILE_THRESHOLD and not range_string:
                     # 返回摘要信息
@@ -740,7 +776,7 @@ class CoreService:
                 all_rows = []
                 headers = []
                 
-                for chunk in reader.iter_chunks(rows=1000, filter_config=filter_config):
+                for chunk in reader.iter_chunks(rows=config.STREAMING_CHUNK_SIZE_ROWS, filter_config=filter_config):
                     if not headers:
                         headers = chunk.headers
                     

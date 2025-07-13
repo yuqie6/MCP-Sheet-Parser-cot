@@ -73,21 +73,32 @@ class CsvRowProvider:
 
 
 class CsvParser(BaseParser):
-    """CSV文件解析器，将CSV文件转换为标准化的Sheet对象。"""
+    """
+    A parser for CSV files.
+
+    This parser converts CSV files into a standardized Sheet object. It handles
+    different encodings (UTF-8 and GBK) and supports streaming for large files.
+    """
+
+    def _extract_style(self, cell):
+        # CSV不支持样式，返回None
+        return None
 
     def parse(self, file_path: str) -> Sheet:
         """
-        解析CSV文件并转换为Sheet对象。
+        Parses a CSV file and converts it into a Sheet object.
+
+        It first tries to decode the file using UTF-8, and falls back to GBK
+        if a UnicodeDecodeError occurs.
 
         Args:
-            file_path: CSV文件路径
+            file_path: The absolute path to the CSV file.
 
         Returns:
-            包含CSV数据的Sheet对象
+            A Sheet object containing the data from the CSV file.
 
         Raises:
-            FileNotFoundError: 当文件不存在时
-            UnicodeDecodeError: 当文件编码不是UTF-8时
+            FileNotFoundError: If the file does not exist.
         """
         path = Path(file_path)
         sheet_name = path.stem
@@ -115,14 +126,14 @@ class CsvParser(BaseParser):
     
     def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> LazySheet:
         """
-        Create a lazy sheet for CSV that can stream data on demand.
-        
+        Creates a LazySheet for streaming data from a CSV file.
+
         Args:
-            file_path: CSV文件路径
-            sheet_name: 工作表名称（可选）
-            
+            file_path: The absolute path to the CSV file.
+            sheet_name: The name of the sheet (optional, defaults to filename).
+
         Returns:
-            LazySheet对象
+            A LazySheet object that can stream data on demand.
         """
         path = Path(file_path)
         name = sheet_name or path.stem

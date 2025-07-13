@@ -11,7 +11,7 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
-from src.mcp_server.tools import (
+from src.models.tools import (
     _handle_convert_to_html,
     _handle_parse_sheet,
     _handle_apply_changes
@@ -284,7 +284,7 @@ class TestMCPTools:
             assert isinstance(result, list)
             text_content = result[0].text
             # 当前实现返回验证成功的消息
-            assert "验证成功" in text_content or "数据修改完成" in text_content
+            assert ("验证成功" in text_content or "数据修改已成功应用" in text_content)
                 
         finally:
             os.unlink(tmp_path)
@@ -320,7 +320,7 @@ class TestMCPTools:
             assert isinstance(result, list)
             text_content = result[0].text
             # 当前实现返回验证成功的消息
-            assert "验证成功" in text_content or "数据修改完成" in text_content
+            assert ("验证成功" in text_content or "数据修改已成功应用" in text_content)
             
         finally:
             os.unlink(tmp_path)

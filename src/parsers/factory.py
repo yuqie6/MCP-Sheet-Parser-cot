@@ -24,14 +24,18 @@ class UnsupportedFileType(Exception):
 
 class ParserFactory:
     """
-    解析器工厂类，根据文件扩展名返回对应的解析器。
+    A factory class for creating file parsers based on file extensions.
 
-    支持的格式：
-    - CSV (.csv): 通用逗号分隔值文件
-    - XLSX (.xlsx): Excel 2007+格式，支持完整样式提取
-    - XLS (.xls): Excel 97-2003格式，支持基础样式提取
-    - XLSB (.xlsb): Excel二进制格式，专注数据准确性
-    - XLSM (.xlsm): Excel宏文件格式，与XLSX样式一致
+    This factory provides a centralized way to get the correct parser for a
+    given file format. It supports various spreadsheet formats and handles
+    errors for unsupported types.
+
+    Supported formats:
+    - CSV (.csv): Comma-Separated Values.
+    - XLSX (.xlsx): Modern Excel format (2007+), with full style support.
+    - XLS (.xls): Legacy Excel format (97-2003), with basic style support.
+    - XLSB (.xlsb): Excel binary format, focused on data accuracy.
+    - XLSM (.xlsm): Excel macro-enabled format, similar to XLSX.
     """
 
     _parsers = {
@@ -45,16 +49,16 @@ class ParserFactory:
     @staticmethod
     def get_parser(file_path: str) -> BaseParser:
         """
-        根据文件路径获取对应的解析器。
+        Retrieves the appropriate parser for a given file path.
 
         Args:
-            file_path: 文件路径
+            file_path: The absolute path to the file.
 
         Returns:
-            对应格式的解析器实例
+            An instance of a parser that inherits from BaseParser.
 
         Raises:
-            UnsupportedFileType: 当文件格式不支持时
+            UnsupportedFileType: If the file format is not supported.
         """
         file_extension = file_path.split('.')[-1].lower()
         parser = ParserFactory._parsers.get(file_extension)
@@ -69,10 +73,7 @@ class ParserFactory:
     @staticmethod
     def get_supported_formats() -> list[str]:
         """
-        获取所有支持的文件格式列表。
-
-        Returns:
-            支持的文件格式列表
+        Returns a list of all supported file format extensions.
         """
         return list(ParserFactory._parsers.keys())
 
@@ -125,13 +126,13 @@ class ParserFactory:
     @staticmethod
     def is_supported_format(file_path: str) -> bool:
         """
-        检查文件格式是否受支持。
+        Checks if the file format of a given path is supported.
 
         Args:
-            file_path: 文件路径
+            file_path: The path to the file.
 
         Returns:
-            如果格式受支持则返回True，否则返回False
+            True if the format is supported, False otherwise.
         """
         try:
             file_extension = file_path.split('.')[-1].lower()

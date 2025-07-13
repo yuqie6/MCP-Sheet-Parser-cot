@@ -106,21 +106,31 @@ class XlsxRowProvider:
 
 
 class XlsxParser(BaseParser):
-    """XLSX文件解析器，支持完整的样式提取"""
+    """
+    A parser for XLSX files with comprehensive style extraction.
+
+    This parser handles modern Excel files (.xlsx) and is capable of extracting
+    a wide range of styling information, including fonts, colors, borders,
+    and number formats. It also supports streaming for large files via the
+    XlsxRowProvider.
+    """
 
     def parse(self, file_path: str) -> Sheet:
         """
-        解析XLSX文件并返回Sheet对象。
+        Parses an XLSX file and returns a Sheet object.
+
+        This method loads the entire file into memory to parse its content
+        and styles. For large files, consider using `create_lazy_sheet`.
 
         Args:
-            file_path: XLSX文件路径
+            file_path: The absolute path to the XLSX file.
 
         Returns:
-            包含完整数据和样式的Sheet对象
+            A Sheet object containing the full data and styles.
 
         Raises:
-            ValueError: 当工作簿不包含活动工作表时
-            FileNotFoundError: 当文件不存在时
+            ValueError: If the workbook contains no active worksheet.
+            FileNotFoundError: If the file does not exist.
         """
         workbook = openpyxl.load_workbook(file_path)
         worksheet = workbook.active
@@ -152,15 +162,40 @@ class XlsxParser(BaseParser):
             merged_cells=merged_cells
         )
 
+    def _column_letter_to_number(self, column_letter: str) -> int:
+        """
+        将Excel列字母（如 'A', 'B', 'AA'）转换为数字（1-based）。
+        """
+        result = 0
+        for char in column_letter:
+            result = result * 26 + (ord(char.upper()) - ord('A') + 1)
+        return result
+
+    def _parse_range(self, range_string: str) -> tuple[int, int, int, int]:
+        """
+        解析Excel范围字符串（如 "A1:C3"）为数字索引。
+        """
+        import re
+        match = re.match(r"([A-Z]+)(\d+):([A-Z]+)(\d+)", range_string, re.IGNORECASE)
+        if not match:
+            raise ValueError(f"无效的范围格式: {range_string}")
+        
+        start_col_letter, start_row, end_col_letter, end_row = match.groups()
+        
+        start_col = self._column_letter_to_number(start_col_letter)
+        end_col = self._column_letter_to_number(end_col_letter)
+        
+        return int(start_row), start_col, int(end_row), end_col
+
     def _extract_style(self, cell) -> Style:
         """
-        从openpyxl单元格中提取全面的样式信息。
+        Extracts comprehensive style information from an openpyxl cell.
 
         Args:
-            cell: openpyxl单元格对象
+            cell: An openpyxl cell object.
 
         Returns:
-            包含完整样式信息的Style对象
+            A Style object populated with the cell's formatting.
         """
         # 初始化默认样式
         style = Style()
@@ -505,14 +540,14 @@ class XlsxParser(BaseParser):
     
     def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> LazySheet:
         """
-        Create a lazy sheet for XLSX that can stream data on demand.
-        
+        Creates a LazySheet for streaming data from an XLSX file.
+
         Args:
-            file_path: XLSX文件路径
-            sheet_name: 工作表名称（可选）
-            
+            file_path: The absolute path to the XLSX file.
+            sheet_name: The name of the sheet to parse (optional).
+
         Returns:
-            LazySheet对象
+            A LazySheet object that can stream data on demand.
         """
         provider = XlsxRowProvider(file_path, sheet_name)
         name = provider._get_worksheet_info()

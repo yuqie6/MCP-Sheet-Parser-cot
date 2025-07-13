@@ -11,7 +11,7 @@ import os
 import json
 from pathlib import Path
 from src.core_service import CoreService
-from src.mcp_server.tools import (
+from src.models.tools import (
     _handle_convert_to_html,
     _handle_parse_sheet,
     _handle_apply_changes

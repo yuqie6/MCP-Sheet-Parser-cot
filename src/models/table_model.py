@@ -32,8 +32,14 @@ class StreamingCapable(ABC):
 
 @dataclass
 class Style:
-    """样式类，定义单元格的视觉样式属性。"""
-    # 字体属性
+    """
+    Represents the visual styling of a cell.
+
+    This class captures all styling information, including font properties, colors,
+    alignment, borders, and other formatting details. It provides a standardized
+    way to handle styles across different file formats.
+    """
+    # Font properties
     bold: bool = False
     italic: bool = False
     underline: bool = False
@@ -41,50 +47,72 @@ class Style:
     font_size: float | None = None
     font_name: str | None = None
 
-    # 背景和填充
+    # Background and fill
     background_color: str = "#FFFFFF"
 
-    # 文本对齐
-    text_align: str = "left"  # left, center, right, justify
-    vertical_align: str = "top"  # top, middle, bottom
+    # Text alignment
+    text_align: str = "left"  # Options: left, center, right, justify
+    vertical_align: str = "top"  # Options: top, middle, bottom
 
-    # 边框属性
+    # Border properties
     border_top: str = ""
     border_bottom: str = ""
     border_left: str = ""
     border_right: str = ""
     border_color: str = "#000000"
 
-    # 文本换行和格式化
+    # Text wrapping and formatting
     wrap_text: bool = False
     number_format: str = ""
 
-    # 进阶功能
-    hyperlink: str | None = None  # 超链接URL
-    comment: str | None = None    # 单元格注释
+    # Advanced features
+    hyperlink: str | None = None  # URL of the hyperlink
+    comment: str | None = None    # Cell comment text
+
 
 @dataclass
 class Cell:
-    """单元格类，包含值、样式和合并信息。"""
+    """
+    Represents a single cell in a sheet.
+
+    A cell contains its value, an optional Style object, and row/column span
+    information for merged cells.
+    """
     value: Any
     style: Style | None = None
     row_span: int = 1
     col_span: int = 1
 
+
 @dataclass
 class Row:
-    """行类，包含一行中的所有单元格。"""
+    """
+    Represents a single row in a sheet, containing a list of Cell objects.
+    """
     cells: list[Cell]
+
 
 @dataclass
 class Sheet:
-    """工作表类，包含表格的完整结构和数据。"""
+    """
+    Represents a full sheet with its name, all its rows, and merged cell info.
+    This class holds all data in memory.
+    """
     name: str
     rows: list[Row]
     merged_cells: list[str] = field(default_factory=list)
-    
+
     def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
-        """Iterate over rows in the sheet."""
+        """
+        Iterates over a subset of rows in the sheet.
+
+        Args:
+            start_row: The starting row index.
+            max_rows: The maximum number of rows to iterate over.
+
+        Yields:
+            Row objects from the specified subset.
+        """
         end_row = len(self.rows)
         if max_rows is not None:
             end_row = min(start_row + max_rows, len(self.rows))
@@ -92,10 +120,11 @@ class Sheet:
         for i in range(start_row, end_row):
             if i < len(self.rows):
                 yield self.rows[i]
-    
+
     def get_total_rows(self) -> int:
-        """Get total number of rows."""
+        """Returns the total number of rows in the sheet."""
         return len(self.rows)
+
 
 class LazySheet:
     """Lazy sheet that can stream data on demand without loading everything into memory."""
