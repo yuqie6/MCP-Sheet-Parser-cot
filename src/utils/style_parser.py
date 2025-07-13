@@ -18,7 +18,7 @@ def extract_style(cell) -> Style:
         style.font_name = font.name if font.name else None
         if font.color:
             font_color = extract_color(font.color)
-            if font_color and font_color != "#000000":
+            if font_color:
                 style.font_color = font_color
     if cell.fill:
         background_color = extract_fill_color(cell.fill)
@@ -91,20 +91,20 @@ def extract_fill_color(fill) -> str | None:
         if hasattr(fill, 'patternType') and fill.patternType:
             if fill.patternType == 'solid' and hasattr(fill, 'start_color') and fill.start_color:
                 color = extract_color(fill.start_color)
-                if color and color not in ["#FFFFFF", "#000000"]:
+                if color and color != "#FFFFFF":  # 保留黑色背景，只过滤白色
                     return color
             elif fill.patternType in ['lightGray', 'mediumGray', 'darkGray']:
                 return {'lightGray': "#F2F2F2", 'mediumGray': "#D9D9D9", 'darkGray': "#BFBFBF"}.get(fill.patternType)
             elif hasattr(fill, 'fgColor') and fill.fgColor:
                 color = extract_color(fill.fgColor)
-                if color and color not in ["#FFFFFF", "#000000"]:
+                if color and color != "#FFFFFF":  # 保留黑色背景，只过滤白色
                     return color
         if hasattr(fill, 'type') and fill.type == 'gradient':
             if hasattr(fill, 'stop') and fill.stop:
                 stop = fill.stop[0] if isinstance(fill.stop, (list, tuple)) and len(fill.stop) > 0 else fill.stop
                 if hasattr(stop, 'color') and not isinstance(stop, (list, tuple)):
                     color = extract_color(stop.color)
-                    if color and color not in ["#FFFFFF", "#000000"]:
+                    if color and color != "#FFFFFF":  # 保留黑色背景，只过滤白色
                         return color
     except Exception:
         pass
@@ -121,6 +121,16 @@ def extract_color(color_obj) -> str | None:
         if isinstance(value, str) and len(value) >= 6:
             return f"#{value[-6:]}"
         elif isinstance(value, int):
+            # 检查是否为默认颜色索引
+            if value == 1:  # 索引1通常是白色，但在Excel中默认文字应该是黑色
+                # 检查是否为自动/默认颜色
+                if hasattr(color_obj, 'auto') and color_obj.auto:
+                    return None  # 返回None让系统使用默认黑色
+                # 检查是否为主题颜色
+                if hasattr(color_obj, 'theme') and color_obj.theme is not None:
+                    # 主题颜色1通常是深色文字
+                    if color_obj.theme == 1:
+                        return "#000000"  # 返回黑色
             return get_color_by_index(value)
     except Exception:
         pass

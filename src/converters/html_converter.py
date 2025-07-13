@@ -17,14 +17,16 @@ logger = logging.getLogger(__name__)
 class HTMLConverter:
     """HTML转换器，将Sheet对象转换为完美的HTML文件。"""
     
-    def __init__(self, compact_mode: bool = False):
+    def __init__(self, compact_mode: bool = False, header_rows: int = 1):
         """
         初始化HTML转换器。
-        
+
         Args:
             compact_mode: 是否使用紧凑模式（减少空白字符）
+            header_rows: 表头行数，默认第一行为表头
         """
         self.compact_mode = compact_mode
+        self.header_rows = header_rows
     
     def convert_to_file(self, sheet: Sheet, output_path: str) -> Dict[str, Any]:
         """
@@ -201,15 +203,23 @@ class HTMLConverter:
             border-collapse: collapse;
             width: 100%;
             font-family: Arial, sans-serif;
+            color: #000000 !important;  /* 强制默认文字颜色为黑色 */
         }
         th, td {
             border: 1px solid #ddd;
             padding: 8px;
             text-align: left;
+            color: #000000 !important;  /* 强制确保默认文字颜色为黑色 */
         }
         th {
             background-color: #f2f2f2;
             font-weight: bold;
+            color: #000000 !important;  /* 强制表头文字为黑色 */
+        }
+        /* 覆盖可能的暗色主题影响 */
+        body {
+            color: #000000 !important;
+            background-color: #ffffff !important;
         }
         """)
         
@@ -223,7 +233,7 @@ class HTMLConverter:
             if style.font_size:
                 css_rule += f" font-size: {style.font_size}pt;"
             if style.font_color:
-                css_rule += f" color: {style.font_color};"
+                css_rule += f" color: {style.font_color} !important;"
             if style.bold:
                 css_rule += " font-weight: bold;"
             if style.italic:
