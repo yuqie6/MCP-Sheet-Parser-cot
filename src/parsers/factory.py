@@ -15,11 +15,8 @@ from .csv_parser import CsvParser
 from .xls_parser import XlsParser
 from .xlsb_parser import XlsbParser
 from .xlsm_parser import XlsmParser
-
-
-class UnsupportedFileType(Exception):
-    """不支持的文件类型异常。"""
-    pass
+from ..exceptions import UnsupportedFileTypeError
+from ..validators import validate_file_input
 
 
 class ParserFactory:
@@ -58,16 +55,18 @@ class ParserFactory:
             An instance of a parser that inherits from BaseParser.
 
         Raises:
-            UnsupportedFileType: If the file format is not supported.
+            UnsupportedFileTypeError: If the file format is not supported.
+            ValidationError: If the file path is invalid.
+            FileNotFoundError: If the file does not exist.
         """
-        file_extension = file_path.split('.')[-1].lower()
+        # 使用验证器验证文件输入
+        validated_path, file_extension = validate_file_input(file_path)
+
         parser = ParserFactory._parsers.get(file_extension)
         if not parser:
-            supported_formats = ", ".join(ParserFactory._parsers.keys())
-            raise UnsupportedFileType(
-                f"不支持的文件格式: '{file_extension}'. "
-                f"支持的格式: {supported_formats}"
-            )
+            supported_formats = list(ParserFactory._parsers.keys())
+            raise UnsupportedFileTypeError(file_extension, supported_formats)
+
         return parser
 
     @staticmethod

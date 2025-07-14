@@ -198,12 +198,23 @@ class XlsParser(BaseParser):
                 if font.colour_index:
                     style.font_color = self._get_color_from_index(workbook, font.colour_index)
             
-            # 提取背景颜色
+            # 提取背景颜色（增强版）
             if hasattr(xf, 'background') and xf.background:
+                # 获取填充模式
+                fill_pattern = getattr(xf.background, 'fill_pattern', 0)
+
                 if hasattr(xf.background, 'pattern_colour_index'):
                     bg_color_index = xf.background.pattern_colour_index
                     # 64是默认/自动颜色，通常是白色，我们将其视为空
                     if bg_color_index != 64:
+                        bg_color = self._get_color_from_index(workbook, bg_color_index)
+                        if bg_color:
+                            style.background_color = bg_color
+
+                # 如果有背景颜色索引，也尝试提取
+                if hasattr(xf.background, 'background_colour_index'):
+                    bg_color_index = xf.background.background_colour_index
+                    if bg_color_index != 64 and not style.background_color:
                         bg_color = self._get_color_from_index(workbook, bg_color_index)
                         if bg_color:
                             style.background_color = bg_color
@@ -239,20 +250,42 @@ class XlsParser(BaseParser):
                 if format_info and format_info.format_str:
                     style.number_format = format_info.format_str
             
-            # 提取边框信息（XLS中边框信息较为有限）
+            # 提取边框信息（增强版）
             if hasattr(xf, 'border'):
                 border = xf.border
                 if border:
-                    # 简化的边框处理
+                    # 边框样式映射
+                    border_style_map = {
+                        0: None,           # 无边框
+                        1: "thin",         # 细线
+                        2: "medium",       # 中等线
+                        3: "dashed",       # 虚线
+                        4: "dotted",       # 点线
+                        5: "thick",        # 粗线
+                        6: "double",       # 双线
+                        7: "hair",         # 极细线
+                        8: "medium_dashed", # 中等虚线
+                        9: "dash_dot",     # 点划线
+                        10: "medium_dash_dot", # 中等点划线
+                        11: "dash_dot_dot", # 双点划线
+                        12: "medium_dash_dot_dot", # 中等双点划线
+                        13: "slant_dash_dot" # 斜点划线
+                    }
+
+                    # 处理各个边框
                     if border.top_line_style:
-                        style.border_top = "1px solid"
+                        style_name = border_style_map.get(border.top_line_style, "solid")
+                        style.border_top = style_name if style_name else "solid"
                     if border.bottom_line_style:
-                        style.border_bottom = "1px solid"
+                        style_name = border_style_map.get(border.bottom_line_style, "solid")
+                        style.border_bottom = style_name if style_name else "solid"
                     if border.left_line_style:
-                        style.border_left = "1px solid"
+                        style_name = border_style_map.get(border.left_line_style, "solid")
+                        style.border_left = style_name if style_name else "solid"
                     if border.right_line_style:
-                        style.border_right = "1px solid"
-                    
+                        style_name = border_style_map.get(border.right_line_style, "solid")
+                        style.border_right = style_name if style_name else "solid"
+
                     # 边框颜色（使用第一个有效的边框颜色）
                     for color_idx in [border.top_colour_index, border.bottom_colour_index,
                                     border.left_colour_index, border.right_colour_index]:

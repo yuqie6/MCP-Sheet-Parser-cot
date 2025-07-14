@@ -18,6 +18,12 @@ from .converters.html_converter import HTMLConverter
 from .streaming import StreamingTableReader, ChunkFilter
 from .config import config
 from .cache import get_cache_manager
+from .exceptions import (
+    FileNotFoundError, ValidationError, HTMLConversionError,
+    MemoryLimitExceededError, TimeoutError
+)
+from .validators import validate_file_input, DataValidator
+from .constants import Limits, ErrorCodes
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +53,8 @@ class CoreService:
             标准化的TableModel JSON
         """
         try:
-            # 验证文件存在
-            path = Path(file_path)
-            if not path.exists():
-                raise FileNotFoundError(f"文件不存在: {file_path}")
+            # 使用新的验证器验证文件输入
+            validated_path, file_extension = validate_file_input(file_path)
             
             # 尝试从缓存获取数据
             cache_manager = get_cache_manager()
@@ -60,14 +64,14 @@ class CoreService:
                 return cached_data['data']
             
             # 获取解析器
-            parser = self.parser_factory.get_parser(file_path)
-            
+            parser = self.parser_factory.get_parser(str(validated_path))
+
             # 检查是否应该使用流式读取
-            if enable_streaming and self._should_use_streaming(file_path, streaming_threshold):
-                json_data = self._parse_sheet_streaming(file_path, sheet_name, range_string)
+            if enable_streaming and self._should_use_streaming(str(validated_path), streaming_threshold):
+                json_data = self._parse_sheet_streaming(str(validated_path), sheet_name, range_string)
             else:
                 # 使用传统方法
-                sheet = parser.parse(file_path)
+                sheet = parser.parse(str(validated_path))
                 # 转换为标准化JSON格式
                 json_data = self._sheet_to_json(sheet, range_string)
             
@@ -82,7 +86,8 @@ class CoreService:
             raise
 
     def convert_to_html(self, file_path: str, output_path: Optional[str] = None,
-                       page_size: Optional[int] = None, page_number: Optional[int] = None) -> Dict[str, Any]:
+                       page_size: Optional[int] = None, page_number: Optional[int] = None,
+                       header_rows: int = 1) -> Dict[str, Any]:
         """
         将表格文件转换为HTML文件。
 
@@ -91,6 +96,7 @@ class CoreService:
             output_path: 输出HTML文件路径，如果为None则生成默认路径
             page_size: 分页大小（每页行数），如果为None则不分页
             page_number: 页码（从1开始），如果为None则显示第1页
+            header_rows: 表头行数，默认第一行为表头
 
         Returns:
             转换结果信息
@@ -120,7 +126,7 @@ class CoreService:
                 )
             else:
                 # 使用标准HTML转换器
-                html_converter = HTMLConverter(compact_mode=False)
+                html_converter = HTMLConverter(compact_mode=False, header_rows=header_rows)
 
             result = html_converter.convert_to_file(sheet, output_path)
 
