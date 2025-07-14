@@ -1,8 +1,7 @@
 """
-MCP Server Module
+MCP 服务器模块
 
-This module provides the Model Context Protocol server implementation
-for the Sheet Parser service.
+本模块为表格解析服务提供模型上下文协议（MCP）服务器实现。
 """
 
 from .server import main

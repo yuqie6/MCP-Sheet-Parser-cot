@@ -15,16 +15,17 @@ logger = logging.getLogger(__name__)
 class PaginatedHTMLConverter(HTMLConverter):
     """分页HTML转换器，继承自HTMLConverter，添加分页功能。"""
     
-    def __init__(self, compact_mode: bool = False, page_size: int = 100, page_number: int = 1):
+    def __init__(self, compact_mode: bool = False, page_size: int = 100, page_number: int = 1, header_rows: int = 1):
         """
         初始化分页HTML转换器。
-        
+
         Args:
             compact_mode: 是否使用紧凑模式
             page_size: 每页显示的行数
             page_number: 当前页码（从1开始）
+            header_rows: 表头行数，默认第一行为表头
         """
-        super().__init__(compact_mode)
+        super().__init__(compact_mode, header_rows)
         self.page_size = max(1, page_size)  # 确保页面大小至少为1
         self.page_number = max(1, page_number)  # 确保页码至少为1
         
@@ -86,8 +87,57 @@ class PaginatedHTMLConverter(HTMLConverter):
         )
         
         return paginated_sheet
-    
-    def _generate_pagination_controls(self, current_page: int, total_pages: int, 
+
+    def convert_to_file(self, sheet: Sheet, output_path: str) -> dict[str, Any]:
+        """
+        将单个Sheet对象转换为分页HTML文件。
+
+        Args:
+            sheet: Sheet对象
+            output_path: 输出文件路径
+
+        Returns:
+            转换结果信息字典
+        """
+        from pathlib import Path
+
+        try:
+            # 生成HTML内容
+            html_content = self._generate_html(sheet)
+
+            # 写入文件
+            output_p = Path(output_path)
+            output_p.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(output_p, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+
+            # 计算文件大小
+            file_size = output_p.stat().st_size
+
+            return {
+                "status": "success",
+                "output_path": str(output_p.absolute()),
+                "file_size": file_size,
+                "file_size_kb": round(file_size / 1024, 2),
+                "sheet_name": sheet.name,
+                "rows_converted": len(sheet.rows),
+                "cells_converted": sum(len(row.cells) for row in sheet.rows),
+                "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows),
+                "has_merged_cells": len(sheet.merged_cells) > 0,
+                "page_size": self.page_size,
+                "page_number": self.page_number,
+                "total_pages": (len(sheet.rows) + self.page_size - 1) // self.page_size if len(sheet.rows) > 0 else 1
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "sheet_name": sheet.name
+            }
+
+    def _generate_pagination_controls(self, current_page: int, total_pages: int,
                                     total_rows: int, start_row: int, end_row: int) -> str:
         """
         生成分页导航控件HTML。

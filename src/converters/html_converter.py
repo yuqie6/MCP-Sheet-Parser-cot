@@ -78,13 +78,13 @@ def format_chinese_date(date_obj: dt, format_str: str) -> str:
 
 
 class HTMLConverter:
-    """HTML转换器，将Sheet对象转换为完美的HTML文件。"""
-    
+    """HTML转换器，将Sheet对象转换为HTML文件。"""
+
     def __init__(self, compact_mode: bool = False, header_rows: int = 1):
         """
         初始化HTML转换器。
 
-        Args:
+        参数：
             compact_mode: 是否使用紧凑模式（减少空白字符）
             header_rows: 表头行数，默认第一行为表头
         """
@@ -94,12 +94,12 @@ class HTMLConverter:
     def convert_to_files(self, sheets: List[Sheet], output_path: str) -> List[dict[str, Any]]:
         """
         将多个Sheet对象转换为多个HTML文件。
-        
-        Args:
+
+        参数：
             sheets: Sheet对象列表
             output_path: 输出文件路径模板
-            
-        Returns:
+
+        返回：
             转换结果信息列表
         """
         results = []
@@ -154,11 +154,11 @@ class HTMLConverter:
     def _generate_html(self, sheet: Sheet) -> str:
         """
         生成完整的HTML内容。
-        
-        Args:
+
+        参数：
             sheet: Sheet对象
-            
-        Returns:
+
+        返回：
             HTML字符串
         """
         # 收集所有样式
@@ -192,11 +192,11 @@ class HTMLConverter:
     def _collect_styles(self, sheet: Sheet) -> dict[str, Style]:
         """
         收集所有唯一的样式。
-        
-        Args:
+
+        参数：
             sheet: Sheet对象
-            
-        Returns:
+
+        返回：
             样式字典，键为样式ID，值为Style对象
         """
         styles = {}
@@ -216,11 +216,11 @@ class HTMLConverter:
     def _get_style_key(self, style: Style) -> str:
         """
         生成样式的唯一标识。
-        
-        Args:
+
+        参数：
             style: Style对象
-            
-        Returns:
+
+        返回：
             样式的唯一标识字符串
         """
         # 基于样式属性生成唯一键
@@ -277,11 +277,11 @@ class HTMLConverter:
         """
         生成CSS样式。
 
-        Args:
+        参数：
             styles: 样式字典
             sheet: Sheet对象，用于获取尺寸信息
 
-        Returns:
+        返回：
             CSS字符串
         """
         css_rules = []
@@ -419,10 +419,10 @@ class HTMLConverter:
         """
         生成列宽和行高的CSS样式。
 
-        Args:
+        参数：
             sheet: Sheet对象
 
-        Returns:
+        返回：
             尺寸CSS字符串
         """
         css_rules = []
@@ -450,10 +450,10 @@ class HTMLConverter:
         """
         生成边框CSS样式。
 
-        Args:
+        参数：
             style: Style对象
 
-        Returns:
+        返回：
             边框CSS字符串
         """
         border_css = ""
@@ -486,11 +486,11 @@ class HTMLConverter:
         """
         解析完整的边框样式，包括宽度、样式和颜色。
 
-        Args:
+        参数：
             border_style: 边框样式字符串
             border_color: 边框颜色
 
-        Returns:
+        返回：
             完整的CSS边框样式
         """
         if not border_style:
@@ -520,10 +520,10 @@ class HTMLConverter:
         """
         使用智能字体管理器格式化字体名称。
 
-        Args:
+        参数：
             font_name: 原始字体名称
 
-        Returns:
+        返回：
             格式化后的字体族字符串
         """
         font_manager = get_font_manager()
@@ -535,10 +535,10 @@ class HTMLConverter:
         """
         格式化字体大小，优化单位转换。
 
-        Args:
+        参数：
             font_size: 原始字体大小（通常为pt单位）
 
-        Returns:
+        返回：
             格式化后的字体大小字符串
         """
         if not font_size or font_size <= 0:
@@ -568,10 +568,10 @@ class HTMLConverter:
         """
         验证和格式化颜色值。
 
-        Args:
+        参数：
             color: 原始颜色值
 
-        Returns:
+        返回：
             格式化后的颜色值
         """
         if not color:
@@ -605,12 +605,12 @@ class HTMLConverter:
     def _generate_table(self, sheet: Sheet, styles: dict[str, Style]) -> str:
         """
         生成表格HTML。
-        
-        Args:
+
+        参数：
             sheet: Sheet对象
             styles: 样式字典
-            
-        Returns:
+
+        返回：
             表格HTML字符串
         """
         
@@ -676,7 +676,7 @@ class HTMLConverter:
         return "\n".join(table_parts)
 
     def _generate_charts_html(self, charts: list[Chart]) -> str:
-        """Generates HTML for embedding charts."""
+        """生成嵌入图表的HTML。"""
         if not charts:
             return ""
 
@@ -694,9 +694,9 @@ class HTMLConverter:
                            merged_cells_map: dict, style_key_to_id_map: dict,
                            is_header: bool = False, row_offset: int = 0):
         """
-        生成行HTML的通用方法，避免代码重复。
+        通用行HTML生成方法，避免代码重复。
 
-        Args:
+        参数：
             table_parts: HTML部分列表
             rows: 行列表
             occupied_cells: 被占用的单元格集合
@@ -746,13 +746,13 @@ class HTMLConverter:
         """
         生成单个单元格的HTML，支持超链接和注释。
 
-        Args:
+        参数：
             cell: 单元格对象
             style_class: 样式类字符串
             span_attrs: 跨行跨列属性
             is_header: 是否为表头单元格
 
-        Returns:
+        返回：
             单元格HTML字符串
         """
         # 处理单元格值并转义HTML
@@ -807,7 +807,7 @@ class HTMLConverter:
         
     def _format_cell_value(self, cell: Cell) -> str:
         """
-        Formats the cell value, handling rich text and other types.
+        格式化单元格值，处理富文本和其他类型。
         """
         if isinstance(cell.value, list):
             # Handle rich text by creating styled spans
@@ -831,7 +831,7 @@ class HTMLConverter:
 
 
     def _format_rich_text_fragment(self, fragment: RichTextFragment) -> str:
-        """Formats a single rich text fragment into a styled HTML span."""
+        """将单个富文本片段格式化为带样式的HTML span。"""
         style = fragment.style
         css_parts = []
         if style.font_name:
@@ -855,11 +855,11 @@ class HTMLConverter:
         """
         应用数字格式。
 
-        Args:
+        参数：
             value: 原始值
             number_format: 数字格式字符串
 
-        Returns:
+        返回：
             格式化后的字符串
         """
 
@@ -911,10 +911,10 @@ class HTMLConverter:
         """
         转义HTML特殊字符，防止XSS攻击。
 
-        Args:
+        参数：
             text: 原始文本
 
-        Returns:
+        返回：
             转义后的文本
         """
         if not isinstance(text, str):
@@ -929,8 +929,8 @@ class HTMLConverter:
     def _get_html_template(self) -> str:
         """
         获取HTML模板。
-        
-        Returns:
+
+        返回：
             HTML模板字符串
         """
         return """<!DOCTYPE html>
@@ -953,11 +953,11 @@ class HTMLConverter:
     def _compact_html(self, html: str) -> str:
         """
         压缩HTML内容。
-        
-        Args:
+
+        参数：
             html: 原始HTML
-            
-        Returns:
+
+        返回：
             压缩后的HTML
         """
         # 简单的压缩：移除多余的空白字符

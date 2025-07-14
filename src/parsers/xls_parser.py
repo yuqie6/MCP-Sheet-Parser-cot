@@ -7,7 +7,6 @@ XLS格式解析器模块
 import logging
 import xlrd
 import xlrd.xldate
-from typing import Optional
 from src.models.table_model import Sheet, Row, Cell, Style, LazySheet
 from src.parsers.base_parser import BaseParser
 
@@ -48,59 +47,66 @@ class XlsParser(BaseParser):
         # 动态颜色缓存
         self.workbook_colors = {}
     
-    def parse(self, file_path: str) -> Sheet:
+    def parse(self, file_path: str) -> list[Sheet]:
         """
-        解析XLS文件并返回Sheet对象。
-        
+        解析XLS文件并返回Sheet对象列表。
+
         Args:
             file_path: XLS文件路径
-            
+
         Returns:
-            包含完整数据和样式的Sheet对象
-            
+            包含完整数据和样式的Sheet对象列表
+
         Raises:
             RuntimeError: 当解析失败时
         """
         try:
             # 打开XLS文件，启用格式化信息
             workbook = xlrd.open_workbook(file_path, formatting_info=True)
-            
-            # 获取第一个工作表
+
+            # 检查工作表数量
             if workbook.nsheets == 0:
                 raise RuntimeError("工作簿不包含任何工作表")
-            
-            worksheet = workbook.sheet_by_index(0)
-            sheet_name = worksheet.name
-            
-            # 解析所有行和单元格
-            rows = []
-            for row_idx in range(worksheet.nrows):
-                cells = []
-                for col_idx in range(worksheet.ncols):
-                    # 获取单元格值
-                    cell_value = self._get_cell_value(workbook, worksheet, row_idx, col_idx)
-                    
-                    # 提取样式信息
-                    cell_style = self._extract_style(workbook, worksheet, row_idx, col_idx)
-                    
-                    # 创建Cell对象
-                    cell = Cell(
-                        value=cell_value,
-                        style=cell_style
-                    )
-                    cells.append(cell)
-                
-                rows.append(Row(cells=cells))
-            
-            # 处理合并单元格
-            merged_cells = self._extract_merged_cells(worksheet)
-            
-            return Sheet(
-                name=sheet_name,
-                rows=rows,
-                merged_cells=merged_cells
-            )
-            
+
+            sheets = []
+
+            # 解析所有工作表
+            for sheet_idx in range(workbook.nsheets):
+                worksheet = workbook.sheet_by_index(sheet_idx)
+                sheet_name = worksheet.name
+
+                # 解析所有行和单元格
+                rows = []
+                for row_idx in range(worksheet.nrows):
+                    cells = []
+                    for col_idx in range(worksheet.ncols):
+                        # 获取单元格值
+                        cell_value = self._get_cell_value(workbook, worksheet, row_idx, col_idx)
+
+                        # 提取样式信息
+                        cell_style = self._extract_style(workbook, worksheet, row_idx, col_idx)
+
+                        # 创建Cell对象
+                        cell = Cell(
+                            value=cell_value,
+                            style=cell_style
+                        )
+                        cells.append(cell)
+
+                    rows.append(Row(cells=cells))
+
+                # 处理合并单元格
+                merged_cells = self._extract_merged_cells(worksheet)
+
+                sheet = Sheet(
+                    name=sheet_name,
+                    rows=rows,
+                    merged_cells=merged_cells
+                )
+                sheets.append(sheet)
+
+            return sheets
+
         except Exception as e:
             logger.error(f"解析XLS文件失败: {e}")
             raise RuntimeError(f"无法解析XLS文件 {file_path}: {str(e)}")
@@ -381,12 +387,12 @@ class XlsParser(BaseParser):
         return f"{col_str}{row + 1}"
     
     def supports_streaming(self) -> bool:
-        """XLS parser has limited streaming support due to xlrd limitations."""
-        return False  # xlrd doesn't support true streaming, but we could implement chunked reading
-    
-    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> Optional[LazySheet]:
+        """由于xlrd库限制，XLS解析器不支持流式处理。"""
+        return False  # xlrd 不支持真正的流式读取，但可实现分块读取
+
+    def create_lazy_sheet(self, file_path: str, sheet_name: str | None = None) -> LazySheet | None:
         """
-        XLS format has limited streaming support due to xlrd library limitations.
-        Consider using chunked reading for large files.
+        由于xlrd库限制，XLS格式不支持流式读取。
+        大文件建议采用分块读取方案。
         """
-        return None  # Not implemented due to xlrd limitations
+        return None  # 受xlrd限制，未实现

@@ -5,7 +5,7 @@
 统一的接口来分块读取大文件，支持可选过滤。
 """
 
-from typing import Iterator, Optional, List, Dict, Any, Tuple
+from typing import Iterator, Any
 from pathlib import Path
 from dataclasses import dataclass
 import re
@@ -21,22 +21,22 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ChunkFilter:
     """流式读取时的数据过滤配置。"""
-    columns: Optional[List[str]] = None  # 要包含的列名
-    column_indices: Optional[List[int]] = None  # 要包含的列索引（替代列名）
+    columns: list[str] | None= None  # 要包含的列名
+    column_indices: list[int] | None = None  # 要包含的列索引（替代列名）
     start_row: int = 0  # 起始行索引（基于0）
-    max_rows: Optional[int] = None  # 最大读取行数
-    range_string: Optional[str] = None  # Excel样式的范围，如"A1:D10"
+    max_rows: int | None = None  # 最大读取行数
+    range_string: str | None = None  # Excel样式的范围，如"A1:D10"
 
 
 @dataclass
 class StreamingChunk:
     """表示流式操作中的数据块。"""
-    rows: List[Row]  # 数据行
-    headers: List[str]  # 表头
+    rows: list[Row]  # 数据行
+    headers: list[str]  # 表头
     chunk_index: int  # 块索引
-    total_chunks: Optional[int] = None  # 总块数
+    total_chunks: int | None = None  # 总块数
     start_row: int = 0  # 起始行
-    metadata: Optional[Dict[str, Any]] = None  # 元数据
+    metadata: dict[str, Any] | None = None  # 元数据
 
 
 class StreamingTableReader:
@@ -47,7 +47,7 @@ class StreamingTableReader:
     和范围过滤器进行早期数据剪枝。
     """
     
-    def __init__(self, file_path: str, parser: Optional[BaseParser] = None):
+    def __init__(self, file_path: str, parser: BaseParser | None = None):
         """
         初始化流式读取器。
         
@@ -57,10 +57,10 @@ class StreamingTableReader:
         """
         self.file_path = Path(file_path)
         self._parser = parser or ParserFactory.get_parser(str(file_path))
-        self._lazy_sheet: Optional[LazySheet] = None
-        self._regular_sheet: Optional[Sheet] = None
-        self._total_rows_cache: Optional[int] = None
-        self._headers_cache: Optional[List[str]] = None
+        self._lazy_sheet: LazySheet | None = None
+        self._regular_sheet: Sheet | None = None
+        self._total_rows_cache: int| None = None
+        self._headers_cache: list[str] | None = None
         
         # 初始化数据源
         self._init_data_source()
@@ -74,7 +74,7 @@ class StreamingTableReader:
             self._regular_sheet = self._parser.parse(str(self.file_path))
             logger.info(f"为 {self.file_path} 初始化了常规工作表")
     
-    def iter_chunks(self, rows: int = 1000, filter_config: Optional[ChunkFilter] = None) -> Iterator[StreamingChunk]:
+    def iter_chunks(self, rows: int = 1000, filter_config: ChunkFilter | None = None) -> Iterator[StreamingChunk]:
         """
         分块迭代数据。
         
@@ -152,7 +152,7 @@ class StreamingTableReader:
             current_row += chunk_size
             chunk_index += 1
     
-    def _get_headers(self) -> List[str]:
+    def _get_headers(self) -> list[str]:
         """从第一行获取表头。"""
         if self._headers_cache is None:
             first_row = None
@@ -180,9 +180,9 @@ class StreamingTableReader:
                 self._total_rows_cache = 0
         return self._total_rows_cache
     
-    def _get_chunk_rows(self, start_row: int, chunk_size: int, column_indices: Optional[List[int]] = None) -> List[Row]:
+    def _get_chunk_rows(self, start_row: int, chunk_size: int, column_indices: list[int] | None = None) -> list[Row]:
         """获取一块数据行，支持可选的列过滤。"""
-        rows: List[Row] = []
+        rows: list[Row] = []
         if self._lazy_sheet:
             # 使用懒加载工作表进行流式读取
             rows = list(self._lazy_sheet.iter_rows(start_row, chunk_size))
@@ -205,8 +205,8 @@ class StreamingTableReader:
 
         return rows
     
-    def _apply_column_filter(self, headers: List[str], filter_config: ChunkFilter, 
-                           existing_indices: Optional[List[int]] = None) -> Tuple[List[str], List[int]]:
+    def _apply_column_filter(self, headers: list[str], filter_config: ChunkFilter, 
+                           existing_indices: list[int] | None = None) -> tuple[list[str], list[int]]:
         """对表头应用列过滤并返回过滤后的表头和索引。"""
         if existing_indices:
             # 使用来自范围过滤器的现有索引
@@ -236,7 +236,7 @@ class StreamingTableReader:
         # 不过滤
         return headers, list(range(len(headers)))
     
-    def _parse_range_filter(self, range_string: str) -> Dict[str, Any]:
+    def _parse_range_filter(self, range_string: str) -> dict[str, Any]:
         """解析Excel样式的范围字符串，如'A1:D10'。"""
         range_string = range_string.strip().upper()
         
@@ -270,7 +270,7 @@ class StreamingTableReader:
             result = result * 26 + (ord(char) - ord('A') + 1)
         return result - 1
     
-    def get_info(self) -> Dict[str, Any]:
+    def get_info(self) -> dict[str, Any]:
         """获取文件和读取器的信息。"""
         return {
             'file_path': str(self.file_path),

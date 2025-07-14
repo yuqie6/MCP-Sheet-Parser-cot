@@ -6,65 +6,65 @@ CSV解析器模块
 
 import csv
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator
 from src.models.table_model import Sheet, Row, Cell, LazySheet
 from src.parsers.base_parser import BaseParser
 
 
 class CsvRowProvider:
-    """Lazy row provider for CSV files that streams rows on demand."""
-    
+    """CSV文件的惰性行提供者，支持按需流式读取。"""
+
     def __init__(self, file_path: str):
         self.file_path = Path(file_path)
-        self._total_rows_cache: Optional[int] = None
+        self._total_rows_cache: int | None = None
         self._encoding = self._detect_encoding()
-    
+
     def _detect_encoding(self) -> str:
-        """Detect the encoding of the CSV file."""
+        """检测CSV文件的编码格式。"""
         try:
             with open(self.file_path, mode='r', encoding='utf-8') as f:
-                f.read(1024)  # Try reading a small chunk
+                f.read(1024)  # 尝试读取一小段内容
             return 'utf-8'
         except UnicodeDecodeError:
             return 'gbk'
-    
-    def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
-        """Yield rows on demand using csv.reader as a generator."""
+
+    def iter_rows(self, start_row: int = 0, max_rows: int | None = None) -> Iterator[Row]:
+        """使用csv.reader生成器按需产出行。"""
         with open(self.file_path, mode='r', encoding=self._encoding) as csvfile:
             reader = csv.reader(csvfile)
-            
-            # Skip to start_row
+
+            # 跳过到start_row
             for _ in range(start_row):
                 try:
                     next(reader)
                 except StopIteration:
                     return
-            
-            # Yield rows up to max_rows
+
+            # 产出最多max_rows行
             count = 0
             for row_data in reader:
                 if max_rows is not None and count >= max_rows:
                     break
-                
+
                 cells = [Cell(value=item) for item in row_data]
                 yield Row(cells=cells)
                 count += 1
-    
+
     def get_row(self, row_index: int) -> Row:
-        """Get a specific row by index."""
+        """按索引获取指定行。"""
         with open(self.file_path, mode='r', encoding=self._encoding) as csvfile:
             reader = csv.reader(csvfile)
-            
-            # Skip to the desired row
+
+            # 跳转到目标行
             for i, row_data in enumerate(reader):
                 if i == row_index:
                     cells = [Cell(value=item) for item in row_data]
                     return Row(cells=cells)
-            
-            raise IndexError(f"Row index {row_index} out of range")
-    
+
+            raise IndexError(f"行索引 {row_index} 超出范围")
+
     def get_total_rows(self) -> int:
-        """Get total number of rows without loading all data."""
+        """无需加载全部数据即可获取总行数。"""
         if self._total_rows_cache is None:
             with open(self.file_path, mode='r', encoding=self._encoding) as csvfile:
                 reader = csv.reader(csvfile)
@@ -74,31 +74,30 @@ class CsvRowProvider:
 
 class CsvParser(BaseParser):
     """
-    A parser for CSV files.
+    CSV文件解析器。
 
-    This parser converts CSV files into a standardized Sheet object. It handles
-    different encodings (UTF-8 and GBK) and supports streaming for large files.
+    该解析器将CSV文件转换为标准化的Sheet对象。支持UTF-8和GBK编码，并支持大文件流式处理。
     """
 
     def _extract_style(self, cell):
         # CSV不支持样式，返回None
         return None
 
-    def parse(self, file_path: str) -> Sheet:
+    def parse(self, file_path: str) -> list[Sheet]:
         """
-        Parses a CSV file and converts it into a Sheet object.
+        解析CSV文件并转换为Sheet对象列表。
 
-        It first tries to decode the file using UTF-8, and falls back to GBK
-        if a UnicodeDecodeError occurs.
+        首先尝试使用UTF-8解码文件，如遇UnicodeDecodeError则回退为GBK。
+        CSV文件只包含一个工作表，因此返回包含单个Sheet的列表。
 
-        Args:
-            file_path: The absolute path to the CSV file.
+        参数：
+            file_path: CSV文件的绝对路径。
 
-        Returns:
-            A Sheet object containing the data from the CSV file.
+        返回：
+            包含CSV数据的Sheet对象列表。
 
-        Raises:
-            FileNotFoundError: If the file does not exist.
+        异常：
+            FileNotFoundError: 文件不存在时抛出。
         """
         path = Path(file_path)
         sheet_name = path.stem
@@ -118,22 +117,23 @@ class CsvParser(BaseParser):
                     cells = [Cell(value=item) for item in row_data]
                     rows.append(Row(cells=cells))
 
-        return Sheet(name=sheet_name, rows=rows)
+        sheet = Sheet(name=sheet_name, rows=rows)
+        return [sheet]
     
     def supports_streaming(self) -> bool:
-        """CSV parser supports streaming."""
+        """CSV解析器支持流式处理。"""
         return True
     
-    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> LazySheet:
+    def create_lazy_sheet(self, file_path: str, sheet_name: str | None = None) -> LazySheet:
         """
-        Creates a LazySheet for streaming data from a CSV file.
+        创建用于流式读取CSV数据的LazySheet。
 
-        Args:
-            file_path: The absolute path to the CSV file.
-            sheet_name: The name of the sheet (optional, defaults to filename).
+        参数：
+            file_path: CSV文件的绝对路径。
+            sheet_name: 工作表名称（可选，默认为文件名）。
 
-        Returns:
-            A LazySheet object that can stream data on demand.
+        返回：
+            可按需流式读取数据的LazySheet对象。
         """
         path = Path(file_path)
         name = sheet_name or path.stem

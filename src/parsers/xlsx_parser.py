@@ -7,32 +7,33 @@ XLSX解析器模块
 
 import openpyxl
 from openpyxl.utils import get_column_letter
-from typing import Iterator, Optional, List
-import io
-import matplotlib.pyplot as plt
+from openpyxl.cell.cell import Cell as OpenpyxlCell
+from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.drawing.image import Image as OpenpyxlImage
 from openpyxl.chart.bar_chart import BarChart
 from openpyxl.chart.line_chart import LineChart
 from openpyxl.chart.pie_chart import PieChart
 from openpyxl.chart.area_chart import AreaChart
-from openpyxl.worksheet.worksheet import Worksheet
-from openpyxl.drawing.image import Image as OpenpyxlImage
+from typing import Iterator,Any
+import io
+import matplotlib.pyplot as plt
 from src.models.table_model import Sheet, Row, Cell, LazySheet, Chart
 from src.parsers.base_parser import BaseParser
 from src.utils.style_parser import extract_style, extract_cell_value
 
 
 class XlsxRowProvider:
-    """Lazy row provider for XLSX files using openpyxl streaming with read_only=True."""
+    """XLSX文件的惰性行提供者，基于openpyxl的read_only流式模式。"""
     
-    def __init__(self, file_path: str, sheet_name: Optional[str] = None):
+    def __init__(self, file_path: str, sheet_name: str | None = None):
         self.file_path = file_path
         self.sheet_name = sheet_name
-        self._total_rows_cache: Optional[int] = None
-        self._merged_cells_cache: Optional[list[str]] = None
-        self._worksheet_title_cache: Optional[str] = None
+        self._total_rows_cache: int | None= None
+        self._merged_cells_cache: list[str] | None = None
+        self._worksheet_title_cache: str | None = None
     
     def _get_worksheet_info(self):
-        """Get worksheet info without reading all data."""
+        """无需读取全部数据即可获取工作表信息。"""
         if self._worksheet_title_cache is None:
             workbook = openpyxl.load_workbook(self.file_path, read_only=True)
             worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
@@ -44,7 +45,7 @@ class XlsxRowProvider:
         return self._worksheet_title_cache
     
     def _get_merged_cells(self) -> list[str]:
-        """Get merged cells info."""
+        """获取合并单元格信息。"""
         if self._merged_cells_cache is None:
             # Read merged cells from non-read-only workbook (required for merged_cells access)
             workbook = openpyxl.load_workbook(self.file_path)
@@ -57,17 +58,20 @@ class XlsxRowProvider:
         return self._merged_cells_cache
     
     def _parse_row(self, row_cells: tuple) -> Row:
-        """Parse a tuple of openpyxl cells into a Row object."""
+        """将openpyxl单元格元组解析为Row对象。"""
         cells = []
         for cell in row_cells:
             cell_value = cell.value
             cell_style = extract_style(cell) if cell else None
-            formula = cell.formula if isinstance(cell, openpyxl.cell.cell.Cell) and cell.is_date() is False and cell.data_type == 'f' else None
+            formula = None
+            if isinstance(cell, OpenpyxlCell) and hasattr(cell, 'data_type') and cell.data_type == 'f':
+                if hasattr(cell, 'value') and cell.value:
+                    formula = str(cell.value)
             cells.append(Cell(value=cell_value, style=cell_style, formula=formula))
         return Row(cells=cells)
 
-    def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
-        """Yield rows on demand with complete row structure."""
+    def iter_rows(self, start_row: int = 0, max_rows: int | None = None) -> Iterator[Row]:
+        """按需产出完整结构的行。"""
         workbook = openpyxl.load_workbook(self.file_path, read_only=True)
         worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
         try:
@@ -96,7 +100,7 @@ class XlsxRowProvider:
             workbook.close()
     
     def get_row(self, row_index: int) -> Row:
-        """Get a specific row by index with complete structure."""
+        """按索引获取完整结构的指定行。"""
         workbook = openpyxl.load_workbook(self.file_path, read_only=True)
         worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
         try:
@@ -126,7 +130,7 @@ class XlsxRowProvider:
             workbook.close()
     
     def get_total_rows(self) -> int:
-        """Get total number of rows without loading all data."""
+        """无需加载全部数据即可获取总行数。"""
         if self._total_rows_cache is None:
             workbook = openpyxl.load_workbook(self.file_path, read_only=True)
             worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
@@ -143,17 +147,15 @@ class XlsxRowProvider:
 
 class XlsxParser(BaseParser):
     """
-    A parser for XLSX files with comprehensive style extraction.
+    XLSX文件解析器，支持完整样式提取。
 
-    This parser handles modern Excel files (.xlsx) and is capable of extracting
-    a wide range of styling information, including fonts, colors, borders,
-    and number formats. It also supports streaming for large files via the
-    XlsxRowProvider.
+    该解析器处理现代Excel文件（.xlsx），可提取丰富的样式信息，包括字体、颜色、边框和数字格式。
+    同时支持通过XlsxRowProvider进行大文件流式读取。
     """
 
     def parse(self, file_path: str) -> list[Sheet]:
         """
-        Parses an XLSX file and returns a list of Sheet objects, one for each sheet.
+        解析XLSX文件，返回每个工作表对应的Sheet对象列表。
         """
         try:
             workbook = openpyxl.load_workbook(file_path, data_only=False)
@@ -175,7 +177,7 @@ class XlsxParser(BaseParser):
         return sheets
 
     def _parse_sheet(self, worksheet: Worksheet, data_only_worksheet: Worksheet) -> Sheet:
-        """Helper method to parse a single worksheet."""
+        """解析单个工作表的辅助方法。"""
         # Get sheet dimensions
         max_row = worksheet.max_row or 0
         max_col = worksheet.max_column or 0
@@ -235,21 +237,27 @@ class XlsxParser(BaseParser):
         )
 
     def _extract_images(self, worksheet: Worksheet) -> list[Chart]:
-        """Extracts embedded images from the worksheet."""
+        """提取工作表中的嵌入图片。"""
         images = []
-        for image in worksheet._images:
+        # Use getattr to safely access _images attribute
+        worksheet_images = getattr(worksheet, '_images', [])
+        for image in worksheet_images:
             if isinstance(image, OpenpyxlImage):
                 try:
-                    # The image data is already in bytes
-                    img_data = image.ref
-                    
+                    # Get image data - use a simple approach for type safety
+                    img_data = getattr(image, 'ref', None)
+                    if img_data and not isinstance(img_data, bytes):
+                        img_data = str(img_data).encode('utf-8')
+
+                    # Get anchor position safely - use string representation
+                    anchor_str = str(getattr(image, 'anchor', 'A1'))
+
                     # Create a Chart object to represent the image
-                    # We can use the 'image' type to distinguish from charts
                     image_chart = Chart(
                         name=f"Image {len(images) + 1}",
                         type="image",
                         image_data=img_data,
-                        anchor=f"{image.anchor.to_row}{image.anchor.to_col}"
+                        anchor=anchor_str
                     )
                     images.append(image_chart)
                 except Exception as e:
@@ -261,7 +269,7 @@ class XlsxParser(BaseParser):
 
     
     def _extract_charts(self, worksheet) -> list[Chart]:
-        """Extracts charts from the worksheet and renders them as images."""
+        """提取工作表中的图表并渲染为图片。"""
         charts = []
         for chart_drawing in worksheet._charts:
             chart_type = "unknown"
@@ -276,11 +284,15 @@ class XlsxParser(BaseParser):
 
             try:
                 img_data = self._render_chart(chart_drawing)
+                # Safely get chart title
+                chart_title = str(chart_drawing.title) if chart_drawing.title else f"Chart {len(charts) + 1}"
+                # Safely get anchor
+                anchor_value = str(getattr(chart_drawing.anchor, 'cell', 'A1'))
                 charts.append(Chart(
-                    name=chart_drawing.title or f"Chart {len(charts) + 1}",
+                    name=chart_title,
                     type=chart_type,
                     image_data=img_data,
-                    anchor=chart_drawing.anchor.cell
+                    anchor=anchor_value
                 ))
             except Exception as e:
                 import logging
@@ -289,8 +301,8 @@ class XlsxParser(BaseParser):
 
         return charts
 
-    def _render_chart(self, chart) -> Optional[bytes]:
-        """Renders a chart to an image using matplotlib."""
+    def _render_chart(self, chart) ->bytes | None:
+        """使用matplotlib将图表渲染为图片。"""
         fig, ax = plt.subplots()
 
         try:
@@ -321,10 +333,15 @@ class XlsxParser(BaseParser):
                         ax.fill_between(x, y, label=series_label, alpha=0.4)
 
                 ax.set_title(str(chart.title) if chart.title else "Chart")
-                if chart.x_axis and chart.x_axis.title and hasattr(chart.x_axis.title, 'tx') and chart.x_axis.title.tx.rich:
-                    ax.set_xlabel(chart.x_axis.title.tx.rich.p[0].r.t)
-                if chart.y_axis and chart.y_axis.title and hasattr(chart.y_axis.title, 'tx') and chart.y_axis.title.tx.rich:
-                    ax.set_ylabel(chart.y_axis.title.tx.rich.p[0].r.t)
+                # Safely extract axis titles
+                if chart.x_axis and chart.x_axis.title:
+                    x_title = self._extract_axis_title(chart.x_axis.title)
+                    if x_title:
+                        ax.set_xlabel(x_title)
+                if chart.y_axis and chart.y_axis.title:
+                    y_title = self._extract_axis_title(chart.y_axis.title)
+                    if y_title:
+                        ax.set_ylabel(y_title)
                 ax.legend()
 
             elif isinstance(chart, PieChart):
@@ -356,21 +373,47 @@ class XlsxParser(BaseParser):
 
     
     def supports_streaming(self) -> bool:
-        """XLSX parser supports streaming."""
+        """XLSX解析器支持流式处理。"""
         return True
     
-    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> LazySheet:
+    def create_lazy_sheet(self, file_path: str, sheet_name: str | None = None) -> LazySheet:
         """
-        Creates a LazySheet for streaming data from an XLSX file.
+        创建用于流式读取XLSX数据的LazySheet。
 
-        Args:
-            file_path: The absolute path to the XLSX file.
-            sheet_name: The name of the sheet to parse (optional).
+        参数：
+            file_path: XLSX文件的绝对路径。
+            sheet_name: 要解析的工作表名称（可选）。
 
-        Returns:
-            A LazySheet object that can stream data on demand.
+        返回：
+            可按需流式读取数据的LazySheet对象。
         """
         provider = XlsxRowProvider(file_path, sheet_name)
         name = provider._get_worksheet_info()
         merged_cells = provider._get_merged_cells()
         return LazySheet(name=name, provider=provider, merged_cells=merged_cells)
+
+    def _extract_axis_title(self, title_obj: Any) -> str | None:
+        """
+        安全提取openpyxl图表轴的标题。
+
+        参数：
+            title_obj: 图表轴的标题对象
+
+        返回：
+            标题字符串，提取失败时返回None
+        """
+        try:
+            # 多种方式尝试提取标题文本
+            if hasattr(title_obj, 'tx') and title_obj.tx:
+                tx = title_obj.tx
+                if hasattr(tx, 'rich') and tx.rich:
+                    rich = tx.rich
+                    if hasattr(rich, 'p') and rich.p and len(rich.p) > 0:
+                        p = rich.p[0]
+                        if hasattr(p, 'r') and p.r and hasattr(p.r, 't'):
+                            return str(p.r.t)
+
+            # 回退为字符串表示
+            return str(title_obj) if title_obj else None
+        except Exception:
+            return None

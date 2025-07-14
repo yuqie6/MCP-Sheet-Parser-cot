@@ -1,51 +1,57 @@
 """
-Utility functions for parsing cell styles from openpyxl objects.
+用于从 openpyxl 对象解析单元格样式的工具函数。
 """
-from typing import Any, Union
+from typing import Any
 from openpyxl.cell.cell import Cell as OpenpyxlCell, MergedCell as OpenpyxlMergedCell
 from openpyxl.styles.colors import Color
 from src.models.table_model import Style, RichTextFragment, RichTextFragmentStyle, CellValue
 
-# Define a type hint for cells that can be either a regular or merged cell
-CellLike = Union[OpenpyxlCell, OpenpyxlMergedCell]
+# 定义一个类型提示，表示既可以是普通单元格也可以是合并单元格
+CellLike = OpenpyxlCell | OpenpyxlMergedCell
 
 def _extract_rich_text(cell: CellLike) -> list[RichTextFragment]:
-    """Extracts rich text fragments from a cell."""
+    """从单元格中提取富文本片段。"""
     fragments = []
-    # MergedCells don't have a value, the top-left cell of a merged range does.
-    # The parser should already be handling this, but we safe-guard here.
+    # 合并单元格没有值，只有合并区域左上角的单元格有值。
+    # 解析器应已处理此情况，这里做二次保护。
     if not hasattr(cell, 'value') or cell.value is None:
         return []
 
     if isinstance(cell.value, list):
-        # Handle rich text
+        # 处理富文本
         for fragment in cell.value:
-            font = fragment.font
-            style = RichTextFragmentStyle(
-                bold=font.bold or False,
-                italic=font.italic or False,
-                underline=font.underline is not None and font.underline != 'none',
-                font_name=font.name,
-                font_size=font.size,
-                font_color=extract_color(font.color) if font.color else None
-            )
-            fragments.append(RichTextFragment(text=fragment.text, style=style))
+            font = getattr(fragment, 'font', None)
+            if font:
+                style = RichTextFragmentStyle(
+                    bold=getattr(font, 'bold', False) or False,
+                    italic=getattr(font, 'italic', False) or False,
+                    underline=getattr(font, 'underline', None) is not None and getattr(font, 'underline', None) != 'none',
+                    font_name=getattr(font, 'name', None),
+                    font_size=getattr(font, 'size', None),
+                    font_color=extract_color(getattr(font, 'color', None)) if getattr(font, 'color', None) else None
+                )
+            else:
+                style = RichTextFragmentStyle()
+            fragments.append(RichTextFragment(text=getattr(fragment, 'text', ''), style=style))
     else:
-        # Handle plain text
-        font = cell.font
-        style = RichTextFragmentStyle(
-            bold=font.bold or False,
-            italic=font.italic or False,
-            underline=font.underline is not None and font.underline != 'none',
-            font_name=font.name,
-            font_size=font.size,
-            font_color=extract_color(font.color) if font.color else None
-        )
+        # 处理纯文本
+        font = getattr(cell, 'font', None)
+        if font:
+            style = RichTextFragmentStyle(
+                bold=getattr(font, 'bold', False) or False,
+                italic=getattr(font, 'italic', False) or False,
+                underline=getattr(font, 'underline', None) is not None and getattr(font, 'underline', None) != 'none',
+                font_name=getattr(font, 'name', None),
+                font_size=getattr(font, 'size', None),
+                font_color=extract_color(getattr(font, 'color', None)) if getattr(font, 'color', None) else None
+            )
+        else:
+            style = RichTextFragmentStyle()
         fragments.append(RichTextFragment(text=str(cell.value), style=style))
     return fragments
 
 def extract_cell_value(cell: CellLike) -> CellValue:
-    """Extracts the cell value, handling rich text if present."""
+    """提取单元格的值，如有富文本则处理为富文本片段。"""
     if not hasattr(cell, 'value'):
         return None
     if isinstance(cell.value, list):
@@ -54,8 +60,8 @@ def extract_cell_value(cell: CellLike) -> CellValue:
 
 def extract_style(cell: CellLike) -> Style:
     """
-    Extracts comprehensive style information from an openpyxl cell.
-    Handles both regular and merged cells.
+    从 openpyxl 单元格中提取完整的样式信息。
+    兼容普通单元格和合并单元格。
     """
     style = Style()
     if not hasattr(cell, 'has_style') or not cell.has_style:
@@ -115,7 +121,7 @@ def extract_style(cell: CellLike) -> Style:
 
 def get_border_style(border_side) -> str:
     """
-    Converts openpyxl border style to CSS border style.
+    将 openpyxl 边框样式转换为 CSS 边框样式。
     """
     if not border_side or not border_side.style:
         return ""
@@ -135,7 +141,7 @@ def get_border_style(border_side) -> str:
 
 def extract_fill_color(fill) -> str | None:
     """
-    Enhanced fill color extraction for various fill types.
+    针对多种填充类型增强的填充色提取。
     """
     if not fill:
         return None
@@ -164,7 +170,7 @@ def extract_fill_color(fill) -> str | None:
 
 def extract_color(color_obj) -> str | None:
     """
-    Simplified color extraction using openpyxl's unified value interface.
+    使用 openpyxl 的统一 value 接口简化颜色提取。
     """
     if not color_obj:
         return None
@@ -190,7 +196,7 @@ def extract_color(color_obj) -> str | None:
 
 def get_color_by_index(index: int) -> str:
     """
-    Unified indexed color map for standard and theme colors.
+    标准色与主题色统一的索引颜色映射。
     """
     color_map = {
         0: "#000000", 1: "#FFFFFF", 2: "#FF0000", 3: "#00FF00", 4: "#0000FF",
@@ -201,7 +207,7 @@ def get_color_by_index(index: int) -> str:
 
 def extract_number_format(cell) -> str:
     """
-    Enhanced number format extraction.
+    增强的数字格式提取。
     """
     try:
         if cell.number_format and cell.number_format != 'General':
@@ -215,7 +221,7 @@ def extract_number_format(cell) -> str:
 
 def extract_hyperlink(cell) -> str | None:
     """
-    Enhanced hyperlink extraction.
+    增强的超链接提取。
     """
     if not cell.hyperlink:
         return None
@@ -236,14 +242,14 @@ def extract_hyperlink(cell) -> str | None:
 
 def style_to_dict(style: Style) -> dict[str, Any]:
     """
-    Converts a Style object to a dictionary.
+    将 Style 对象转换为字典。
     """
     if not style:
         return {}
     
     style_dict = {}
     
-    # Use vars() to dynamically get attributes, but filter out defaults to keep it clean.
+    # 使用 vars() 动态获取属性，但过滤默认值以保持简洁。
     default_style = Style()
     for attr, value in vars(style).items():
         if value != getattr(default_style, attr):

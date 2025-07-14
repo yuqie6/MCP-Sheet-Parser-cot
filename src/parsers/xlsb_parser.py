@@ -18,75 +18,80 @@ logger = logging.getLogger(__name__)
 class XlsbParser(BaseParser):
     """XLSB格式解析器，基于pyxlsb库实现数据提取和基础样式支持。"""
     
-    def parse(self, file_path: str) -> Sheet:
+    def parse(self, file_path: str) -> list[Sheet]:
         """
-        解析XLSB文件并返回Sheet对象。
-        
+        解析XLSB文件并返回Sheet对象列表。
+
         Args:
             file_path: XLSB文件路径
-            
+
         Returns:
-            包含数据和基础样式的Sheet对象
-            
+            包含数据和基础样式的Sheet对象列表
+
         Raises:
             RuntimeError: 当解析失败时
         """
         try:
             with open_workbook(file_path) as workbook:
-                # 获取第一个工作表
+                # 检查工作表数量
                 if not workbook.sheets:
                     raise RuntimeError("工作簿不包含任何工作表")
-                
-                sheet_name = workbook.sheets[0]
-                
-                # 打开第一个工作表
-                with workbook.get_sheet(1) as worksheet:
-                    rows = []
-                    
-                    # 读取所有行数据
-                    for row_data in worksheet.rows():
-                        cells = []
-                        
-                        # 处理当前行的所有单元格
-                        if row_data:
-                            # 获取最大列数
-                            max_col = max(cell.c for cell in row_data) if row_data else 0
-                            
-                            # 创建完整的行，包括空单元格
-                            for col_idx in range(max_col + 1):
-                                # 查找当前列的单元格
-                                cell_data = None
-                                for cell in row_data:
-                                    if cell.c == col_idx:
-                                        cell_data = cell
-                                        break
-                                
-                                # 获取单元格值和样式
-                                if cell_data:
-                                    cell_value = self._process_cell_value(cell_data.v)
-                                    cell_style = self._extract_basic_style(cell_data)
-                                else:
-                                    cell_value = None
-                                    cell_style = None
-                                
-                                # 创建Cell对象
-                                cell = Cell(
-                                    value=cell_value,
-                                    style=cell_style
-                                )
-                                cells.append(cell)
-                        
-                        rows.append(Row(cells=cells))
-                    
-                    # XLSB格式中合并单元格信息较难获取，暂时返回空列表
-                    merged_cells = []
-                    
-                    return Sheet(
-                        name=sheet_name,
-                        rows=rows,
-                        merged_cells=merged_cells
-                    )
-                    
+
+                sheets = []
+
+                # 解析所有工作表
+                for sheet_idx, sheet_name in enumerate(workbook.sheets, 1):
+                    # 打开工作表（pyxlsb使用1基索引）
+                    with workbook.get_sheet(sheet_idx) as worksheet:
+                        rows = []
+
+                        # 读取所有行数据
+                        for row_data in worksheet.rows():
+                            cells = []
+
+                            # 处理当前行的所有单元格
+                            if row_data:
+                                # 获取最大列数
+                                max_col = max(cell.c for cell in row_data) if row_data else 0
+
+                                # 创建完整的行，包括空单元格
+                                for col_idx in range(max_col + 1):
+                                    # 查找当前列的单元格
+                                    cell_data = None
+                                    for cell in row_data:
+                                        if cell.c == col_idx:
+                                            cell_data = cell
+                                            break
+
+                                    # 获取单元格值和样式
+                                    if cell_data:
+                                        cell_value = self._process_cell_value(cell_data.v)
+                                        cell_style = self._extract_basic_style(cell_data)
+                                    else:
+                                        cell_value = None
+                                        cell_style = None
+
+                                    # 创建Cell对象
+                                    cell = Cell(
+                                        value=cell_value,
+                                        style=cell_style
+                                    )
+                                    cells.append(cell)
+
+                            rows.append(Row(cells=cells))
+
+                        # XLSB格式中合并单元格信息较难获取，暂时返回空列表
+                        merged_cells = []
+
+                        sheet = Sheet(
+                            name=sheet_name,
+                            rows=rows,
+                            merged_cells=merged_cells
+                        )
+                        sheets.append(sheet)
+
+                return sheets
+
         except Exception as e:
             logger.error(f"解析XLSB文件失败: {e}")
             raise RuntimeError(f"无法解析XLSB文件 {file_path}: {str(e)}")
@@ -223,12 +228,12 @@ class XlsbParser(BaseParser):
         return normalized_row
     
     def supports_streaming(self) -> bool:
-        """XLSB parser has limited streaming support due to pyxlsb limitations."""
-        return False  # pyxlsb has some streaming capabilities but limited style support
-    
+        """由于pyxlsb库限制，XLSB解析器的流式处理能力有限。"""
+        return False  # pyxlsb 有部分流式能力，但样式支持有限
+
     def create_lazy_sheet(self, file_path: str, sheet_name: str | None = None) -> LazySheet | None:
         """
-        XLSB format has limited streaming support.
-        pyxlsb supports streaming but with very limited style information.
+        XLSB格式流式处理能力有限。
+        pyxlsb支持流式读取，但样式信息极为有限。
         """
-        return None  # Not implemented due to limited style support in streaming mode
+        return None  # 由于流式模式下样式支持有限，未实现

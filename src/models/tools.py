@@ -19,6 +19,9 @@ from ..core_service import CoreService
 logger = logging.getLogger(__name__)
 
 
+
+
+
 def register_tools(server: Server) -> None:
     """向服务器注册3个核心MCP工具。"""
 
@@ -30,7 +33,7 @@ def register_tools(server: Server) -> None:
         return [
             Tool(
                 name="convert_to_html",
-                description="将表格文件（如 CSV, XLSX, XLS 等）转换为高保真 HTML，保留大部分样式。对于大型文件，会自动进行分页以优化性能和阅读体验。返回包含HTML文件路径和转换摘要的JSON对象。",
+                description="将Excel/CSV文件转换为可在浏览器中查看的HTML文件。保留原始样式、颜色、字体等格式。支持多工作表文件，可选择特定工作表或转换全部。大文件可使用分页功能。返回结构化JSON，包含成功状态、生成的文件信息和转换摘要。",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -64,7 +67,7 @@ def register_tools(server: Server) -> None:
             ),
             Tool(
                 name="parse_sheet",
-                description="将表格文件的指定工作表和范围解析为结构化的 TableModel JSON 对象。这个JSON格式对大型语言模型（LLM）非常友好，方便进行数据分析和修改。对于大型工作表，会自动返回摘要信息以避免过多的输出。",
+                description="解析Excel/CSV文件为结构化JSON数据。默认返回文件概览信息（行数、列数、数据类型、前几行预览），避免上下文过载。LLM可通过参数控制是否获取完整数据、样式信息等。适合数据分析和处理，修改后可用apply_changes写回。",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -74,11 +77,27 @@ def register_tools(server: Server) -> None:
                         },
                         "sheet_name": {
                             "type": "string",
-                            "description": "【可选】要解析的工作表的名称。如果留空，将自动使用活动工作表或第一个工作表。"
+                            "description": "【可选】要解析的工作表名称。如果留空，使用第一个工作表。"
                         },
                         "range_string": {
                             "type": "string",
-                            "description": "【可选】要解析的单元格范围，格式如 'A1:D10'。如果留空，将解析整个工作表。建议在处理大文件时指定此参数以提高效率。"
+                            "description": "【可选】单元格范围，如'A1:D10'。指定范围时会返回该范围的完整数据。"
+                        },
+                        "include_full_data": {
+                            "type": "boolean",
+                            "description": "【可选，默认false】是否返回完整数据。false时只返回概览和预览，true时返回所有行数据。大文件建议先查看概览。"
+                        },
+                        "include_styles": {
+                            "type": "boolean",
+                            "description": "【可选，默认false】是否包含样式信息（字体、颜色、边框等）。样式信息会显著增加数据量。"
+                        },
+                        "preview_rows": {
+                            "type": "integer",
+                            "description": "【可选，默认5】预览行数。当include_full_data为false时，返回前N行作为数据预览。"
+                        },
+                        "max_rows": {
+                            "type": "integer",
+                            "description": "【可选】最大返回行数。用于限制大文件的数据量，超出部分会被截断并提示。"
                         }
                     },
                     "required": ["file_path"]
@@ -86,7 +105,7 @@ def register_tools(server: Server) -> None:
             ),
             Tool(
                 name="apply_changes",
-                description="将通过 `parse_sheet` 获取并已修改的 TableModel JSON 数据写回到原始表格文件中。此工具能够完成数据的闭环操作，同时保留原始文件的格式和大部分样式。默认会自动创建文件备份。",
+                description="将修改后的数据写回Excel/CSV文件，完成数据编辑闭环。接受parse_sheet返回的JSON格式数据（修改后）。保留原文件格式和样式，默认创建备份文件防止数据丢失。支持添加、删除、修改行和单元格数据。",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -149,98 +168,236 @@ def register_tools(server: Server) -> None:
 
 async def _handle_convert_to_html(arguments: dict[str, Any], core_service: CoreService) -> list[TextContent]:
     """处理 convert_to_html 工具调用。"""
-    file_path = arguments.get("file_path")
-    if not isinstance(file_path, str):
-        return [TextContent(
-            type="text",
-            text="错误: 必须提供有效的 file_path 参数"
-        )]
-    output_path = arguments.get("output_path")
-    page_size = arguments.get("page_size")
-    page_number = arguments.get("page_number")
-    sheet_name = arguments.get("sheet_name")
-
-    if not file_path:
-        return [TextContent(
-            type="text",
-            text="错误: 必须提供 file_path 参数"
-        )]
 
     try:
         result = core_service.convert_to_html(
-            file_path,
-            output_path,
-            sheet_name=sheet_name,
+            arguments["file_path"],
+            arguments.get("output_path"),
+            sheet_name=arguments.get("sheet_name"),
             page_size=arguments.get("page_size"),
             page_number=arguments.get("page_number"),
             header_rows=arguments.get("header_rows", 1)
         )
+
+        # 结构化成功响应，便于LLM理解
+        response = {
+            "success": True,
+            "operation": "convert_to_html",
+            "results": result,
+            "summary": {
+                "files_generated": len(result),
+                "total_size_kb": sum(r.get("file_size_kb", 0) for r in result),
+                "sheets_converted": [r.get("sheet_name") for r in result]
+            }
+        }
+
         return [TextContent(
             type="text",
-            text=json.dumps(result, ensure_ascii=False, indent=2)
+            text=json.dumps(response, ensure_ascii=False, indent=2)
+        )]
+
+    except FileNotFoundError as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": False,
+                "error_type": "file_not_found",
+                "error_message": f"文件未找到: {str(e)}",
+                "suggestion": "请检查文件路径是否正确，确保文件存在且可访问。支持的格式: .xlsx, .xls, .xlsb, .xlsm, .csv"
+            }, ensure_ascii=False, indent=2)
+        )]
+    except PermissionError as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": False,
+                "error_type": "permission_error",
+                "error_message": f"权限不足: {str(e)}",
+                "suggestion": "请检查文件权限，确保有读取源文件和写入目标目录的权限"
+            }, ensure_ascii=False, indent=2)
+        )]
+    except ValueError as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": False,
+                "error_type": "invalid_parameter",
+                "error_message": f"参数错误: {str(e)}",
+                "suggestion": "请检查参数格式，如page_size和page_number应为正整数，sheet_name应为有效的工作表名称"
+            }, ensure_ascii=False, indent=2)
         )]
     except Exception as e:
         return [TextContent(
             type="text",
-            text=f"错误: {str(e)}"
+            text=json.dumps({
+                "success": False,
+                "error_type": "conversion_error",
+                "error_message": f"转换失败: {str(e)}",
+                "suggestion": "请检查文件是否损坏，或尝试使用不同的参数。如果是大文件，建议使用page_size参数进行分页"
+            }, ensure_ascii=False, indent=2)
         )]
 
 
 async def _handle_parse_sheet(arguments: dict[str, Any], core_service: CoreService) -> list[TextContent]:
-    """处理 parse_sheet 工具调用。"""
-    file_path = arguments.get("file_path")
-    if not isinstance(file_path, str):
-        return [TextContent(
-            type="text",
-            text="错误: 必须提供有效的 file_path 参数"
-        )]
-    sheet_name = arguments.get("sheet_name")
-    range_string = arguments.get("range_string")
-
-    if not file_path:
-        return [TextContent(
-            type="text",
-            text="错误: 必须提供 file_path 参数"
-        )]
+    """处理 parse_sheet 工具调用 - 优化版本，避免上下文爆炸。"""
 
     try:
-        result = core_service.parse_sheet(file_path, sheet_name, range_string)
+        # 获取参数
+        file_path = arguments["file_path"]
+        sheet_name = arguments.get("sheet_name")
+        range_string = arguments.get("range_string")
+        include_full_data = arguments.get("include_full_data", False)
+        include_styles = arguments.get("include_styles", False)
+        preview_rows = arguments.get("preview_rows", 5)
+        max_rows = arguments.get("max_rows")
+
+        # 调用优化后的解析方法
+        result = core_service.parse_sheet_optimized(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            range_string=range_string,
+            include_full_data=include_full_data,
+            include_styles=include_styles,
+            preview_rows=preview_rows,
+            max_rows=max_rows
+        )
+
+        # 为LLM添加使用指导
+        result["llm_guidance"] = {
+            "current_mode": "overview" if not include_full_data else "full_data",
+            "next_steps": _generate_next_steps_guidance(result, include_full_data, include_styles),
+            "data_access": {
+                "headers": "result['headers'] - 列标题",
+                "preview": "result['preview_rows'] - 数据预览",
+                "full_data": "设置 include_full_data=true 获取完整数据",
+                "styles": "设置 include_styles=true 获取样式信息"
+            }
+        }
+
+        response = {
+            "success": True,
+            "operation": "parse_sheet",
+            "data": result
+        }
+
         return [TextContent(
             type="text",
-            text=json.dumps(result, ensure_ascii=False, indent=2)
+            text=json.dumps(response, ensure_ascii=False, indent=2)
+        )]
+
+    except FileNotFoundError as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": False,
+                "error_type": "file_not_found",
+                "error_message": f"文件未找到: {str(e)}",
+                "suggestion": "请检查文件路径是否正确。支持的格式: .xlsx, .xls, .xlsb, .xlsm, .csv"
+            }, ensure_ascii=False, indent=2)
+        )]
+    except ValueError as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": False,
+                "error_type": "invalid_parameter",
+                "error_message": f"参数错误: {str(e)}",
+                "suggestion": "请检查sheet_name是否存在，range_string格式是否正确（如'A1:D10'）"
+            }, ensure_ascii=False, indent=2)
         )]
     except Exception as e:
         return [TextContent(
             type="text",
-            text=f"错误: {str(e)}"
+            text=json.dumps({
+                "success": False,
+                "error_type": "parsing_error",
+                "error_message": f"解析失败: {str(e)}",
+                "suggestion": "请检查文件是否损坏，或尝试指定具体的工作表名称和范围"
+            }, ensure_ascii=False, indent=2)
         )]
+
+
+def _generate_next_steps_guidance(result: dict, include_full_data: bool, include_styles: bool) -> list[str]:
+    """生成下一步操作建议。"""
+    guidance = []
+
+    if not include_full_data:
+        total_rows = result.get("metadata", {}).get("total_rows", 0)
+        if total_rows > result.get("metadata", {}).get("preview_rows", 5):
+            guidance.append(f"文件包含{total_rows}行数据，当前只显示预览。设置include_full_data=true获取完整数据")
+
+    if not include_styles and result.get("metadata", {}).get("has_styles", False):
+        guidance.append("文件包含样式信息（字体、颜色等）。设置include_styles=true获取样式数据")
+
+    if result.get("metadata", {}).get("total_cells", 0) > 1000:
+        guidance.append("文件较大，建议使用range_string参数获取特定范围，如'A1:D10'")
+
+    if len(guidance) == 0:
+        guidance.append("数据已完整加载，可以进行分析或修改")
+
+    return guidance
 
 
 async def _handle_apply_changes(arguments: dict[str, Any], core_service: CoreService) -> list[TextContent]:
     """处理 apply_changes 工具调用。"""
-    file_path = arguments.get("file_path")
-    if not isinstance(file_path, str):
-        return [TextContent(
-            type="text",
-            text="错误: 必须提供有效的 file_path 参数"
-        )]
-    
-    table_model_json = arguments.get("table_model_json")
-    if not isinstance(table_model_json, dict):
-        return [TextContent(
-            type="text",
-            text="错误: 必须提供有效的 table_model_json 参数"
-        )]
-    create_backup = arguments.get("create_backup", True)
 
     try:
-        result = core_service.apply_changes(file_path, table_model_json, create_backup)
+        result = core_service.apply_changes(
+            arguments["file_path"],
+            arguments["table_model_json"],
+            arguments.get("create_backup", True)
+        )
+
+        response = {
+            "success": True,
+            "operation": "apply_changes",
+            "result": result,
+            "message": "数据已成功写回文件",
+            "backup_created": arguments.get("create_backup", True)
+        }
+
         return [TextContent(
             type="text",
-            text=json.dumps(result, ensure_ascii=False, indent=2)
+            text=json.dumps(response, ensure_ascii=False, indent=2)
+        )]
+
+    except FileNotFoundError as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": False,
+                "error_type": "file_not_found",
+                "error_message": f"文件未找到: {str(e)}",
+                "suggestion": "请检查文件路径是否正确，确保目标文件存在"
+            }, ensure_ascii=False, indent=2)
+        )]
+    except PermissionError as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": False,
+                "error_type": "permission_error",
+                "error_message": f"权限不足: {str(e)}",
+                "suggestion": "请检查文件权限，确保有写入文件的权限，文件可能被其他程序占用"
+            }, ensure_ascii=False, indent=2)
+        )]
+    except ValueError as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": False,
+                "error_type": "invalid_data",
+                "error_message": f"数据格式错误: {str(e)}",
+                "suggestion": "请确保table_model_json格式正确，包含必需的字段：sheet_name, headers, rows"
+            }, ensure_ascii=False, indent=2)
         )]
     except Exception as e:
         return [TextContent(
             type="text",
-            text=f"错误: {str(e)}"
+            text=json.dumps({
+                "success": False,
+                "error_type": "write_error",
+                "error_message": f"写入失败: {str(e)}",
+                "suggestion": "请检查数据格式是否与原文件兼容，或尝试关闭可能占用文件的程序"
+            }, ensure_ascii=False, indent=2)
         )]

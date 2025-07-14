@@ -1,14 +1,14 @@
 """
-Parses cell range strings like "A1:D10" or "A1".
+解析单元格范围字符串，如 "A1:D10" 或 "A1"。
 """
 import re
 
 def parse_range_string(range_string: str) -> tuple[int, int, int, int]:
     """
-    Parses a range string, e.g., "A1:D10" or "A1".
+    解析范围字符串，例如 "A1:D10" 或 "A1"。
 
-    Returns:
-        (start_row, start_col, end_row, end_col) - 0-based indices
+    返回：
+        (start_row, start_col, end_row, end_col) - 基于0的索引
     """
     range_string = range_string.strip().upper()
 
@@ -16,7 +16,7 @@ def parse_range_string(range_string: str) -> tuple[int, int, int, int]:
     range_pattern = r'^([A-Z]+)(\d+):([A-Z]+)(\d+)$'
 
     def col_to_num(col_str):
-        """Converts column letters to numbers (A=0, B=1, ...)."""
+        """将列字母转换为数字 (A=0, B=1, ...)。"""
         result = 0
         for char in col_str:
             result = result * 26 + (ord(char) - ord('A') + 1)
@@ -38,4 +38,4 @@ def parse_range_string(range_string: str) -> tuple[int, int, int, int]:
         col = col_to_num(col_str)
         return row, col, row, col
 
-    raise ValueError(f"Invalid range format: {range_string}. Supported formats: A1 or A1:D10")
+    raise ValueError(f"无效的范围格式: {range_string}。支持的格式: A1 或 A1:D10")

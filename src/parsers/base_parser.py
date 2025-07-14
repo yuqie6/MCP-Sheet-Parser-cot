@@ -5,65 +5,65 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 from src.models.table_model import Sheet, LazySheet
 
 
 class BaseParser(ABC):
     """
-    Abstract base class for all file parsers.
+    所有文件解析器的抽象基类。
 
-    Defines the common interface that all parsers must implement. This includes
-    methods for parsing a file into a Sheet object, checking for streaming
-    support, and creating a lazy-loading sheet.
+    定义所有解析器必须实现的通用接口，包括：
+    - 解析文件为 Sheet 对象列表的方法
+    - 检查是否支持流式处理的方法
+    - 创建惰性加载表的方法
     """
 
     @abstractmethod
-    def parse(self, file_path: str) -> Sheet:
+    def parse(self, file_path: str) -> list[Sheet]:
         """
-        Parses the given file and returns a Sheet object.
+        解析指定文件并返回 Sheet 对象列表。
 
-        This is the primary method for each parser. It should handle opening the
-        file, reading its content and structure, and converting it into a
-        standardized Sheet object.
+        这是每个解析器的主要方法。应负责打开文件、读取内容和结构，并转换为标准化的 Sheet 对象列表。
+        对于单工作表文件（如CSV），返回包含一个Sheet的列表。
+        对于多工作表文件（如Excel），返回包含所有工作表的列表。
 
-        Args:
-            file_path: The absolute path to the file to be parsed.
+        参数：
+            file_path: 要解析的文件的绝对路径。
 
-        Returns:
-            A Sheet object containing the structured data and styles.
+        返回：
+            包含结构化数据和样式的 Sheet 对象列表。
 
-        Raises:
-            RuntimeError: If parsing fails for any reason.
+        异常：
+            RuntimeError: 解析失败时抛出。
         """
         pass
     
     def supports_streaming(self) -> bool:
-        """Check if this parser supports streaming."""
+        """检查该解析器是否支持流式处理。"""
         return False
     
-    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> Optional[LazySheet]:
+    def create_lazy_sheet(self, file_path: str, sheet_name: str | None = None) -> LazySheet | None:
         """
-        Creates a LazySheet for streaming data on demand.
+        创建用于按需流式读取数据的 LazySheet。
 
-        This method should be implemented by parsers that support streaming.
-        It returns a LazySheet object which can load data in chunks instead of
-        all at once.
+        仅支持流式处理的解析器应实现此方法。
+        返回一个 LazySheet 对象，可分块加载数据而非一次性全部加载。
 
-        Args:
-            file_path: The absolute path to the file.
-            sheet_name: The name of the sheet to parse (optional).
+        参数：
+            file_path: 文件的绝对路径。
+            sheet_name: 要解析的工作表名称（可选）。
 
-        Returns:
-            A LazySheet object if streaming is supported, otherwise None.
+        返回：
+            如果支持流式处理，返回 LazySheet 对象，否则返回 None。
         """
-    def _style_to_dict(self, style: Any) -> Dict[str, Any]:
+    def _style_to_dict(self, style: Any) -> dict[str, Any]:
         """
-        将特定于库的Style对象转换为标准化的字典格式。
-        这是一个辅助方法，可以在子类中实现，以供CoreService使用。
+        将特定库的 Style 对象转换为标准化字典格式。
+        这是一个辅助方法，可在子类中实现，供 CoreService 使用。
         """
         if not style:
             return {}
-        # 默认实现返回一个空字典，子类应重写此方法
+        # 默认实现返回空字典，子类应重写此方法
         return {}
 

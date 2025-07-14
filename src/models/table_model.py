@@ -2,10 +2,10 @@ from dataclasses import dataclass, field
 from typing import Any, Iterator, Optional, Protocol, Union
 from abc import ABC, abstractmethod
 
-# 定义富文本片段的样式
 @dataclass
+# 富文本片段的样式定义
 class RichTextFragmentStyle:
-    """Represents the styling for a fragment of rich text."""
+    """表示富文本片段的样式。"""
     bold: bool = False
     italic: bool = False
     underline: bool = False
@@ -13,54 +13,54 @@ class RichTextFragmentStyle:
     font_size: Optional[float] = None
     font_name: Optional[str] = None
 
-# 定义富文本片段
 @dataclass
+# 富文本片段定义
 class RichTextFragment:
-    """Represents a fragment of text with its own style."""
+    """表示带有独立样式的文本片段。"""
     text: str
     style: RichTextFragmentStyle
 
-# 单元格值可以是简单字符串或富文本列表
+# 单元格的值可以是简单类型或富文本片段列表
 CellValue = Union[Any, list[RichTextFragment]]
 
 class LazyRowProvider(Protocol):
-    """Protocol for lazy row providers that can stream rows on demand."""
-    
+    """惰性行提供者协议，可按需流式获取行。"""
+
     def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator['Row']:
-        """Yield rows on demand starting from start_row."""
+        """从 start_row 开始按需生成行。"""
         ...
-    
+
     def get_row(self, row_index: int) -> 'Row':
-        """Get a specific row by index."""
+        """按索引获取指定行。"""
         ...
-    
+
     def get_total_rows(self) -> int:
-        """Get total number of rows without loading all data."""
+        """无需加载全部数据即可获取总行数。"""
         ...
 
 class StreamingCapable(ABC):
-    """Base class for parsers that support streaming."""
-    
+    """支持流式处理的解析器基类。"""
+
     @abstractmethod
     def supports_streaming(self) -> bool:
-        """Check if this parser supports streaming."""
+        """检查该解析器是否支持流式处理。"""
         return False
-    
+
     @abstractmethod
     def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> 'LazySheet':
-        """Create a lazy sheet that can stream data on demand."""
+        """创建可按需流式读取数据的惰性表对象。"""
         pass
+
 
 @dataclass
 class Style:
     """
-    Represents the visual styling of a cell.
+    单元格的视觉样式。
 
-    This class captures all styling information, including font properties, colors,
-    alignment, borders, and other formatting details. It provides a standardized
-    way to handle styles across different file formats.
+    此类包含所有样式信息，包括字体属性、颜色、对齐方式、边框和其他格式细节。
+    提供跨不同文件格式统一处理样式的方式。
     """
-    # Font properties - will be deprecated for rich text
+    # 字体属性（富文本后将弃用）
     bold: bool = False
     italic: bool = False
     underline: bool = False
@@ -68,37 +68,37 @@ class Style:
     font_size: Optional[float] = None
     font_name: Optional[str] = None
 
-    # Background and fill
+    # 背景与填充
     background_color: Optional[str] = None
 
-    # Text alignment
-    text_align: Optional[str] = None  # Options: left, center, right, justify
-    vertical_align: Optional[str] = None  # Options: top, middle, bottom
+    # 文本对齐
+    text_align: Optional[str] = None  # 可选：left, center, right, justify
+    vertical_align: Optional[str] = None  # 可选：top, middle, bottom
 
-    # Border properties
+    # 边框属性
     border_top: Optional[str] = None
     border_bottom: Optional[str] = None
     border_left: Optional[str] = None
     border_right: Optional[str] = None
     border_color: Optional[str] = None
 
-    # Text wrapping and formatting
+    # 自动换行与格式
     wrap_text: bool = False
     number_format: Optional[str] = None
 
-    # Advanced features
-    formula: Optional[str] = None     # The formula string, if any
-    hyperlink: Optional[str] = None  # URL of the hyperlink
-    comment: Optional[str] = None    # Cell comment text
+    # 高级特性
+    formula: Optional[str] = None     # 单元格公式字符串
+    hyperlink: Optional[str] = None  # 超链接 URL
+    comment: Optional[str] = None    # 单元格批注
+
 
 
 @dataclass
 class Cell:
     """
-    Represents a single cell in a sheet.
+    表格中的单个单元格。
 
-    A cell contains its value, an optional Style object, and row/column span
-    information for merged cells.
+    单元格包含其值、可选的样式对象，以及合并单元格的行/列跨度信息。
     """
     value: CellValue
     style: Style | None = None
@@ -108,28 +108,31 @@ class Cell:
 
 
 
+
 @dataclass
 class Row:
     """
-    Represents a single row in a sheet, containing a list of Cell objects.
+    表格中的一行，包含若干单元格对象。
     """
     cells: list[Cell]
 
 
+
 @dataclass
 class Chart:
-    """Represents a chart in a sheet."""
+    """表格中的图表对象。"""
     name: str
-    type: str  # e.g., 'bar', 'line', 'pie'
-    image_data: Optional[bytes] = None  # The chart rendered as image bytes
-    anchor: Optional[str] = None  # E.g., 'A1'
+    type: str  # 如 'bar', 'line', 'pie'
+    image_data: Optional[bytes] = None  # 图表渲染后的图片字节
+    anchor: Optional[str] = None  # 锚点位置，如 'A1'
+
 
 
 @dataclass
 class Sheet:
     """
-    Represents a full sheet with its name, all its rows, and merged cell info.
-    This class holds all data in memory.
+    表格的完整工作表对象，包含名称、所有行和合并单元格信息。
+    此类将所有数据存储于内存中。
     """
     name: str
     rows: list[Row]
@@ -142,64 +145,64 @@ class Sheet:
 
     def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
         """
-        Iterates over a subset of rows in the sheet.
+        遍历表格中的部分行。
 
-        Args:
-            start_row: The starting row index.
-            max_rows: The maximum number of rows to iterate over.
+        参数：
+            start_row: 起始行索引。
+            max_rows: 遍历的最大行数。
 
-        Yields:
-            Row objects from the specified subset.
+        产出：
+            指定范围内的 Row 对象。
         """
         end_row = len(self.rows)
         if max_rows is not None:
             end_row = min(start_row + max_rows, len(self.rows))
-        
+
         for i in range(start_row, end_row):
             if i < len(self.rows):
                 yield self.rows[i]
 
     def get_total_rows(self) -> int:
-        """Returns the total number of rows in the sheet."""
+        """返回表格的总行数。"""
         return len(self.rows)
 
 
 class LazySheet:
-    """Lazy sheet that can stream data on demand without loading everything into memory."""
-    
+    """惰性表对象，可按需流式读取数据，无需一次性加载全部内容到内存。"""
+
     def __init__(self, name: str, provider: LazyRowProvider, merged_cells: Optional[list[str]] = None):
         self.name = name
         self._provider = provider
         self.merged_cells = merged_cells or []
         self._total_rows_cache: Optional[int] = None
-    
+
     def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
-        """Iterate over rows on demand."""
+        """按需遍历行。"""
         return self._provider.iter_rows(start_row, max_rows)
-    
+
     def get_row(self, row_index: int) -> Row:
-        """Get a specific row by index."""
+        """按索引获取指定行。"""
         return self._provider.get_row(row_index)
-    
+
     def get_total_rows(self) -> int:
-        """Get total number of rows without loading all data."""
+        """无需加载全部数据即可获取总行数。"""
         if self._total_rows_cache is None:
             self._total_rows_cache = self._provider.get_total_rows()
         return self._total_rows_cache
-    
-    def __getitem__(self, key) -> Row:
-        """Support bracket notation for row access."""
+
+    def __getitem__(self, key) -> Row | list[Row]:
+        """支持下标访问行。"""
         if isinstance(key, int):
             return self.get_row(key)
         elif isinstance(key, slice):
             start, stop, step = key.indices(self.get_total_rows())
             if step != 1:
-                raise ValueError("Step slicing not supported")
+                raise ValueError("暂不支持步长切片")
             return list(self.iter_rows(start, stop - start))
         else:
-            raise TypeError("Invalid key type")
-    
+            raise TypeError("无效的下标类型")
+
     def to_sheet(self) -> Sheet:
-        """Convert lazy sheet to regular sheet by loading all data."""
+        """将惰性表全部加载为常规 Sheet 对象。"""
         rows = list(self.iter_rows())
         return Sheet(name=self.name, rows=rows, merged_cells=self.merged_cells)

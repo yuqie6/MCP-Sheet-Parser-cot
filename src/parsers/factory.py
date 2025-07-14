@@ -21,18 +21,16 @@ from ..validators import validate_file_input
 
 class ParserFactory:
     """
-    A factory class for creating file parsers based on file extensions.
+    解析器工厂类，根据文件扩展名创建对应的解析器。
 
-    This factory provides a centralized way to get the correct parser for a
-    given file format. It supports various spreadsheet formats and handles
-    errors for unsupported types.
+    该工厂为给定的文件格式提供统一的解析器获取方式。支持多种表格格式，并对不支持的类型抛出错误。
 
-    Supported formats:
-    - CSV (.csv): Comma-Separated Values.
-    - XLSX (.xlsx): Modern Excel format (2007+), with full style support.
-    - XLS (.xls): Legacy Excel format (97-2003), with basic style support.
-    - XLSB (.xlsb): Excel binary format, focused on data accuracy.
-    - XLSM (.xlsm): Excel macro-enabled format, similar to XLSX.
+    支持的格式：
+    - CSV (.csv)：通用逗号分隔值文件。
+    - XLSX (.xlsx)：现代Excel格式（2007+），支持完整样式。
+    - XLS (.xls)：传统Excel格式（97-2003），支持基础样式。
+    - XLSB (.xlsb)：Excel二进制格式，注重数据准确性。
+    - XLSM (.xlsm)：Excel宏文件格式，类似XLSX。
     """
 
     _parsers = {
@@ -46,18 +44,18 @@ class ParserFactory:
     @staticmethod
     def get_parser(file_path: str) -> BaseParser:
         """
-        Retrieves the appropriate parser for a given file path.
+        获取指定文件路径对应的解析器。
 
-        Args:
-            file_path: The absolute path to the file.
+        参数：
+            file_path: 文件的绝对路径。
 
-        Returns:
-            An instance of a parser that inherits from BaseParser.
+        返回：
+            继承自 BaseParser 的解析器实例。
 
-        Raises:
-            UnsupportedFileTypeError: If the file format is not supported.
-            ValidationError: If the file path is invalid.
-            FileNotFoundError: If the file does not exist.
+        异常：
+            UnsupportedFileTypeError: 文件格式不支持时抛出。
+            ValidationError: 文件路径无效时抛出。
+            FileNotFoundError: 文件不存在时抛出。
         """
         # 使用验证器验证文件输入
         validated_path, file_extension = validate_file_input(file_path)
@@ -72,7 +70,7 @@ class ParserFactory:
     @staticmethod
     def get_supported_formats() -> list[str]:
         """
-        Returns a list of all supported file format extensions.
+        返回所有支持的文件格式扩展名列表。
         """
         return list(ParserFactory._parsers.keys())
 
@@ -81,7 +79,7 @@ class ParserFactory:
         """
         获取所有支持格式的详细信息。
 
-        Returns:
+        返回：
             格式信息字典，包含每种格式的描述和特性
         """
         return {
@@ -125,13 +123,13 @@ class ParserFactory:
     @staticmethod
     def is_supported_format(file_path: str) -> bool:
         """
-        Checks if the file format of a given path is supported.
+        检查指定路径的文件格式是否受支持。
 
-        Args:
-            file_path: The path to the file.
+        参数：
+            file_path: 文件路径。
 
-        Returns:
-            True if the format is supported, False otherwise.
+        返回：
+            如果支持该格式返回True，否则返回False。
         """
         try:
             file_extension = file_path.split('.')[-1].lower()
@@ -143,25 +141,25 @@ class ParserFactory:
     def supports_streaming(file_path: str) -> bool:
         """
         检查指定文件格式是否支持流式读取。
-        
-        Args:
+
+        参数：
             file_path: 文件路径
-            
-        Returns:
+
+        返回：
             如果格式支持流式读取则返回True，否则返回False
         """
         try:
             parser = ParserFactory.get_parser(file_path)
             return parser.supports_streaming()
-        except UnsupportedFileType:
+        except UnsupportedFileTypeError:
             return False
     
     @staticmethod
     def get_streaming_formats() -> list[str]:
         """
         获取所有支持流式读取的文件格式列表。
-        
-        Returns:
+
+        返回：
             支持流式读取的文件格式列表
         """
         streaming_formats = []
@@ -171,19 +169,19 @@ class ParserFactory:
         return streaming_formats
     
     @staticmethod
-    def create_lazy_sheet(file_path: str, sheet_name: str = None):
+    def create_lazy_sheet(file_path: str, sheet_name: str | None = None):
         """
         为支持流式读取的文件创建懒加载工作表。
-        
-        Args:
+
+        参数：
             file_path: 文件路径
             sheet_name: 工作表名称（可选）
-            
-        Returns:
+
+        返回：
             LazySheet对象，如果不支持流式读取则返回None
-            
-        Raises:
-            UnsupportedFileType: 当文件格式不支持时
+
+        异常：
+            UnsupportedFileTypeError: 当文件格式不支持时抛出
         """
         parser = ParserFactory.get_parser(file_path)
         return parser.create_lazy_sheet(file_path, sheet_name)

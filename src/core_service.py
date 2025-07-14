@@ -10,7 +10,7 @@
 import logging
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any
 
 from .utils.range_parser import parse_range_string
 from .parsers.factory import ParserFactory
@@ -36,10 +36,10 @@ class CoreService:
         self.parser_factory = ParserFactory()
     
 
-    def parse_sheet(self, file_path: str, sheet_name: Optional[str] = None,
-                   range_string: Optional[str] = None, 
+    def parse_sheet(self, file_path: str, sheet_name: str | None = None,
+                   range_string: str | None = None, 
                    enable_streaming: bool = True, 
-                   streaming_threshold: int = config.STREAMING_THRESHOLD_CELLS) -> Dict[str, Any]:
+                   streaming_threshold: int = config.STREAMING_THRESHOLD_CELLS) -> dict[str, Any]:
         """
         解析表格文件为标准化的JSON格式。
         
@@ -98,10 +98,71 @@ class CoreService:
             logger.error(f"解析表格失败: {e}")
             raise
 
-    def convert_to_html(self, file_path: str, output_path: Optional[str] = None,
-                       sheet_name: Optional[str] = None,
-                       page_size: Optional[int] = None, page_number: Optional[int] = None,
-                       header_rows: int = 1) -> List[Dict[str, Any]]:
+    def parse_sheet_optimized(self, file_path: str, sheet_name: str | None = None,
+                             range_string: str | None = None, include_full_data: bool = False,
+                             include_styles: bool = False, preview_rows: int = 5,
+                             max_rows: int | None = None) -> dict[str, Any]:
+        """
+        优化版本的表格解析，避免上下文爆炸。
+
+        Args:
+            file_path: 文件路径
+            sheet_name: 工作表名称（可选）
+            range_string: 单元格范围（可选）
+            include_full_data: 是否返回完整数据（默认False，只返回概览）
+            include_styles: 是否包含样式信息（默认False）
+            preview_rows: 预览行数（默认5行）
+            max_rows: 最大返回行数（可选）
+
+        Returns:
+            优化后的JSON数据
+        """
+        try:
+            # 验证文件输入
+            validated_path, file_extension = validate_file_input(file_path)
+
+            # 获取解析器
+            parser = self.parser_factory.get_parser(str(validated_path))
+
+            # 解析文件
+            sheets = parser.parse(str(validated_path))
+
+            # 选择目标工作表
+            if sheet_name:
+                target_sheet = next((s for s in sheets if s.name == sheet_name), None)
+                if not target_sheet:
+                    available_sheets = [s.name for s in sheets]
+                    raise ValueError(f"工作表 '{sheet_name}' 不存在。可用工作表: {available_sheets}")
+            else:
+                if not sheets:
+                    raise ValueError("文件中没有找到任何工作表。")
+                target_sheet = sheets[0]
+
+            # 处理范围选择
+            if range_string:
+                try:
+                    start_row, start_col, end_row, end_col = parse_range_string(range_string)
+                    return self._extract_range_data(target_sheet, start_row, start_col, end_row, end_col, include_styles)
+                except ValueError as e:
+                    raise ValueError(f"范围格式错误: {e}")
+
+            # 根据参数返回不同级别的数据
+            return self._extract_optimized_data(
+                target_sheet,
+                include_full_data=include_full_data,
+                include_styles=include_styles,
+                preview_rows=preview_rows,
+                max_rows=max_rows
+            )
+
+        except Exception as e:
+            logger.error(f"优化解析失败: {e}")
+            raise
+
+    def convert_to_html(self, file_path: str, output_path: str | None = None,
+                       sheet_name: str | None = None,
+                       page_size: int | None = None, page_number: int | None = None,
+                       header_rows: int = 1) -> list[dict[str, Any]]:
         """
         将表格文件转换为HTML文件。
 
@@ -127,7 +188,7 @@ class CoreService:
 
             # 获取解析器并解析
             parser = self.parser_factory.get_parser(file_path)
-            sheets: List[Sheet] = parser.parse(file_path)
+            sheets: list[Sheet] = parser.parse(file_path)
 
             # Filter sheets if a specific sheet_name is provided
             sheets_to_convert = sheets
@@ -168,7 +229,7 @@ class CoreService:
             logger.error(f"HTML转换失败: {e}")
             raise
 
-    def apply_changes(self, file_path: str, table_model_json: Dict[str, Any], create_backup: bool = True) -> Dict[str, Any]:
+    def apply_changes(self, file_path: str, table_model_json: dict[str, Any], create_backup: bool = True) -> dict[str, Any]:
         """
         将TableModel JSON的修改应用回原始文件。
 
@@ -232,7 +293,7 @@ class CoreService:
             logger.error(f"应用修改失败: {e}")
             raise
 
-    def _write_back_csv(self, file_path: Path, table_model_json: Dict[str, Any]) -> int:
+    def _write_back_csv(self, file_path: Path, table_model_json: dict[str, Any]) -> int:
         """
         将修改写回CSV文件。
 
@@ -274,7 +335,7 @@ class CoreService:
         logger.info(f"CSV文件已更新: {file_path}")
         return len(rows)  # 返回修改的行数
 
-    def _write_back_xls(self, file_path: Path, table_model_json: Dict[str, Any]) -> int:
+    def _write_back_xls(self, file_path: Path, table_model_json: dict[str, Any]) -> int:
         """
         将修改写回XLS文件。
 
@@ -310,7 +371,7 @@ class CoreService:
         logger.info(f"XLS文件已更新: {file_path}")
         return changes_count
 
-    def _write_back_xlsx(self, file_path: Path, table_model_json: Dict[str, Any]) -> int:
+    def _write_back_xlsx(self, file_path: Path, table_model_json: dict[str, Any]) -> int:
         """
         将修改写回XLSX文件。
 
@@ -367,6 +428,11 @@ class CoreService:
                     value = cell_data
 
                 # 尝试转换数值类型
+                # 检查是否为合并单元格（MergedCell的value属性是只读的）
+                if 'MergedCell' in str(type(cell)):
+                    # 跳过合并单元格，因为它们的value属性是只读的
+                    continue
+
                 if value is not None and value != "":
                     try:
                         # 尝试转换为数字
@@ -391,7 +457,7 @@ class CoreService:
         logger.info(f"XLSX文件已更新: {file_path}")
         return changes_count
 
-    def _sheet_to_json(self, sheet: Sheet, range_string: Optional[str] = None) -> Dict[str, Any]:
+    def _sheet_to_json(self, sheet: Sheet, range_string: str | None = None) -> dict[str, Any]:
         """
         将Sheet对象转换为标准化的JSON格式。
 
@@ -405,8 +471,9 @@ class CoreService:
         # 计算数据大小
         total_cells = self._calculate_data_size(sheet)
 
-        # 智能大小检测
+        # 智能大小检测 - 针对LLM上下文优化
         SMALL_FILE_THRESHOLD = config.SMALL_FILE_THRESHOLD_CELLS
+        MEDIUM_FILE_THRESHOLD = config.MEDIUM_FILE_THRESHOLD_CELLS
         LARGE_FILE_THRESHOLD = config.LARGE_FILE_THRESHOLD_CELLS
 
         # 处理范围选择
@@ -415,32 +482,226 @@ class CoreService:
                 start_row, start_col, end_row, end_col = parse_range_string(range_string)
                 return self._extract_range_data(sheet, start_row, start_col, end_row, end_col)
             except ValueError as e:
-                logger.warning(f"范围解析失败: {e}, 返回完整数据")
+                logger.warning(f"范围解析失败: {e}, 返回采样数据")
+                # 范围解析失败时，返回采样数据而不是完整数据
+                return self._extract_sample_data(sheet, total_cells)
 
-        # 根据文件大小选择处理策略
+        # 根据文件大小选择处理策略 - 更激进的优化
         if total_cells >= LARGE_FILE_THRESHOLD:
             # 大文件：返回摘要
             return self._generate_summary(sheet)
+        elif total_cells >= MEDIUM_FILE_THRESHOLD:
+            # 中文件：返回采样数据
+            return self._extract_sample_data(sheet, total_cells)
         elif total_cells >= SMALL_FILE_THRESHOLD:
-            # 中文件：返回完整数据+建议
-            full_data = self._extract_full_data(sheet)
-            full_data["size_info"] = {
-                "total_cells": total_cells,
-                "processing_mode": "full_with_warning",
-                "recommendation": f"文件较大({total_cells}个单元格)，建议使用范围选择功能获取特定数据"
-            }
-            return full_data
+            # 小-中文件：返回简化的完整数据（无样式）
+            return self._extract_simplified_data(sheet, total_cells)
         else:
-            # 小文件：直接返回完整数据
+            # 小文件：返回完整数据
             full_data = self._extract_full_data(sheet)
             full_data["size_info"] = {
                 "total_cells": total_cells,
                 "processing_mode": "full",
-                "recommendation": "文件大小适中，已返回完整数据"
+                "recommendation": "文件较小，已返回完整数据包含样式信息"
             }
             return full_data
 
-    def _style_to_dict(self, style) -> Dict[str, Any]:
+    def _extract_optimized_data(self, sheet: Sheet, include_full_data: bool = False,
+                               include_styles: bool = False, preview_rows: int = 5,
+                               max_rows: int | None = None) -> dict[str, Any]:
+        """
+        提取优化后的数据，避免上下文爆炸。
+        """
+        # 基础元数据
+        total_rows = len(sheet.rows)
+        total_cols = len(sheet.rows[0].cells) if sheet.rows else 0
+        total_cells = total_rows * total_cols
+
+        # 提取表头
+        headers = []
+        if sheet.rows:
+            headers = [cell.value if cell.value is not None else f"Column_{i}"
+                      for i, cell in enumerate(sheet.rows[0].cells)]
+
+        # 分析数据类型
+        data_types = self._analyze_data_types(sheet, headers)
+
+        # 基础响应结构
+        response = {
+            "sheet_name": sheet.name,
+            "metadata": {
+                "total_rows": total_rows,
+                "total_cols": total_cols,
+                "total_cells": total_cells,
+                "data_rows": max(0, total_rows - 1),  # 减去表头行
+                "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows),
+                "has_merged_cells": len(sheet.merged_cells) > 0,
+                "merged_cells_count": len(sheet.merged_cells),
+                "preview_rows": min(preview_rows, max(0, total_rows - 1))
+            },
+            "headers": headers,
+            "data_types": data_types,
+            "merged_cells": sheet.merged_cells if len(sheet.merged_cells) <= 10 else sheet.merged_cells[:10]
+        }
+
+        # 根据参数决定返回的数据量
+        if include_full_data:
+            # 返回完整数据
+            data_rows = []
+            start_row = 1 if total_rows > 1 else 0
+            end_row = total_rows
+
+            if max_rows and (end_row - start_row) > max_rows:
+                end_row = start_row + max_rows
+                response["metadata"]["truncated"] = True
+                response["metadata"]["truncated_at"] = max_rows
+
+            for row in sheet.rows[start_row:end_row]:
+                row_data = []
+                for cell in row.cells:
+                    cell_data = {"value": self._value_to_json_serializable(cell.value)}
+                    if include_styles and cell.style:
+                        cell_data["style"] = self._style_to_dict(cell.style)
+                    row_data.append(cell_data)
+                data_rows.append(row_data)
+
+            response["rows"] = data_rows
+            response["metadata"]["returned_rows"] = len(data_rows)
+        else:
+            # 只返回预览数据
+            preview_data = []
+            start_row = 1 if total_rows > 1 else 0
+            end_row = min(start_row + preview_rows, total_rows)
+
+            for row in sheet.rows[start_row:end_row]:
+                row_data = []
+                for cell in row.cells:
+                    # 预览模式下不包含样式，减少数据量
+                    row_data.append(self._value_to_json_serializable(cell.value))
+                preview_data.append(row_data)
+
+            response["preview_rows"] = preview_data
+
+        return response
+
+    def _analyze_data_types(self, sheet: Sheet, headers: list) -> dict[str, str]:
+        """分析每列的数据类型。"""
+        data_types = {}
+
+        if len(sheet.rows) <= 1:
+            return {header: "unknown" for header in headers}
+
+        for col_idx, header in enumerate(headers):
+            types_found = set()
+            sample_count = 0
+
+            # 检查前几行来推断数据类型
+            for row in sheet.rows[1:min(6, len(sheet.rows))]:
+                if col_idx < len(row.cells) and row.cells[col_idx].value is not None:
+                    value = row.cells[col_idx].value
+                    if isinstance(value, str) and value.strip():
+                        types_found.add("text")
+                    elif isinstance(value, (int, float)):
+                        types_found.add("number")
+                    elif isinstance(value, bool):
+                        types_found.add("boolean")
+                    else:
+                        types_found.add("other")
+                    sample_count += 1
+
+            if len(types_found) == 0:
+                data_types[header] = "empty"
+            elif len(types_found) == 1:
+                data_types[header] = list(types_found)[0]
+            else:
+                data_types[header] = "mixed"
+
+        return data_types
+
+    def _extract_sample_data(self, sheet: Sheet, total_cells: int) -> dict[str, Any]:
+        """提取采样数据，用于中等大小的文件。"""
+        # 提取前10行作为样本
+        sample_size = min(10, len(sheet.rows))
+        sample_rows = []
+
+        # 提取表头
+        headers = []
+        if sheet.rows:
+            headers = [cell.value if cell.value is not None else f"Column_{i}"
+                      for i, cell in enumerate(sheet.rows[0].cells)]
+
+        # 提取样本数据
+        for i in range(sample_size):
+            if i < len(sheet.rows):
+                row_data = []
+                for cell in sheet.rows[i].cells:
+                    cell_data = {
+                        "value": self._value_to_json_serializable(cell.value),
+                        "style": self._style_to_dict(cell.style) if cell.style else None
+                    }
+                    row_data.append(cell_data)
+                sample_rows.append(row_data)
+
+        return {
+            "sheet_name": sheet.name,
+            "metadata": {
+                "total_rows": len(sheet.rows),
+                "total_cols": len(sheet.rows[0].cells) if sheet.rows else 0,
+                "total_cells": total_cells,
+                "processing_mode": "sample",
+                "supports_streaming": False
+            },
+            "sample_data": {
+                "headers": headers,
+                "rows": sample_rows,
+                "note": f"显示前{sample_size}行数据作为样本"
+            },
+            "size_info": {
+                "total_cells": total_cells,
+                "processing_mode": "sample",
+                "recommendation": f"文件较大({total_cells}个单元格)，已返回采样数据。如需完整数据，请使用范围选择。"
+            }
+        }
+
+    def _extract_simplified_data(self, sheet: Sheet, total_cells: int) -> dict[str, Any]:
+        """提取简化数据，不包含样式信息。"""
+        # 提取表头
+        headers = []
+        data_rows = []
+
+        if sheet.rows:
+            # 第一行作为表头
+            headers = [cell.value if cell.value is not None else f"Column_{i}"
+                      for i, cell in enumerate(sheet.rows[0].cells)]
+
+            # 其余行作为数据（不包含样式）
+            for row in sheet.rows[1:]:
+                row_data = []
+                for cell in row.cells:
+                    row_data.append(self._value_to_json_serializable(cell.value))
+                data_rows.append(row_data)
+
+        return {
+            "sheet_name": sheet.name,
+            "metadata": {
+                "total_rows": len(sheet.rows),
+                "total_cols": len(sheet.rows[0].cells) if sheet.rows else 0,
+                "total_cells": total_cells,
+                "processing_mode": "simplified",
+                "supports_streaming": False
+            },
+            "data": {
+                "headers": headers,
+                "rows": data_rows
+            },
+            "size_info": {
+                "total_cells": total_cells,
+                "processing_mode": "simplified",
+                "recommendation": "已返回完整数据但不包含样式信息以节省空间。"
+            }
+        }
+
+    def _style_to_dict(self, style) -> dict[str, Any]:
         """
         将Style对象转换为字典格式。
 
@@ -504,14 +765,6 @@ class CoreService:
         if isinstance(value, (datetime, date)):
             return value.isoformat()
         if isinstance(value, list):  # Rich text
-            return "".join(fragment.text for fragment in value)
-        return value
-
-    def _value_to_json_serializable(self, value):
-        """Converts a cell value to a JSON serializable format."""
-        if isinstance(value, (datetime, date)):
-            return value.isoformat()
-        if isinstance(value, list):  # Rich text
             return "".join(str(fragment.text) if hasattr(fragment, 'text') else str(fragment) for fragment in value)
         return value
 
@@ -521,7 +774,7 @@ class CoreService:
 
 
     def _extract_range_data(self, sheet: Sheet, start_row: int, start_col: int,
-                           end_row: int, end_col: int) -> Dict[str, Any]:
+                           end_row: int, end_col: int, include_styles: bool = False) -> dict[str, Any]:
         """提取指定范围的数据。"""
         # 验证范围有效性
         if start_row < 0 or start_col < 0:
@@ -541,11 +794,14 @@ class CoreService:
                 if col_idx < len(row.cells):
                     cell = row.cells[col_idx]
                     cell_data = {
-                        "value": self._value_to_json_serializable(cell.value),
-                        "style": self._style_to_dict(cell.style) if cell.style else None
+                        "value": self._value_to_json_serializable(cell.value)
                     }
+                    if include_styles:
+                        cell_data["style"] = self._style_to_dict(cell.style) if cell.style else None
                 else:
-                    cell_data = {"value": None, "style": None}
+                    cell_data = {"value": None}
+                    if include_styles:
+                        cell_data["style"] = None
                 row_data.append(cell_data)
 
             if row_idx == start_row:
@@ -573,7 +829,7 @@ class CoreService:
             }
         }
 
-    def _generate_summary(self, sheet: Sheet) -> Dict[str, Any]:
+    def _generate_summary(self, sheet: Sheet) -> dict[str, Any]:
         """为大文件生成摘要信息。"""
         total_cells = self._calculate_data_size(sheet)
 
@@ -638,7 +894,7 @@ class CoreService:
             ]
         }
 
-    def _extract_full_data(self, sheet: Sheet) -> Dict[str, Any]:
+    def _extract_full_data(self, sheet: Sheet) -> dict[str, Any]:
         """提取完整的表格数据。"""
         # 提取表头（假设第一行是表头）
         headers = []
@@ -647,7 +903,7 @@ class CoreService:
         if sheet.rows:
             # If there's only one row, treat it as data, not a header.
             if len(sheet.rows) == 1:
-                 headers = [f"Column_{i}" for i, cell in enumerate(sheet.rows[0].cells)]
+                 headers = [f"Column_{i}" for i in range(len(sheet.rows[0].cells))]
                  start_row_index = 0
             else:
                  headers = [cell.value if cell.value is not None else f"Column_{i}"
@@ -723,8 +979,8 @@ class CoreService:
             logger.warning(f"检查流式读取支持时出错: {e}")
             return False
     
-    def _parse_sheet_streaming(self, file_path: str, sheet_name: Optional[str] = None, 
-                              range_string: Optional[str] = None) -> Dict[str, Any]:
+    def _parse_sheet_streaming(self, file_path: str, sheet_name: str | None = None, 
+                              range_string: str | None = None) -> dict[str, Any]:
         """
         使用流式读取器解析表格文件。
         
@@ -798,10 +1054,19 @@ class CoreService:
             logger.error(f"流式解析失败: {e}")
             # 回退到传统方法
             parser = self.parser_factory.get_parser(file_path)
-            sheet = parser.parse(file_path)
-            return self._sheet_to_json(sheet, range_string)
+            sheets = parser.parse(file_path)
+            # 选择指定的工作表或第一个工作表
+            if sheet_name:
+                target_sheet = next((s for s in sheets if s.name == sheet_name), None)
+                if not target_sheet:
+                    raise ValueError(f"工作表 '{sheet_name}' 不存在。")
+            else:
+                if not sheets:
+                    raise ValueError("文件中没有找到任何工作表。")
+                target_sheet = sheets[0]
+            return self._sheet_to_json(target_sheet, range_string)
     
-    def _generate_streaming_summary(self, reader: StreamingTableReader, file_info: Dict[str, Any]) -> Dict[str, Any]:
+    def _generate_streaming_summary(self, reader: StreamingTableReader, file_info: dict[str, Any]) -> dict[str, Any]:
         """
         为大文件生成流式摘要信息。
         

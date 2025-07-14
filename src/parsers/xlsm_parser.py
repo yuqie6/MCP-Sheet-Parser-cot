@@ -17,69 +17,75 @@ logger = logging.getLogger(__name__)
 
 class XlsmParser(XlsxParser):
     """
-    XLSM格式解析器，继承XlsxParser实现。
-    
-    XLSM格式与XLSX在数据和样式方面完全相同，主要区别是包含VBA宏代码。
-    本解析器保留宏信息但不执行，专注于数据和样式提取。
+    XLSM格式解析器，继承自XlsxParser。
+
+    XLSM格式与XLSX在数据和样式方面完全一致，主要区别是包含VBA宏代码。
+    本解析器保留宏信息但不执行，仅专注于数据和样式提取。
     """
     
-    def parse(self, file_path: str) -> Sheet:
+    def parse(self, file_path: str) -> list[Sheet]:
         """
-        解析XLSM文件并返回Sheet对象。
-        
+        解析XLSM文件并返回Sheet对象列表。
+
         Args:
             file_path: XLSM文件路径
-            
+
         Returns:
-            包含完整数据和样式的Sheet对象
-            
+            包含完整数据和样式的Sheet对象列表
+
         Raises:
             RuntimeError: 当解析失败时
         """
         try:
             # 使用keep_vba=True保留宏信息，但不执行
             workbook = openpyxl.load_workbook(file_path, keep_vba=True)
-            worksheet = workbook.active
 
-            if worksheet is None:
-                raise ValueError("工作簿不包含任何活动工作表")
-            
+            if not workbook.worksheets:
+                raise ValueError("工作簿不包含任何工作表")
+
             # 记录宏文件信息（用于调试和日志）
             self._log_macro_info(workbook, file_path)
-            
-            # 解析数据和样式（使用与XlsxParser相同的完整性逻辑）
-            # 获取工作表的实际尺寸，确保包含所有数据和样式
-            max_row = worksheet.max_row or 0
-            max_col = worksheet.max_column or 0
 
-            rows = []
-            # 使用坐标访问方式确保完整的表格结构
-            for row_idx in range(1, max_row + 1):
-                cells = []
-                for col_idx in range(1, max_col + 1):
-                    # 直接通过坐标访问单元格，确保包含空单元格
-                    cell = worksheet.cell(row=row_idx, column=col_idx)
+            sheets = []
 
-                    # 提取单元格值和样式
-                    cell_value = cell.value
-                    cell_style = extract_style(cell)
+            # 解析所有工作表
+            for worksheet in workbook.worksheets:
+                # 解析数据和样式（使用与XlsxParser相同的完整性逻辑）
+                # 获取工作表的实际尺寸，确保包含所有数据和样式
+                max_row = worksheet.max_row or 0
+                max_col = worksheet.max_column or 0
 
-                    # 创建Cell对象
-                    parsed_cell = Cell(
-                        value=cell_value,
-                        style=cell_style
-                    )
-                    cells.append(parsed_cell)
-                rows.append(Row(cells=cells))
-                
-            # 提取合并单元格信息
-            merged_cells = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
+                rows = []
+                # 使用坐标访问方式确保完整的表格结构
+                for row_idx in range(1, max_row + 1):
+                    cells = []
+                    for col_idx in range(1, max_col + 1):
+                        # 直接通过坐标访问单元格，确保包含空单元格
+                        cell = worksheet.cell(row=row_idx, column=col_idx)
 
-            return Sheet(
-                name=worksheet.title,
-                rows=rows,
-                merged_cells=merged_cells
-            )
+                        # 提取单元格值和样式
+                        cell_value = cell.value
+                        cell_style = extract_style(cell)
+
+                        # 创建Cell对象
+                        parsed_cell = Cell(
+                            value=cell_value,
+                            style=cell_style
+                        )
+                        cells.append(parsed_cell)
+                    rows.append(Row(cells=cells))
+
+                # 提取合并单元格信息
+                merged_cells = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
+
+                sheet = Sheet(
+                    name=worksheet.title,
+                    rows=rows,
+                    merged_cells=merged_cells
+                )
+                sheets.append(sheet)
+
+            return sheets
             
         except Exception as e:
             logger.error(f"解析XLSM文件失败: {e}")
@@ -165,24 +171,24 @@ class XlsmParser(XlsxParser):
         return macro_info
     
     def supports_streaming(self) -> bool:
-        """XLSM parser supports streaming (inherits from XLSX)."""
+        """XLSM解析器支持流式处理（继承自XLSX）。"""
         return True
     
     def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> LazySheet:
         """
-        Create a lazy sheet for XLSM that can stream data on demand.
-        XLSM files are processed the same as XLSX files for streaming.
-        
-        Args:
+        为XLSM创建可按需流式读取的惰性表对象。
+        XLSM文件的流式处理方式与XLSX完全一致。
+
+        参数：
             file_path: XLSM文件路径
             sheet_name: 工作表名称（可选）
-            
-        Returns:
+
+        返回：
             LazySheet对象
         """
-        # Use the same streaming implementation as XLSX
+        # 复用XLSX的流式实现
         from .xlsx_parser import XlsxRowProvider
-        
+
         provider = XlsxRowProvider(file_path, sheet_name)
         name = provider._get_worksheet_info()
         merged_cells = provider._get_merged_cells()

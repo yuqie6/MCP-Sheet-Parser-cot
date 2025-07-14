@@ -4,7 +4,7 @@
 定义了项目中使用的所有自定义异常类，提供统一的错误处理机制。
 """
 
-from typing import Any, Optional
+from typing import Any
 
 
 class SheetParserError(Exception):
@@ -14,7 +14,7 @@ class SheetParserError(Exception):
     所有自定义异常都应该继承自这个基类。
     """
     
-    def __init__(self, message: str, error_code: str = None, details: dict[str, Any] = None):
+    def __init__(self, message: str, error_code: str | None = None, details: dict[str, Any] | None = None):
         """
         初始化异常。
         
@@ -95,7 +95,7 @@ class ParseError(SheetParserError):
 class SheetNotFoundError(ParseError):
     """工作表不存在错误。"""
     
-    def __init__(self, sheet_name: str, available_sheets: list[str] = None):
+    def __init__(self, sheet_name: str, available_sheets: list[str] | None = None):
         available = f"可用工作表: {', '.join(available_sheets)}" if available_sheets else ""
         super().__init__(
             f"工作表不存在: '{sheet_name}'. {available}",
@@ -134,7 +134,7 @@ class ConversionError(SheetParserError):
 class HTMLConversionError(ConversionError):
     """HTML转换错误。"""
     
-    def __init__(self, reason: str, sheet_name: str = None):
+    def __init__(self, reason: str, sheet_name: str | None = None):
         super().__init__(
             f"HTML转换失败: {reason}",
             "HTML_CONVERSION_ERROR",
