@@ -42,6 +42,10 @@ def register_tools(server: Server) -> None:
                             "type": "string",
                             "description": "输出HTML文件的路径。如果留空，将在源文件目录中生成一个同名的 .html 文件。"
                         },
+                        "sheet_name": {
+                            "type": "string",
+                            "description": "【可选】要转换的单个工作表的名称。如果留空，将转换文件中的所有工作表。"
+                        },
                         "page_size": {
                             "type": "integer",
                             "description": "【可选】分页时每页显示的行数。默认为100行。用于控制大型文件转换后HTML的单页大小。"
@@ -49,6 +53,10 @@ def register_tools(server: Server) -> None:
                         "page_number": {
                             "type": "integer",
                             "description": "【可选】要查看的页码，从1开始。默认为1。用于浏览大型文件的特定页面。"
+                        },
+                        "header_rows": {
+                            "type": "integer",
+                            "description": "【可选】将文件顶部的指定行数视为表头。默认为 1。"
                         }
                     },
                     "required": ["file_path"]
@@ -150,6 +158,7 @@ async def _handle_convert_to_html(arguments: dict[str, Any], core_service: CoreS
     output_path = arguments.get("output_path")
     page_size = arguments.get("page_size")
     page_number = arguments.get("page_number")
+    sheet_name = arguments.get("sheet_name")
 
     if not file_path:
         return [TextContent(
@@ -158,7 +167,14 @@ async def _handle_convert_to_html(arguments: dict[str, Any], core_service: CoreS
         )]
 
     try:
-        result = core_service.convert_to_html(file_path, output_path, page_size, page_number)
+        result = core_service.convert_to_html(
+            file_path,
+            output_path,
+            sheet_name=sheet_name,
+            page_size=arguments.get("page_size"),
+            page_number=arguments.get("page_number"),
+            header_rows=arguments.get("header_rows", 1)
+        )
         return [TextContent(
             type="text",
             text=json.dumps(result, ensure_ascii=False, indent=2)

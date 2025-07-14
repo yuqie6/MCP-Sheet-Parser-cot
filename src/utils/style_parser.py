@@ -1,14 +1,66 @@
 """
 Utility functions for parsing cell styles from openpyxl objects.
 """
-from typing import Any
-from src.models.table_model import Style
+from typing import Any, Union
+from openpyxl.cell.cell import Cell as OpenpyxlCell, MergedCell as OpenpyxlMergedCell
+from openpyxl.styles.colors import Color
+from src.models.table_model import Style, RichTextFragment, RichTextFragmentStyle, CellValue
 
-def extract_style(cell) -> Style:
+# Define a type hint for cells that can be either a regular or merged cell
+CellLike = Union[OpenpyxlCell, OpenpyxlMergedCell]
+
+def _extract_rich_text(cell: CellLike) -> list[RichTextFragment]:
+    """Extracts rich text fragments from a cell."""
+    fragments = []
+    # MergedCells don't have a value, the top-left cell of a merged range does.
+    # The parser should already be handling this, but we safe-guard here.
+    if not hasattr(cell, 'value') or cell.value is None:
+        return []
+
+    if isinstance(cell.value, list):
+        # Handle rich text
+        for fragment in cell.value:
+            font = fragment.font
+            style = RichTextFragmentStyle(
+                bold=font.bold or False,
+                italic=font.italic or False,
+                underline=font.underline is not None and font.underline != 'none',
+                font_name=font.name,
+                font_size=font.size,
+                font_color=extract_color(font.color) if font.color else None
+            )
+            fragments.append(RichTextFragment(text=fragment.text, style=style))
+    else:
+        # Handle plain text
+        font = cell.font
+        style = RichTextFragmentStyle(
+            bold=font.bold or False,
+            italic=font.italic or False,
+            underline=font.underline is not None and font.underline != 'none',
+            font_name=font.name,
+            font_size=font.size,
+            font_color=extract_color(font.color) if font.color else None
+        )
+        fragments.append(RichTextFragment(text=str(cell.value), style=style))
+    return fragments
+
+def extract_cell_value(cell: CellLike) -> CellValue:
+    """Extracts the cell value, handling rich text if present."""
+    if not hasattr(cell, 'value'):
+        return None
+    if isinstance(cell.value, list):
+        return _extract_rich_text(cell)
+    return cell.value
+
+def extract_style(cell: CellLike) -> Style:
     """
     Extracts comprehensive style information from an openpyxl cell.
+    Handles both regular and merged cells.
     """
     style = Style()
+    if not hasattr(cell, 'has_style') or not cell.has_style:
+        return style
+    
     if cell.font:
         font = cell.font
         style.bold = font.bold if font.bold is not None else False

@@ -8,8 +8,9 @@
 """
 
 import logging
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from .utils.range_parser import parse_range_string
 from .parsers.factory import ParserFactory
@@ -71,9 +72,21 @@ class CoreService:
                 json_data = self._parse_sheet_streaming(str(validated_path), sheet_name, range_string)
             else:
                 # 使用传统方法
-                sheet = parser.parse(str(validated_path))
+                sheets = parser.parse(str(validated_path))
+                
+                # 如果指定了工作表名称，则选择对应的工作表
+                if sheet_name:
+                    target_sheet = next((s for s in sheets if s.name == sheet_name), None)
+                    if not target_sheet:
+                        raise ValueError(f"工作表 '{sheet_name}' 不存在。")
+                # 否则，默认使用第一个工作表
+                else:
+                    if not sheets:
+                        raise ValueError("文件中没有找到任何工作表。")
+                    target_sheet = sheets[0]
+                
                 # 转换为标准化JSON格式
-                json_data = self._sheet_to_json(sheet, range_string)
+                json_data = self._sheet_to_json(target_sheet, range_string)
             
             # 缓存解析结果
             cache_manager.set(file_path, json_data, range_string, sheet_name)
@@ -86,8 +99,9 @@ class CoreService:
             raise
 
     def convert_to_html(self, file_path: str, output_path: Optional[str] = None,
+                       sheet_name: Optional[str] = None,
                        page_size: Optional[int] = None, page_number: Optional[int] = None,
-                       header_rows: int = 1) -> Dict[str, Any]:
+                       header_rows: int = 1) -> List[Dict[str, Any]]:
         """
         将表格文件转换为HTML文件。
 
@@ -113,24 +127,42 @@ class CoreService:
 
             # 获取解析器并解析
             parser = self.parser_factory.get_parser(file_path)
-            sheet = parser.parse(file_path)
+            sheets: List[Sheet] = parser.parse(file_path)
 
-            # 检查是否需要分页处理
+            # Filter sheets if a specific sheet_name is provided
+            sheets_to_convert = sheets
+            if sheet_name:
+                sheets_to_convert = [s for s in sheets if s.name == sheet_name]
+                if not sheets_to_convert:
+                    raise ValueError(f"工作表 '{sheet_name}' 在文件中未找到。")
+
+            # When converting a single sheet from a multi-sheet workbook,
+            # the output file name should reflect the sheet name.
+            if len(sheets_to_convert) == 1 and len(sheets) > 1:
+                 output_p = Path(output_path)
+                 final_output_path = str(output_p.parent / f"{output_p.stem}-{sheets_to_convert[0].name}{output_p.suffix or '.html'}")
+            else:
+                 final_output_path = output_path
+                 
+            # 检查是否需要分页处理 (分页仅对第一个符合条件的工作表生效)
             if page_size is not None and page_size > 0:
                 # 使用分页HTML转换器
                 from .converters.paginated_html_converter import PaginatedHTMLConverter
                 html_converter = PaginatedHTMLConverter(
                     compact_mode=False,
                     page_size=page_size,
-                    page_number=page_number or 1
+                    page_number=page_number or 1,
+                    header_rows=header_rows
                 )
+                # Paginated converter still works on a single sheet
+                result = html_converter.convert_to_file(sheets_to_convert[0], final_output_path)
+                return [result] # Return as a list
             else:
                 # 使用标准HTML转换器
                 html_converter = HTMLConverter(compact_mode=False, header_rows=header_rows)
+                results = html_converter.convert_to_files(sheets_to_convert, final_output_path)
 
-            result = html_converter.convert_to_file(sheet, output_path)
-
-            return result
+            return results
 
         except Exception as e:
             logger.error(f"HTML转换失败: {e}")
@@ -296,7 +328,16 @@ class CoreService:
 
         # 打开现有的工作簿
         workbook = openpyxl.load_workbook(file_path)
-        worksheet = workbook.active
+
+        # 根据提供的sheet_name选择正确的工作表
+        sheet_name_to_write = table_model_json.get("sheet_name")
+        if not sheet_name_to_write:
+            raise ValueError("table_model_json 中必须包含 'sheet_name' 字段。")
+        
+        if sheet_name_to_write in workbook.sheetnames:
+            worksheet = workbook[sheet_name_to_write]
+        else:
+            raise ValueError(f"工作表 '{sheet_name_to_write}' 在文件中不存在。")
 
         # 清除现有数据（保留样式）
         max_row = worksheet.max_row
@@ -458,6 +499,22 @@ class CoreService:
 
         return style_dict
 
+    def _value_to_json_serializable(self, value):
+        """Converts a cell value to a JSON serializable format."""
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+        if isinstance(value, list):  # Rich text
+            return "".join(fragment.text for fragment in value)
+        return value
+
+    def _value_to_json_serializable(self, value):
+        """Converts a cell value to a JSON serializable format."""
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+        if isinstance(value, list):  # Rich text
+            return "".join(str(fragment.text) if hasattr(fragment, 'text') else str(fragment) for fragment in value)
+        return value
+
     def _calculate_data_size(self, sheet: Sheet) -> int:
         """计算表格的总单元格数。"""
         return sum(len(row.cells) for row in sheet.rows)
@@ -484,7 +541,7 @@ class CoreService:
                 if col_idx < len(row.cells):
                     cell = row.cells[col_idx]
                     cell_data = {
-                        "value": cell.value,
+                        "value": self._value_to_json_serializable(cell.value),
                         "style": self._style_to_dict(cell.style) if cell.style else None
                     }
                 else:
@@ -528,7 +585,7 @@ class CoreService:
             row_data = []
             for cell in row.cells:
                 cell_data = {
-                    "value": cell.value,
+                    "value": self._value_to_json_serializable(cell.value),
                     "style": self._style_to_dict(cell.style) if cell.style else None
                 }
                 row_data.append(cell_data)
@@ -545,7 +602,7 @@ class CoreService:
             types_found = set()
             for row in sheet.rows[1:6]:  # 检查前5行数据
                 if col_idx < len(row.cells) and row.cells[col_idx].value is not None:
-                    value = row.cells[col_idx].value
+                    value = self._value_to_json_serializable(row.cells[col_idx].value)
                     if isinstance(value, str):
                         types_found.add("text")
                     elif isinstance(value, (int, float)):
@@ -585,22 +642,28 @@ class CoreService:
         """提取完整的表格数据。"""
         # 提取表头（假设第一行是表头）
         headers = []
-        if sheet.rows:
-            first_row = sheet.rows[0]
-            headers = [cell.value if cell.value is not None else f"Column_{i}"
-                      for i, cell in enumerate(first_row.cells)]
-
-        # 提取数据行
         data_rows = []
-        for row_idx, row in enumerate(sheet.rows[1:], 1):  # 跳过表头行
-            row_data = []
-            for cell in row.cells:
-                cell_data = {
-                    "value": cell.value,
-                    "style": self._style_to_dict(cell.style) if cell.style else None
-                }
-                row_data.append(cell_data)
-            data_rows.append(row_data)
+        
+        if sheet.rows:
+            # If there's only one row, treat it as data, not a header.
+            if len(sheet.rows) == 1:
+                 headers = [f"Column_{i}" for i, cell in enumerate(sheet.rows[0].cells)]
+                 start_row_index = 0
+            else:
+                 headers = [cell.value if cell.value is not None else f"Column_{i}"
+                           for i, cell in enumerate(sheet.rows[0].cells)]
+                 start_row_index = 1
+
+            # 提取数据行
+            for row in sheet.rows[start_row_index:]:
+                row_data = []
+                for cell in row.cells:
+                    cell_data = {
+                        "value": self._value_to_json_serializable(cell.value),
+                        "style": self._style_to_dict(cell.style) if cell.style else None
+                    }
+                    row_data.append(cell_data)
+                data_rows.append(row_data)
 
         return {
             "sheet_name": sheet.name,
@@ -704,7 +767,7 @@ class CoreService:
                         row_data = []
                         for cell in row.cells:
                             cell_data = {
-                                "value": cell.value,
+                                "value": self._value_to_json_serializable(cell.value),
                                 "style": self._style_to_dict(cell.style) if cell.style else None
                             }
                             row_data.append(cell_data)
@@ -762,7 +825,7 @@ class CoreService:
                 row_data = []
                 for cell in row.cells:
                     cell_data = {
-                        "value": cell.value,
+                        "value": self._value_to_json_serializable(cell.value),
                         "style": self._style_to_dict(cell.style) if cell.style else None
                     }
                     row_data.append(cell_data)

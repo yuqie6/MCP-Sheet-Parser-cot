@@ -6,10 +6,19 @@ XLSX解析器模块
 """
 
 import openpyxl
-from typing import Iterator, Optional
-from src.models.table_model import Sheet, Row, Cell, LazySheet
+from openpyxl.utils import get_column_letter
+from typing import Iterator, Optional, List
+import io
+import matplotlib.pyplot as plt
+from openpyxl.chart.bar_chart import BarChart
+from openpyxl.chart.line_chart import LineChart
+from openpyxl.chart.pie_chart import PieChart
+from openpyxl.chart.area_chart import AreaChart
+from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.drawing.image import Image as OpenpyxlImage
+from src.models.table_model import Sheet, Row, Cell, LazySheet, Chart
 from src.parsers.base_parser import BaseParser
-from src.utils.style_parser import extract_style
+from src.utils.style_parser import extract_style, extract_cell_value
 
 
 class XlsxRowProvider:
@@ -53,7 +62,8 @@ class XlsxRowProvider:
         for cell in row_cells:
             cell_value = cell.value
             cell_style = extract_style(cell) if cell else None
-            cells.append(Cell(value=cell_value, style=cell_style))
+            formula = cell.formula if isinstance(cell, openpyxl.cell.cell.Cell) and cell.is_date() is False and cell.data_type == 'f' else None
+            cells.append(Cell(value=cell_value, style=cell_style, formula=formula))
         return Row(cells=cells)
 
     def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
@@ -141,67 +151,208 @@ class XlsxParser(BaseParser):
     XlsxRowProvider.
     """
 
-    def parse(self, file_path: str) -> Sheet:
+    def parse(self, file_path: str) -> list[Sheet]:
         """
-        Parses an XLSX file and returns a Sheet object.
-
-        This method loads the entire file into memory to parse its content
-        and styles. For large files, consider using `create_lazy_sheet`.
-
-        Args:
-            file_path: The absolute path to the XLSX file.
-
-        Returns:
-            A Sheet object containing the full data and styles.
-
-        Raises:
-            ValueError: If the workbook contains no active worksheet.
-            FileNotFoundError: If the file does not exist.
+        Parses an XLSX file and returns a list of Sheet objects, one for each sheet.
         """
-        workbook = openpyxl.load_workbook(file_path)
-        worksheet = workbook.active
+        try:
+            workbook = openpyxl.load_workbook(file_path, data_only=False)
+            data_only_workbook = openpyxl.load_workbook(file_path, data_only=True)
+        except Exception as e:
+            raise IOError(f"无法加载Excel文件: {e}")
 
-        if worksheet is None:
-            raise ValueError("工作簿不包含任何活动工作表")
+        sheets = []
+        for sheet_name in workbook.sheetnames:
+            worksheet = workbook[sheet_name]
+            data_only_worksheet = data_only_workbook[sheet_name]
+            
+            # ... (rest of the parsing logic for a single sheet)
+            # This part needs to be encapsulated into a helper method
+            
+            sheet = self._parse_sheet(worksheet, data_only_worksheet)
+            sheets.append(sheet)
+            
+        return sheets
 
-        # 获取工作表的实际尺寸，确保包含所有数据和样式
+    def _parse_sheet(self, worksheet: Worksheet, data_only_worksheet: Worksheet) -> Sheet:
+        """Helper method to parse a single worksheet."""
+        # Get sheet dimensions
         max_row = worksheet.max_row or 0
         max_col = worksheet.max_column or 0
 
-        # 性能警告：对于大型稀疏表格
-        total_cells = max_row * max_col
-        if total_cells > 100000:  # 10万个单元格
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"解析大型表格 ({max_row}x{max_col}={total_cells:,}个单元格)，可能消耗较多内存")
-
+        # Parse rows and cells
         rows = []
-        # 使用坐标访问方式确保完整的表格结构
         for row_idx in range(1, max_row + 1):
             cells = []
             for col_idx in range(1, max_col + 1):
-                # 直接通过坐标访问单元格，确保包含空单元格
                 cell = worksheet.cell(row=row_idx, column=col_idx)
-
-                # 提取单元格值和样式
-                cell_value = cell.value
+                data_cell = data_only_worksheet.cell(row=row_idx, column=col_idx)
+                
                 cell_style = extract_style(cell)
-
-                # 创建包含样式的Cell对象
+                
+                if cell.data_type == 'f' and cell.value:
+                    cell_value = data_cell.value
+                    formula = str(cell.value)
+                else:
+                    cell_value = extract_cell_value(cell)
+                    formula = None
+                
                 parsed_cell = Cell(
                     value=cell_value,
-                    style=cell_style
+                    style=cell_style,
+                    formula=formula
                 )
                 cells.append(parsed_cell)
             rows.append(Row(cells=cells))
 
+        # Extract other sheet properties
         merged_cells = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
+        
+        column_widths = {col_idx - 1: worksheet.column_dimensions[get_column_letter(col_idx)].width 
+                         for col_idx in range(1, max_col + 1) if worksheet.column_dimensions[get_column_letter(col_idx)].width}
+                         
+        row_heights = {row_idx - 1: worksheet.row_dimensions[row_idx].height 
+                       for row_idx in range(1, max_row + 1) if worksheet.row_dimensions[row_idx].height}
+
+        default_col_width = worksheet.sheet_format.defaultColWidth or 8.43
+        default_row_height = worksheet.sheet_format.defaultRowHeight or 18.0
+        
+        # Extract images and charts
+        charts = self._extract_charts(worksheet)
+        images = self._extract_images(worksheet)
+        # Combine them, perhaps differentiating by type if needed in the model
+        all_visuals = charts + images
 
         return Sheet(
             name=worksheet.title,
             rows=rows,
-            merged_cells=merged_cells
+            merged_cells=merged_cells,
+            charts=all_visuals, # Use the combined list
+            column_widths=column_widths,
+            row_heights=row_heights,
+            default_column_width=default_col_width,
+            default_row_height=default_row_height
         )
+
+    def _extract_images(self, worksheet: Worksheet) -> list[Chart]:
+        """Extracts embedded images from the worksheet."""
+        images = []
+        for image in worksheet._images:
+            if isinstance(image, OpenpyxlImage):
+                try:
+                    # The image data is already in bytes
+                    img_data = image.ref
+                    
+                    # Create a Chart object to represent the image
+                    # We can use the 'image' type to distinguish from charts
+                    image_chart = Chart(
+                        name=f"Image {len(images) + 1}",
+                        type="image",
+                        image_data=img_data,
+                        anchor=f"{image.anchor.to_row}{image.anchor.to_col}"
+                    )
+                    images.append(image_chart)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to extract an image: {e}")
+        return images
+
+
+    
+    def _extract_charts(self, worksheet) -> list[Chart]:
+        """Extracts charts from the worksheet and renders them as images."""
+        charts = []
+        for chart_drawing in worksheet._charts:
+            chart_type = "unknown"
+            if isinstance(chart_drawing, BarChart):
+                chart_type = 'bar'
+            elif isinstance(chart_drawing, LineChart):
+                chart_type = 'line'
+            elif isinstance(chart_drawing, PieChart):
+                chart_type = 'pie'
+            elif isinstance(chart_drawing, AreaChart):
+                chart_type = 'area'
+
+            try:
+                img_data = self._render_chart(chart_drawing)
+                charts.append(Chart(
+                    name=chart_drawing.title or f"Chart {len(charts) + 1}",
+                    type=chart_type,
+                    image_data=img_data,
+                    anchor=chart_drawing.anchor.cell
+                ))
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to render chart {chart_drawing.title}: {e}")
+
+        return charts
+
+    def _render_chart(self, chart) -> Optional[bytes]:
+        """Renders a chart to an image using matplotlib."""
+        fig, ax = plt.subplots()
+
+        try:
+            if isinstance(chart, (BarChart, LineChart, AreaChart)):
+                for series in chart.series:
+                    # 确保xVal和yVal存在且包含数据
+                    if series.xVal and series.xVal.numRef:
+                        x = [p.v for p in series.xVal.numRef.get_rows()]
+                    elif series.xVal and series.xVal.strRef:
+                        x = [str(p.v) for p in series.xVal.strRef.get_rows()]
+                    else:
+                        # 如果没有x轴数据，则使用默认的序列
+                        x = range(len(series.yVal.numRef.get_rows()))
+
+                    if series.yVal and series.yVal.numRef:
+                        y = [p.v for p in series.yVal.numRef.get_rows()]
+                    else:
+                        # 没有y轴数据，无法绘制
+                        continue
+                    
+                    series_label = series.tx.v if series.tx else f"Series {len(ax.lines) + 1}"
+
+                    if isinstance(chart, BarChart):
+                        ax.bar(x, y, label=series_label)
+                    elif isinstance(chart, LineChart):
+                        ax.plot(x, y, label=series_label)
+                    elif isinstance(chart, AreaChart):
+                        ax.fill_between(x, y, label=series_label, alpha=0.4)
+
+                ax.set_title(str(chart.title) if chart.title else "Chart")
+                if chart.x_axis and chart.x_axis.title and hasattr(chart.x_axis.title, 'tx') and chart.x_axis.title.tx.rich:
+                    ax.set_xlabel(chart.x_axis.title.tx.rich.p[0].r.t)
+                if chart.y_axis and chart.y_axis.title and hasattr(chart.y_axis.title, 'tx') and chart.y_axis.title.tx.rich:
+                    ax.set_ylabel(chart.y_axis.title.tx.rich.p[0].r.t)
+                ax.legend()
+
+            elif isinstance(chart, PieChart):
+                if chart.series and chart.series[0].xVal and chart.series[0].yVal:
+                    labels = [p.v for p in chart.series[0].xVal.strRef.get_rows()]
+                    sizes = [p.v for p in chart.series[0].yVal.numRef.get_rows()]
+                    ax.pie(sizes, labels=labels, autopct='%1.1f%%')
+                    ax.set_title(str(chart.title) if chart.title else "Chart")
+                else:
+                    raise ValueError("Pie chart data is missing or invalid.")
+
+            else:
+                # 不支持的图表类型
+                plt.close(fig)
+                return None
+
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            plt.close(fig)
+            buf.seek(0)
+            return buf.getvalue()
+        
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to render chart '{chart.title}': {e}")
+            plt.close(fig)  # 确保在异常时关闭图形
+            return None
 
     
     def supports_streaming(self) -> bool:

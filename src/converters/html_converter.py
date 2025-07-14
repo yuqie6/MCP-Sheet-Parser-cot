@@ -8,8 +8,10 @@ import datetime
 import logging
 import re
 from pathlib import Path
-from typing import Any
-from src.models.table_model import Sheet, Cell, Style
+from typing import Any, Union, Callable, List
+from datetime import datetime as dt, timedelta
+import base64
+from src.models.table_model import Sheet, Cell, Style, Chart, RichTextFragment
 from src.utils.range_parser import parse_range_string
 from src.constants import StyleConstants, HTMLConstants, Limits
 from src.exceptions import HTMLConversionError, ValidationError
@@ -63,6 +65,16 @@ DATE_FORMAT_MAP = {
     "dd-mm-yyyy": "%d-%m-%Y",
 }
 
+# 中文日期格式处理函数
+def format_chinese_date(date_obj: dt, format_str: str) -> str:
+    """格式化中文日期"""
+    if 'm"月"d"日"' in format_str:
+        return f"{date_obj.month}月{date_obj.day}日"
+    elif 'yyyy"年"m"月"d"日"' in format_str:
+        return f"{date_obj.year}年{date_obj.month}月{date_obj.day}日"
+    else:
+        return f"{date_obj.month}月{date_obj.day}日"
+
 
 
 class HTMLConverter:
@@ -79,46 +91,65 @@ class HTMLConverter:
         self.compact_mode = compact_mode
         self.header_rows = header_rows
     
-    def convert_to_file(self, sheet: Sheet, output_path: str) -> dict[str, Any]:
+    def convert_to_files(self, sheets: List[Sheet], output_path: str) -> List[dict[str, Any]]:
         """
-        将Sheet对象转换为HTML文件。
+        将多个Sheet对象转换为多个HTML文件。
         
         Args:
-            sheet: Sheet对象
-            output_path: 输出文件路径
+            sheets: Sheet对象列表
+            output_path: 输出文件路径模板
             
         Returns:
-            转换结果信息
+            转换结果信息列表
         """
-        try:
-            # 生成HTML内容
-            html_content = self._generate_html(sheet)
-            
-            # 写入文件
-            output_file = Path(output_path)
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(output_file, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            
-            # 计算文件大小
-            file_size = output_file.stat().st_size
-            
-            return {
-                "status": "success",
-                "output_path": str(output_file.absolute()),
-                "file_size": file_size,
-                "file_size_kb": round(file_size / 1024, 2),
-                "sheet_name": sheet.name,
-                "rows_converted": len(sheet.rows),
-                "cells_converted": sum(len(row.cells) for row in sheet.rows),
-                "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows),
-                "has_merged_cells": len(sheet.merged_cells) > 0
-            }
-            
-        except Exception as e:
-            logger.error(f"HTML转换失败: {e}")
-            raise RuntimeError(f"HTML转换失败: {str(e)}")
+        results = []
+        output_p = Path(output_path)
+        
+        # Determine base name and extension
+        base_name = output_p.stem
+        extension = output_p.suffix or '.html'
+
+        for i, sheet in enumerate(sheets):
+            # Generate a unique path for each sheet
+            if len(sheets) > 1:
+                sheet_output_path = output_p.parent / f"{base_name}-{sheet.name}{extension}"
+            else:
+                sheet_output_path = output_p
+
+            try:
+                # Generate HTML content
+                html_content = self._generate_html(sheet)
+                
+                # Write file
+                sheet_output_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                with open(sheet_output_path, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                
+                # Calculate file size
+                file_size = sheet_output_path.stat().st_size
+                
+                results.append({
+                    "status": "success",
+                    "output_path": str(sheet_output_path.absolute()),
+                    "file_size": file_size,
+                    "file_size_kb": round(file_size / 1024, 2),
+                    "sheet_name": sheet.name,
+                    "rows_converted": len(sheet.rows),
+                    "cells_converted": sum(len(row.cells) for row in sheet.rows),
+                    "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows),
+                    "has_merged_cells": len(sheet.merged_cells) > 0
+                })
+                
+            except Exception as e:
+                logger.error(f"HTML转换失败 for sheet '{sheet.name}': {e}")
+                results.append({
+                    "status": "error",
+                    "sheet_name": sheet.name,
+                    "error": str(e)
+                })
+        
+        return results
     
     def _generate_html(self, sheet: Sheet) -> str:
         """
@@ -134,11 +165,14 @@ class HTMLConverter:
         styles = self._collect_styles(sheet)
         
         # 生成CSS
-        css_content = self._generate_css(styles)
+        css_content = self._generate_css(styles, sheet)
         
         # 生成表格HTML
         table_html = self._generate_table(sheet, styles)
         
+        # 生成图表HTML
+        charts_html = self._generate_charts_html(sheet.charts)
+
         # 组装完整HTML
         html_template = self._get_html_template()
         
@@ -146,6 +180,7 @@ class HTMLConverter:
             title=f"表格: {sheet.name}",
             css_styles=css_content,
             table_content=table_html,
+            charts_content=charts_html,
             sheet_name=sheet.name
         )
         
@@ -229,6 +264,8 @@ class HTMLConverter:
             key_parts.append(f"nf:{style.number_format}")
 
         # 进阶功能
+        if style.formula:
+            key_parts.append(f"formula:{style.formula}")
         if style.hyperlink:
             key_parts.append(f"link:{style.hyperlink}")
         if style.comment:
@@ -236,13 +273,14 @@ class HTMLConverter:
 
         return "|".join(key_parts) if key_parts else "default"
     
-    def _generate_css(self, styles: dict[str, Style]) -> str:
+    def _generate_css(self, styles: dict[str, Style], sheet: Sheet | None = None) -> str:
         """
         生成CSS样式。
-        
+
         Args:
             styles: 样式字典
-            
+            sheet: Sheet对象，用于获取尺寸信息
+
         Returns:
             CSS字符串
         """
@@ -252,25 +290,69 @@ class HTMLConverter:
         css_rules.append("""
         table {
             border-collapse: collapse;
-            width: 100%;
             font-family: Arial, sans-serif;
             color: #000000 !important;  /* 强制默认文字颜色为黑色 */
+            table-layout: fixed;  /* 固定表格布局，以精确控制列宽 */
+            width: auto;  /* 让表格宽度由列宽之和决定 */
+            margin: 20px 0;  /* 表格上下边距 */
         }
         th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
+            border: 1px solid #333;  /* 更深的边框颜色 */
+            padding: 8px 12px;  /* 增加内边距 */
             text-align: left;
             color: #000000 !important;  /* 强制确保默认文字颜色为黑色 */
+            min-width: 60px;  /* 减小最小宽度 */
+            max-width: none;  /* 移除最大宽度限制 */
+            word-wrap: break-word;  /* 自动换行 */
+            overflow: visible;  /* 允许内容可见 */
+            white-space: normal;  /* 允许正常换行 */
+            vertical-align: middle;  /* 默认垂直居中对齐 */
         }
         th {
-            background-color: #f2f2f2;
+            background-color: #f8f9fa;  /* 更好的表头背景色 */
             font-weight: bold;
             color: #000000 !important;  /* 强制表头文字为黑色 */
+            height: 20px;  /* 固定表头高度，更扁 */
+            text-align: center;  /* 表头居中对齐 */
+            font-size: 11pt;  /* 统一表头字体大小 */
+        }
+        td {
+            height: 18px;  /* 固定单元格高度，更扁 */
+            font-size: 10pt;  /* 统一单元格字体大小 */
+        }
+        /* 允许包含换行的单元格正常显示 */
+        .wrap-text {
+            white-space: pre-wrap !important;
+            height: auto !important;
+            min-height: 18px !important;  /* 与普通单元格高度一致 */
         }
         /* 覆盖可能的暗色主题影响 */
         body {
             color: #000000 !important;
             background-color: #ffffff !important;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.1;  /* 减少行高，让表格更紧凑 */
+        }
+        /* 表格容器样式 */
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        /* 公式单元格样式 */
+        .formula-cell {
+            background-color: #f0f8ff !important;
+            font-style: italic;
+        }
+        /* 数字单元格样式 */
+        .number-cell {
+            text-align: right;
+        }
+        /* 日期单元格样式 */
+        .date-cell {
+            text-align: center;
         }
         """)
         
@@ -291,6 +373,7 @@ class HTMLConverter:
                 # 验证和格式化颜色
                 formatted_color = self._format_color(style.font_color)
                 css_rule += f" color: {formatted_color} !important;"
+            
             if style.bold:
                 css_rule += " font-weight: bold;"
             if style.italic:
@@ -326,6 +409,41 @@ class HTMLConverter:
             css_rule += " }"
             css_rules.append(css_rule)
         
+        # 添加列宽和行高的CSS
+        if sheet:
+            css_rules.append(self._generate_dimension_css(sheet))
+
+        return "\n".join(css_rules)
+
+    def _generate_dimension_css(self, sheet: Sheet) -> str:
+        """
+        生成列宽和行高的CSS样式。
+
+        Args:
+            sheet: Sheet对象
+
+        Returns:
+            尺寸CSS字符串
+        """
+        css_rules = []
+
+        # Excel列宽单位是字符数，转换为像素 (基于Calibri 11pt字体，1个单位约等于8.43像素)
+        # 这是一个近似值，实际效果可能因字体而异
+        excel_to_px = 8.43 
+
+        # 生成列宽CSS
+        for col_idx, width in sheet.column_widths.items():
+            if width > 0:
+                width_px = width * excel_to_px
+                # 使用max-width和min-width来更好地控制
+                css_rules.append(f"table td:nth-child({col_idx + 1}), table th:nth-child({col_idx + 1}) {{ width: {width_px:.0f}px; min-width: {width_px:.0f}px; }}")
+
+        # 生成行高CSS
+        for row_idx, height in sheet.row_heights.items():
+            if height > 0:
+                # Excel行高单位是点(pt)，直接使用
+                css_rules.append(f"table tr:nth-child({row_idx + 1}) {{ height: {height}pt; }}")
+
         return "\n".join(css_rules)
 
     def _generate_border_css(self, style: Style) -> str:
@@ -340,8 +458,8 @@ class HTMLConverter:
         """
         border_css = ""
 
-        # 边框颜色
-        border_color = style.border_color if style.border_color else "#000000"
+        # 边框颜色 - 使用更深的默认颜色以确保可见性
+        border_color = self._format_color(style.border_color) if style.border_color else "#333333"
 
         # 处理各个边框
         if style.border_top:
@@ -557,6 +675,21 @@ class HTMLConverter:
         
         return "\n".join(table_parts)
 
+    def _generate_charts_html(self, charts: list[Chart]) -> str:
+        """Generates HTML for embedding charts."""
+        if not charts:
+            return ""
+
+        charts_html_parts = ['<h2>Charts</h2>']
+        for chart in charts:
+            if chart.image_data:
+                img_base64 = base64.b64encode(chart.image_data).decode('utf-8')
+                charts_html_parts.append(f'<h3>{self._escape_html(chart.name)}</h3>')
+                charts_html_parts.append(f'<img src="data:image/png;base64,{img_base64}" alt="{self._escape_html(chart.name)}">')
+        
+        return "\n".join(charts_html_parts)
+
+
     def _generate_rows_html(self, table_parts: list, rows: list, occupied_cells: set,
                            merged_cells_map: dict, style_key_to_id_map: dict,
                            is_header: bool = False, row_offset: int = 0):
@@ -582,11 +715,18 @@ class HTMLConverter:
 
                 # 确定样式类
                 style_class = ""
+                css_classes = []
                 if cell.style:
                     style_key = self._get_style_key(cell.style)
                     style_id = style_key_to_id_map.get(style_key)
                     if style_id:
-                        style_class = f' class="{style_id}"'
+                        css_classes.append(style_id)
+                    # 添加wrap-text类用于需要换行的单元格
+                    if cell.style.wrap_text:
+                        css_classes.append("wrap-text")
+
+                if css_classes:
+                    style_class = f' class="{" ".join(css_classes)}"'
 
                 span_attrs = ""
                 if (actual_row_idx, c_idx) in merged_cells_map:
@@ -616,17 +756,27 @@ class HTMLConverter:
             单元格HTML字符串
         """
         # 处理单元格值并转义HTML
-        formatted_value = self._format_cell_value(cell)
-        cell_value = self._escape_html(formatted_value)
-
-        # 处理超链接
-        if cell.style and cell.style.hyperlink:
-            # 转义超链接URL
-            href = self._escape_html(cell.style.hyperlink)
-            cell_content = f'<a href="{href}">{cell_value}</a>'
+        # 注意：富文本在_format_cell_value中已经处理和转义，这里我们直接使用
+        if isinstance(cell.value, list):
+            # For rich text, the value is already formatted HTML
+            cell_content = self._format_cell_value(cell)
         else:
-            cell_content = cell_value
+            # For plain text, format and escape
+            formatted_value = self._format_cell_value(cell)
+            cell_content = self._escape_html(formatted_value)
 
+        # 处理公式显示 - 显示计算结果，公式放在悬停提示中
+        is_formula = cell.formula or (isinstance(cell.value, str) and (cell.value.startswith('=') or cell.value.startswith('==')))
+
+        if cell.formula:
+            # For formula cells, we still display the formatted value, which is now handled correctly.
+            pass # The content is already set
+        elif cell.style and cell.style.hyperlink:
+            # 处理超链接
+            href = self._escape_html(cell.style.hyperlink)
+            # Make sure not to double-escape rich text
+            cell_content = f'<a href="{href}">{cell_content}</a>'
+        
         # 处理注释（工具提示）
         title_attr = ""
         if cell.style and cell.style.comment:
@@ -634,6 +784,15 @@ class HTMLConverter:
             comment = self._escape_html(cell.style.comment)
             title_attr = f' title="{comment}"'
 
+        # 如果有公式，也添加到title属性中，以便悬停查看
+        if cell.formula:
+            formula_escaped = self._escape_html(cell.formula)
+            if title_attr:
+                # 如果已有title（来自comment），则追加
+                title_attr = f'{title_attr} | Formula: {formula_escaped}"'
+            else:
+                title_attr = f' title="Formula: {formula_escaped}"'
+        
         # 处理数字格式（作为data属性）
         data_attr = ""
         if cell.style and cell.style.number_format:
@@ -644,39 +803,53 @@ class HTMLConverter:
         # 选择合适的标签
         tag = 'th' if is_header else 'td'
         return f'<{tag}{style_class}{span_attrs}{title_attr}{data_attr}>{cell_content}</{tag}>'
-
+        
+        
     def _format_cell_value(self, cell: Cell) -> str:
         """
-        格式化单元格值，支持数字和日期格式。
-
-        Args:
-            cell: 单元格对象
-
-        Returns:
-            格式化后的字符串
+        Formats the cell value, handling rich text and other types.
         """
+        if isinstance(cell.value, list):
+            # Handle rich text by creating styled spans
+            return "".join(self._format_rich_text_fragment(f) for f in cell.value)
+        
         if cell.value is None:
             return ""
 
-        # 如果有数字格式，尝试应用格式化
+        # Apply number formatting if applicable
         if cell.style and cell.style.number_format:
             try:
                 return self._apply_number_format(cell.value, cell.style.number_format)
             except Exception:
-                # 格式化失败，使用默认格式
-                pass
+                pass  # Fallback to default formatting on error
 
-        # 默认格式化
+        # Default formatting for common types
         if isinstance(cell.value, float):
-            # 浮点数保留合理的小数位数
-            if cell.value.is_integer():
-                return str(int(cell.value))
-            else:
-                return f"{cell.value:.2f}".rstrip('0').rstrip('.')
-        elif isinstance(cell.value, int):
-            return str(cell.value)
-        else:
-            return str(cell.value)
+            return f"{cell.value:.2f}".rstrip('0').rstrip('.') if not cell.value.is_integer() else str(int(cell.value))
+        
+        return str(cell.value)
+
+
+    def _format_rich_text_fragment(self, fragment: RichTextFragment) -> str:
+        """Formats a single rich text fragment into a styled HTML span."""
+        style = fragment.style
+        css_parts = []
+        if style.font_name:
+            css_parts.append(f"font-family: {self._format_font_family(style.font_name)};")
+        if style.font_size:
+            css_parts.append(f"font-size: {self._format_font_size(style.font_size)};")
+        if style.font_color:
+            css_parts.append(f"color: {self._format_color(style.font_color)};")
+        if style.bold:
+            css_parts.append("font-weight: bold;")
+        if style.italic:
+            css_parts.append("font-style: italic;")
+        if style.underline:
+            css_parts.append("text-decoration: underline;")
+        
+        style_attr = f'style="{" ".join(css_parts)}"' if css_parts else ""
+        return f'<span {style_attr}>{self._escape_html(fragment.text)}</span>'
+
 
     def _apply_number_format(self, value, number_format: str) -> str:
         """
@@ -695,18 +868,41 @@ class HTMLConverter:
         if number_format in NUMBER_FORMAT_MAP:
             return NUMBER_FORMAT_MAP[number_format](value)
 
+        # 处理Excel日期序列号（数字形式的日期）
+        if isinstance(value, (int, float)) and ("月" in number_format and "日" in number_format):
+            try:
+                # Excel的日期基准是1900年1月1日（但实际上是1899年12月30日）
+                excel_epoch = dt(1899, 12, 30)
+                date_obj = excel_epoch + timedelta(days=value)
+
+                # 使用中文日期格式函数
+                return format_chinese_date(date_obj, number_format)
+            except Exception:
+                pass
+
         # 检查是否为日期格式
-        if isinstance(value, datetime.datetime):
+        if isinstance(value, dt):
+            # 检查中文日期格式
+            if "月" in number_format and "日" in number_format:
+                return format_chinese_date(value, number_format)
+
+            # 检查标准日期格式
             if "yyyy" in number_format.lower() or "mm" in number_format.lower() or "dd" in number_format.lower():
                 format_lower = number_format.lower()
-                for excel_fmt, python_fmt in DATE_FORMAT_MAP.items():
+                for excel_fmt, formatter in DATE_FORMAT_MAP.items():
                     if excel_fmt in format_lower:
-                        return value.strftime(python_fmt)
+                        return value.strftime(str(formatter))
 
                 # 默认日期格式
                 return value.strftime("%Y-%m-%d")
 
+        # 处理百分比格式
+        if isinstance(value, (int, float)) and "%" in number_format:
+            return f"{value * 100:.1f}%"
 
+        # 处理千分位分隔符
+        if isinstance(value, (int, float)) and "," in number_format:
+            return f"{value:,.2f}"
 
         # 默认返回字符串
         return str(value)
@@ -750,6 +946,7 @@ class HTMLConverter:
 <body>
     <h1>{sheet_name}</h1>
 {table_content}
+{charts_content}
 </body>
 </html>"""
     

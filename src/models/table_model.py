@@ -1,6 +1,27 @@
 from dataclasses import dataclass, field
-from typing import Any, Iterator, Optional, Protocol
+from typing import Any, Iterator, Optional, Protocol, Union
 from abc import ABC, abstractmethod
+
+# 定义富文本片段的样式
+@dataclass
+class RichTextFragmentStyle:
+    """Represents the styling for a fragment of rich text."""
+    bold: bool = False
+    italic: bool = False
+    underline: bool = False
+    font_color: Optional[str] = None
+    font_size: Optional[float] = None
+    font_name: Optional[str] = None
+
+# 定义富文本片段
+@dataclass
+class RichTextFragment:
+    """Represents a fragment of text with its own style."""
+    text: str
+    style: RichTextFragmentStyle
+
+# 单元格值可以是简单字符串或富文本列表
+CellValue = Union[Any, list[RichTextFragment]]
 
 class LazyRowProvider(Protocol):
     """Protocol for lazy row providers that can stream rows on demand."""
@@ -39,7 +60,7 @@ class Style:
     alignment, borders, and other formatting details. It provides a standardized
     way to handle styles across different file formats.
     """
-    # Font properties
+    # Font properties - will be deprecated for rich text
     bold: bool = False
     italic: bool = False
     underline: bool = False
@@ -66,6 +87,7 @@ class Style:
     number_format: Optional[str] = None
 
     # Advanced features
+    formula: Optional[str] = None     # The formula string, if any
     hyperlink: Optional[str] = None  # URL of the hyperlink
     comment: Optional[str] = None    # Cell comment text
 
@@ -78,10 +100,12 @@ class Cell:
     A cell contains its value, an optional Style object, and row/column span
     information for merged cells.
     """
-    value: Any
+    value: CellValue
     style: Style | None = None
     row_span: int = 1
     col_span: int = 1
+    formula: Optional[str] = None
+
 
 
 @dataclass
@@ -93,6 +117,15 @@ class Row:
 
 
 @dataclass
+class Chart:
+    """Represents a chart in a sheet."""
+    name: str
+    type: str  # e.g., 'bar', 'line', 'pie'
+    image_data: Optional[bytes] = None  # The chart rendered as image bytes
+    anchor: Optional[str] = None  # E.g., 'A1'
+
+
+@dataclass
 class Sheet:
     """
     Represents a full sheet with its name, all its rows, and merged cell info.
@@ -101,6 +134,11 @@ class Sheet:
     name: str
     rows: list[Row]
     merged_cells: list[str] = field(default_factory=list)
+    charts: list[Chart] = field(default_factory=list)
+    column_widths: dict[int, float] = field(default_factory=dict)  # 列宽信息 {列索引: 宽度}
+    row_heights: dict[int, float] = field(default_factory=dict)    # 行高信息 {行索引: 高度}
+    default_column_width: float = 8.43  # Excel默认列宽
+    default_row_height: float = 18.0    # Excel默认行高
 
     def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
         """
