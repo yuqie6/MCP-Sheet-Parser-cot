@@ -11,7 +11,7 @@ SVG图表渲染器 - 将Excel图表转换为高质量的SVG格式。
 from typing import Any, Dict, List, Optional
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-from src.utils.color_utils import DEFAULT_CHART_COLORS, normalize_color
+from src.utils.color_utils import DEFAULT_CHART_COLORS, normalize_color, ensure_distinct_colors
 
 
 class SVGChartRenderer:
@@ -114,13 +114,22 @@ class SVGChartRenderer:
         self._render_legend_if_needed(svg, chart_data, series_list, colors)
         self._render_annotations(svg, chart_data)
     
-    def _should_show_data_labels(self, chart_data: Dict[str, Any], series_data: Dict[str, Any] = None) -> bool:
+    def _should_show_data_labels(self, chart_data: Dict[str, Any], series_data: Optional[Dict[str, Any]] = None) -> bool:
         """判断是否应该显示数据标签的通用方法。"""
-        return (
-            chart_data.get('show_data_labels', False) or
-            (series_data and series_data.get('show_data_labels', False)) or
-            chart_data.get('data_labels', {}).get('show', False)
-        )
+        # 检查图表级别的数据标签设置
+        if chart_data.get('show_data_labels', False):
+            return True
+            
+        # 检查系列级别的数据标签设置
+        if series_data and series_data.get('show_data_labels', False):
+            return True
+            
+        # 检查嵌套的数据标签配置
+        data_labels_config = chart_data.get('data_labels', {})
+        if isinstance(data_labels_config, dict) and data_labels_config.get('show', False):
+            return True
+            
+        return False
     
     def _create_data_label_element(self, svg: ET.Element, x: float, y: float, text: str, 
                                    font_size: str = '10px', fill: str = 'white', 
@@ -568,13 +577,8 @@ class SVGChartRenderer:
             colors = DEFAULT_CHART_COLORS + ['#A5A5A5', '#70E000']  # 扩展颜色用于多系列饼图
 
         # 确保有足够的不重复颜色用于所有片段
-        unique_colors = list(dict.fromkeys(colors))  # 去重但保持顺序
-        if len(unique_colors) < len(values):
-            # 生成更多不同的颜色
-            additional_colors = self._generate_distinct_colors(len(values) - len(unique_colors), unique_colors)
-            unique_colors.extend(additional_colors)
-            # 重新构建颜色列表，确保每个片段都有不同的颜色
-            colors = unique_colors[:len(values)]
+        # 修复：即使有足够的颜色，也要确保它们不重复
+        colors = ensure_distinct_colors(colors, len(values))
         
         current_angle = 0
         for i, (label, value) in enumerate(zip(labels, values)):
@@ -673,48 +677,6 @@ class SVGChartRenderer:
         self._is_pie_chart = False
 
         return self._format_svg(svg)
-
-    def _generate_distinct_colors(self, count: int, existing_colors: list) -> list:
-        """
-        生成与现有颜色不同的新颜色。
-
-        参数：
-            count: 需要生成的颜色数量
-            existing_colors: 已存在的颜色列表
-
-        返回：
-            新颜色列表
-        """
-        # 预定义的颜色池，确保视觉上有足够的区分度
-        color_pool = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-            '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2',
-            '#A3E4D7', '#F9E79F', '#D5A6BD', '#AED6F1', '#A9DFBF',
-            '#FAD7A0', '#E8DAEF', '#D1F2EB', '#FCF3CF', '#FADBD8'
-        ]
-
-        # 过滤掉已存在的颜色
-        available_colors = [c for c in color_pool if c not in existing_colors]
-
-        # 如果可用颜色不够，生成更多颜色
-        if len(available_colors) < count:
-            # 使用HSV色彩空间生成更多颜色
-            import colorsys
-            additional_needed = count - len(available_colors)
-            for i in range(additional_needed):
-                # 在HSV空间中均匀分布色相
-                hue = (i * 137.5) % 360 / 360  # 使用黄金角度分布
-                saturation = 0.7 + (i % 3) * 0.1  # 0.7, 0.8, 0.9
-                value = 0.8 + (i % 2) * 0.1  # 0.8, 0.9
-
-                rgb = colorsys.hsv_to_rgb(hue, saturation, value)
-                hex_color = f"#{int(rgb[0]*255):02X}{int(rgb[1]*255):02X}{int(rgb[2]*255):02X}"
-
-                if hex_color not in existing_colors and hex_color not in available_colors:
-                    available_colors.append(hex_color)
-
-        return available_colors[:count]
 
     def _render_area_chart(self, chart_data: Dict[str, Any]) -> str:
         """渲染面积图。"""
@@ -1084,7 +1046,7 @@ class SVGChartRenderer:
             text = ET.SubElement(svg, 'text', text_attrs)
             text.text = series_name
 
-    def _render_data_labels(self, svg: ET.Element, series_data: dict, x_positions: list, y_positions: list, colors: list = None) -> None:
+    def _render_data_labels(self, svg: ET.Element, series_data: dict, x_positions: list, y_positions: list, colors: Optional[list] = None) -> None:
         """
         渲染数据标签。
 

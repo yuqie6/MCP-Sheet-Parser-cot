@@ -3,7 +3,7 @@ import logging
 from src.converters.svg_chart_renderer import SVGChartRenderer
 from src.models.table_model import Chart
 from src.utils.chart_positioning import create_position_calculator
-from src.utils.html_utils import escape_html
+from src.utils.html_utils import escape_html, create_html_element
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +29,9 @@ class ChartConverter:
                 return renderer.render_chart_to_svg(chart.chart_data)
             except Exception as e:
                 logger.warning(f"Failed to render chart '{chart.name}' as SVG: {e}")
-                return f'<div class="chart-error">Chart rendering failed: {str(e)}</div>'
+                return create_html_element('div', f'Chart rendering failed: {str(e)}', css_classes=['chart-error'])
         else:
-            return '<div class="chart-placeholder">Chart data not available</div>'
+            return create_html_element('div', 'Chart data not available', css_classes=['chart-placeholder'])
 
     def generate_overlay_charts_html(self, sheet) -> str:
         """
@@ -68,17 +68,26 @@ class ChartConverter:
         if not standalone_charts:
             return ""
 
-        charts_html_parts = ['<h2>Charts</h2>']
+        charts_html_parts = [create_html_element('h2', 'Charts')]
         for chart in standalone_charts:
-            chart_html = [
-                f'<div class="chart-container" id="chart-{chart.name.replace(" ", "-")}" data-anchor="{chart.anchor}">',
-                f'<h3>{escape_html(chart.name)}</h3>'
-            ]
+            # 创建容器属性
+            container_attrs = {
+                'id': f'chart-{chart.name.replace(" ", "-")}',
+                'data-anchor': chart.anchor
+            }
+            
+            # 创建图表标题
+            chart_title = create_html_element('h3', escape_html(chart.name))
             
             # 使用新的通用方法渲染图表
             chart_content = self._render_chart_content(chart)
-            chart_html.append(f'<div class="chart-svg-wrapper">{chart_content}</div>')
-            chart_html.append('</div>')
-            charts_html_parts.extend(chart_html)
+            chart_wrapper = create_html_element('div', chart_content, css_classes=['chart-svg-wrapper'])
+            
+            # 组合完整的图表HTML
+            chart_container_content = chart_title + chart_wrapper
+            chart_container = create_html_element('div', chart_container_content, 
+                                                attributes=container_attrs, 
+                                                css_classes=['chart-container'])
+            charts_html_parts.append(chart_container)
 
         return "\n".join(charts_html_parts)

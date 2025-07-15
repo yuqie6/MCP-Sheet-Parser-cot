@@ -7,7 +7,7 @@ from src.converters.chart_converter import ChartConverter
 from src.converters.style_converter import StyleConverter
 from src.converters.table_structure_converter import TableStructureConverter
 from src.models.table_model import Sheet
-from src.utils.html_utils import compact_html
+from src.utils.html_utils import compact_html, create_html_element
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,9 @@ class HTMLConverter:
 
         html_template = self._get_html_template()
         # 修复：将图表覆盖层放在表格容器内部，确保正确的相对定位
-        table_with_charts = f'<div class="table-container">\n{table_html}\n{overlay_charts_html}\n</div>'
+        table_with_charts = create_html_element('div', 
+                                               f'\n{table_html}\n{overlay_charts_html}\n', 
+                                               css_classes=['table-container'])
         html_content = html_template.format(
             title=f"Table: {sheet.name}",
             css_styles=css_content,

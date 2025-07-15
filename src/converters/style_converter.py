@@ -5,30 +5,9 @@ from src.constants import StyleConstants
 from src.font_manager import get_font_manager
 from src.models.table_model import Sheet, Style
 from src.utils.color_utils import format_color
+from src.utils.border_utils import parse_border_style_complete
 
 logger = logging.getLogger(__name__)
-
-# Border style mapping constant
-BORDER_STYLE_MAP = {
-    "thin": ("1px", "solid"),
-    "medium": ("2px", "solid"),
-    "thick": ("3px", "solid"),
-    "solid": ("1px", "solid"),
-    "dashed": ("1px", "dashed"),
-    "dotted": ("1px", "dotted"),
-    "double": ("3px", "double"),
-    "groove": ("2px", "groove"),
-    "ridge": ("2px", "ridge"),
-    "inset": ("2px", "inset"),
-    "outset": ("2px", "outset"),
-    "hair": ("1px", "solid"),
-    "mediumdashed": ("2px", "dashed"),
-    "dashdot": ("1px", "dashed"),
-    "mediumdashdot": ("2px", "dashed"),
-    "dashdotdot": ("1px", "dashed"),
-    "mediumdashdotdot": ("2px", "dashed"),
-    "slantdashdot": ("1px", "dashed")
-}
 
 
 class StyleConverter:
@@ -406,22 +385,11 @@ class StyleConverter:
 
     def _parse_border_style_complete(self, border_style: str, border_color: str) -> str:
         """
-        Parses a complete border style string.
+        解析完整的边框样式字符串。
+        
+        注意：这个方法已迁移到 border_utils.py，这里保留是为了向后兼容
         """
-        if not border_style:
-            return f"1px solid {border_color}"
-        border_lower = border_style.lower()
-        if border_lower in BORDER_STYLE_MAP:
-            width, style_type = BORDER_STYLE_MAP[border_lower]
-            return f"{width} {style_type} {border_color}"
-        pattern = r'(\d+(?:\.\d+)?)(px|pt|em|rem)?\s*(solid|dashed|dotted|double|groove|ridge|inset|outset)?'
-        match = re.search(pattern, border_style.lower())
-        if match:
-            width = match.group(1)
-            unit = match.group(2) or "px"
-            style_type = match.group(3) or "solid"
-            return f"{width}{unit} {style_type} {border_color}"
-        return f"1px solid {border_color}"
+        return parse_border_style_complete(border_style, border_color)
 
     def _format_font_family(self, font_name: str) -> str:
         """

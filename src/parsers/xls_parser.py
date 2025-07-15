@@ -9,6 +9,7 @@ import xlrd
 import xlrd.xldate
 from src.models.table_model import Sheet, Row, Cell, Style, LazySheet
 from src.parsers.base_parser import BaseParser
+from src.utils.border_utils import get_xls_border_style_name
 
 logger = logging.getLogger(__name__)
 
@@ -260,36 +261,18 @@ class XlsParser(BaseParser):
             if hasattr(xf, 'border'):
                 border = xf.border
                 if border:
-                    # 边框样式映射
-                    border_style_map = {
-                        0: None,           # 无边框
-                        1: "thin",         # 细线
-                        2: "medium",       # 中等线
-                        3: "dashed",       # 虚线
-                        4: "dotted",       # 点线
-                        5: "thick",        # 粗线
-                        6: "double",       # 双线
-                        7: "hair",         # 极细线
-                        8: "medium_dashed", # 中等虚线
-                        9: "dash_dot",     # 点划线
-                        10: "medium_dash_dot", # 中等点划线
-                        11: "dash_dot_dot", # 双点划线
-                        12: "medium_dash_dot_dot", # 中等双点划线
-                        13: "slant_dash_dot" # 斜点划线
-                    }
-
-                    # 处理各个边框
+                    # 处理各个边框 - 使用统一的边框工具
                     if border.top_line_style:
-                        style_name = border_style_map.get(border.top_line_style, "solid")
+                        style_name = get_xls_border_style_name(border.top_line_style)
                         style.border_top = style_name if style_name else "solid"
                     if border.bottom_line_style:
-                        style_name = border_style_map.get(border.bottom_line_style, "solid")
+                        style_name = get_xls_border_style_name(border.bottom_line_style)
                         style.border_bottom = style_name if style_name else "solid"
                     if border.left_line_style:
-                        style_name = border_style_map.get(border.left_line_style, "solid")
+                        style_name = get_xls_border_style_name(border.left_line_style)
                         style.border_left = style_name if style_name else "solid"
                     if border.right_line_style:
-                        style_name = border_style_map.get(border.right_line_style, "solid")
+                        style_name = get_xls_border_style_name(border.right_line_style)
                         style.border_right = style_name if style_name else "solid"
 
                     # 边框颜色（使用第一个有效的边框颜色）

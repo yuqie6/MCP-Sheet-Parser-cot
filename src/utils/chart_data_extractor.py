@@ -491,7 +491,7 @@ class ChartDataExtractor:
     def _extract_individual_data_label(self, dLbl) -> Optional[Dict[str, Any]]:
         """提取单个数据标签的信息。"""
         try:
-            label_info = {
+            label_info: Dict[str, Any] = {
                 'index': None,
                 'text': None,
                 'position': None,

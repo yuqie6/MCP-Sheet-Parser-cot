@@ -1,6 +1,6 @@
 from src.models.table_model import Sheet
 from src.utils.range_parser import parse_range_string
-from src.utils.html_utils import escape_html
+from src.utils.html_utils import escape_html, create_html_element, create_table_cell
 
 
 class TableStructureConverter:
@@ -32,9 +32,16 @@ class TableStructureConverter:
             except ValueError as e:
                 print(f"Could not parse merged cell range '{merged_range}': {e}")
 
-        table_parts = [f'<table role="table" aria-label="Table: {sheet.name}">']
+        # 创建表格开始标签，包含属性
+        table_attrs = {
+            'role': 'table',
+            'aria-label': f'Table: {sheet.name}'
+        }
+        table_parts = [create_html_element('table', '', attributes=table_attrs).replace('></table>', '>')]
+        
         if sheet.name and sheet.name.strip():
-            table_parts.append(f'<caption>Table: {escape_html(sheet.name)}</caption>')
+            caption = create_html_element('caption', f'Table: {escape_html(sheet.name)}')
+            table_parts.append(caption)
 
         style_key_to_id_map = {self.style_converter.get_style_key(style_obj): style_id for style_id, style_obj in
                                styles.items()}
@@ -97,27 +104,57 @@ class TableStructureConverter:
     def _generate_cell_html(self, cell, style_class, span_attrs, is_header, overflow_style=""):
         cell_content = self.cell_converter.convert(cell)
 
+        # 处理超链接
         if cell.style and cell.style.hyperlink:
             href = escape_html(cell.style.hyperlink)
-            cell_content = f'<a href="{href}">{cell_content}</a>'
+            cell_content = create_html_element('a', cell_content, attributes={'href': href})
 
-        title_attr = ""
+        # 构建标题属性
+        title_parts = []
         if cell.style and cell.style.comment:
-            comment = escape_html(cell.style.comment)
-            title_attr = f' title="{comment}"'
+            title_parts.append(escape_html(cell.style.comment))
         if cell.formula:
-            formula_escaped = escape_html(cell.formula)
-            if title_attr:
-                title_attr = f'{title_attr} | Formula: {formula_escaped}"'
-            else:
-                title_attr = f' title="Formula: {formula_escaped}"'
-
-        data_attr = ""
+            title_parts.append(f"Formula: {escape_html(cell.formula)}")
+        
+        # 构建属性字典
+        cell_attrs = {}
+        if title_parts:
+            cell_attrs['title'] = " | ".join(title_parts)
         if cell.style and cell.style.number_format:
-            number_format = escape_html(cell.style.number_format)
-            data_attr = f' data-number-format="{number_format}"'
-        tag = 'th' if is_header else 'td'
-        return f'<{tag}{style_class}{span_attrs}{title_attr}{data_attr}{overflow_style}>{cell_content}</{tag}>'
+            cell_attrs['data-number-format'] = escape_html(cell.style.number_format)
+        
+        # 解析跨度属性
+        rowspan = 1
+        colspan = 1
+        if ' rowspan="' in span_attrs:
+            rowspan = int(span_attrs.split('rowspan="')[1].split('"')[0])
+        if ' colspan="' in span_attrs:
+            colspan = int(span_attrs.split('colspan="')[1].split('"')[0])
+        
+        # 解析CSS类
+        css_classes = []
+        if ' class="' in style_class:
+            css_classes = style_class.split('class="')[1].split('"')[0].split()
+        
+        # 解析内联样式
+        inline_styles = {}
+        if overflow_style and 'style="' in overflow_style:
+            style_content = overflow_style.split('style="')[1].split('"')[0]
+            for style_pair in style_content.split(';'):
+                if ':' in style_pair:
+                    key, value = style_pair.split(':', 1)
+                    inline_styles[key.strip()] = value.strip()
+        
+        # 使用工具函数创建表格单元格
+        return create_table_cell(
+            content=cell_content,
+            is_header=is_header,
+            rowspan=rowspan,
+            colspan=colspan,
+            css_classes=css_classes if css_classes else None,
+            inline_styles=inline_styles if inline_styles else None,
+            title=cell_attrs.get('title')
+        )
 
     def _should_overflow_text(self, cell, row, col_idx):
         """
