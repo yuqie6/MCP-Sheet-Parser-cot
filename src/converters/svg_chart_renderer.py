@@ -41,19 +41,22 @@ class SVGChartRenderer:
     def render_chart_to_svg(self, chart_data: Dict[str, Any]) -> str:
         """
         将图表数据渲染为SVG字符串。
-        
+
         参数：
             chart_data: 包含图表类型、数据、标题等信息的字典
                 {
                     'type': 'bar'|'line'|'pie'|'area',
                     'title': '图表标题',
-                    'series': [{'name': '系列名', 'x_data': [...], 'y_data': [...], 'color': '#RRGGBB'}],
+                    'series': [{'name': '系列名', 'x_data': [...], 'y_data': [...], 'color': '#RRGGBB', 'data_labels': {...}}],
                     'x_axis_title': 'X轴标题',
                     'y_axis_title': 'Y轴标题',
                     'colors': ['#RRGGBB', ...],  # 原始Excel颜色
-                    'size': {'width_px': 400, 'height_px': 300}  # 原始Excel尺寸
+                    'size': {'width_px': 400, 'height_px': 300},  # 原始Excel尺寸
+                    'legend': {'enabled': True, 'position': 'right', 'entries': [...]},  # 图例信息
+                    'annotations': [{'type': 'title', 'text': '...', 'position': '...'}],  # 注释信息
+                    'data_labels': {'enabled': True, 'show_value': True, ...}  # 数据标签信息
                 }
-        
+
         返回：
             SVG字符串
         """
@@ -82,8 +85,43 @@ class SVGChartRenderer:
         else:
             return self._render_fallback_chart(chart_data)
     
-    def _create_svg_root(self, title: str = "") -> ET.Element:
-        """创建SVG根元素。"""
+    def _render_legend_if_needed(self, svg: ET.Element, chart_data: Dict[str, Any], series_list: List[Dict], colors: List[str]) -> None:
+        """统一处理图例渲染逻辑。"""
+        show_legend = (
+            chart_data.get('show_legend', False) or
+            chart_data.get('legend', {}).get('show', False) or
+            chart_data.get('legend', {}).get('enabled', False)
+        )
+        if show_legend:
+            legend_style = chart_data.get('legend_style')
+            # 如果有图例条目信息，使用条目信息；否则使用系列信息
+            legend_entries = chart_data.get('legend', {}).get('entries', [])
+            if legend_entries:
+                # 使用图例条目信息创建图例
+                legend_series = []
+                for entry in legend_entries:
+                    if not entry.get('delete', False):
+                        legend_series.append({
+                            'name': entry.get('text', f"Series {entry.get('index', 0) + 1}")
+                        })
+                self._draw_legend(svg, legend_series, colors, legend_style=legend_style)
+            else:
+                # 使用系列信息创建图例
+                self._draw_legend(svg, series_list, colors, legend_style=legend_style)
+    
+    def _render_common_chart_elements(self, svg: ET.Element, chart_data: Dict[str, Any], series_list: List[Dict], colors: List[str]) -> None:
+        """渲染通用的图表元素（图例和注释）。"""
+        self._render_legend_if_needed(svg, chart_data, series_list, colors)
+        self._render_annotations(svg, chart_data)
+    
+    def _create_svg_root(self, title: str = "", title_style: Optional[Dict[str, Any]] = None) -> ET.Element:
+        """
+        创建SVG根元素，并为标题应用指定的字体样式。
+
+        参数：
+            title: 图表标题
+            title_style: 标题的字体样式字典
+        """
         svg = ET.Element('svg', {
             'width': f'{self.width}px',
             'height': f'{self.height}px',
@@ -98,12 +136,28 @@ class SVGChartRenderer:
         
         # 添加标题
         if title:
-            title_elem = ET.SubElement(svg, 'text', {
+            title_attrs = {
                 'x': str(self.width // 2),
                 'y': '25',
                 'text-anchor': 'middle',
                 'class': 'chart-title'
-            })
+            }
+            
+            # 合并外部传入的样式
+            if title_style:
+                style_str = ""
+                if 'font_family' in title_style and title_style['font_family']:
+                    style_str += f"font-family: '{title_style['font_family']}';"
+                if 'font_size' in title_style and title_style['font_size']:
+                    style_str += f"font-size: {title_style['font_size']}px;"
+                if 'color' in title_style and title_style['color']:
+                    style_str += f"fill: {title_style['color']};"
+                if 'bold' in title_style and title_style['bold']:
+                    style_str += "font-weight: bold;"
+                if style_str:
+                    title_attrs['style'] = style_str
+            
+            title_elem = ET.SubElement(svg, 'text', title_attrs)
             title_elem.text = title
         
         return svg
@@ -197,8 +251,12 @@ class SVGChartRenderer:
     
     def _render_bar_chart(self, chart_data: Dict[str, Any]) -> str:
         """Renders a bar chart."""
-        svg = self._create_svg_root(chart_data.get('title', ''))
+        title_style = chart_data.get('title_style')
+        svg = self._create_svg_root(chart_data.get('title', ''), title_style=title_style)
         series_list = chart_data.get('series', [])
+
+        # 智能判断是否应该去重X轴标签
+        should_deduplicate = self._should_deduplicate_x_labels(series_list)
 
         # 保存当前系列，供其他方法使用
         self.current_series = series_list
@@ -222,38 +280,71 @@ class SVGChartRenderer:
         if not all_x_labels or not all_y_values:
             return self._format_svg(svg)
 
-        unique_x_labels = list(dict.fromkeys(all_x_labels))
+        # 根据判断结果决定X轴标签策略
+        if should_deduplicate:
+            # 分组柱状图：去重X轴标签
+            unique_x_labels = list(dict.fromkeys(all_x_labels))
+            display_x_labels = unique_x_labels
+        else:
+            # 连续柱状图：保留所有X轴标签
+            unique_x_labels = list(dict.fromkeys(all_x_labels))  # 仍需要用于计算范围
+            display_x_labels = all_x_labels
         # 修复：Y轴从0开始，这样所有柱子都有合理的高度
         y_min = 0  # 强制从0开始
-        y_max = chart_data.get('y_axis_max') if chart_data.get('y_axis_max') is not None else max(all_y_values) if all_y_values else 1
+        
+        # 修复类型安全问题：确保y_max在传递给float()之前绝不为None
+        y_val = chart_data.get('y_axis_max')
+        if y_val is None:
+            y_val = max(all_y_values) if all_y_values else 1
+        
         # 确保y_min和y_max是数值类型
         y_min = float(y_min)
-        y_max = float(y_max)
+        y_max = float(y_val)
         y_range = y_max - y_min if y_max != y_min else 1
 
         # 绘制X轴标签（保持Excel样式）
-        self._draw_x_axis_labels(svg, unique_x_labels)
+        self._draw_x_axis_labels(svg, display_x_labels)
 
         colors = self._get_series_colors(chart_data)
-        # 修复：每个数据点都是独立的柱子，不按标签分组
-        total_bars = len(all_x_labels)  # 总柱子数
-        bar_group_width = self.plot_width / total_bars
-        bar_width = bar_group_width * 0.5  # 减小柱子宽度，使其更苗条
-        
-        # 重新设计：每个数据点都是独立的柱子，按顺序排列
-        bar_index = 0  # 全局柱子索引
+
+        # 根据标签策略决定柱子渲染方式
+        if should_deduplicate:
+            # 分组柱状图：每个标签下有多个系列的柱子
+            num_groups = len(unique_x_labels)
+            num_series = len(series_list)
+            group_width = self.plot_width / num_groups
+            bar_width = group_width / num_series * 0.8  # 每个系列的柱子宽度
+        else:
+            # 连续柱状图：每个数据点都是独立的柱子
+            total_bars = len(all_x_labels)
+            bar_group_width = self.plot_width / total_bars
+            bar_width = bar_group_width * 0.5
+
+        bar_index = 0  # 全局柱子索引（用于连续模式）
 
         for series_idx, series in enumerate(series_list):
             x_data = series.get('x_data', [])
             y_data = series.get('y_data', [])
 
+            # 收集数据标签位置信息
+            x_positions = []
+            y_positions = []
+
             for i, (x_label, y_value) in enumerate(zip(x_data, y_data)):
-                # 每个柱子都有独立的位置，不按标签分组
                 color = normalize_color(series.get('color') or colors[series_idx % len(colors)])
 
-                # 计算柱子位置：按数据顺序排列
-                bar_center_x = self.margin['left'] + (bar_index + 0.5) * bar_group_width
-                bar_x = bar_center_x - bar_width / 2
+                # 根据标签策略计算柱子位置
+                if should_deduplicate:
+                    # 分组柱状图：每个标签下有多个系列的柱子
+                    group_index = unique_x_labels.index(x_label) if x_label in unique_x_labels else i
+                    group_center = self.margin['left'] + (group_index + 0.5) * group_width
+                    bar_offset = (series_idx - (num_series - 1) / 2) * bar_width
+                    bar_center_x = group_center + bar_offset
+                    bar_x = bar_center_x - bar_width / 2
+                else:
+                    # 连续柱状图：每个数据点都是独立的柱子
+                    bar_center_x = self.margin['left'] + (bar_index + 0.5) * bar_group_width
+                    bar_x = bar_center_x - bar_width / 2
 
                 # 计算柱子高度
                 y_value_norm = max(0, y_value - y_min)  # 确保非负
@@ -271,6 +362,10 @@ class SVGChartRenderer:
                     'fill': color,
                     'class': 'bar-rect'
                 })
+
+                # 收集位置信息用于数据标签
+                x_positions.append(bar_center_x)
+                y_positions.append(bar_y)
 
                 # 只有在Excel明确设置显示数据标签时才显示数字
                 show_data_labels = (
@@ -291,21 +386,23 @@ class SVGChartRenderer:
                     })
                     text.text = str(int(y_value))
 
-                bar_index += 1  # 下一个柱子
-        
-        # 只有在Excel明确设置显示图例时才绘制图例
-        show_legend = (
-            chart_data.get('show_legend', False) or
-            chart_data.get('legend', {}).get('show', False)
-        )
-        if show_legend:
-            self._draw_legend(svg, series_list, colors)
+                # 只在连续模式下更新bar_index
+                if not should_deduplicate:
+                    bar_index += 1
+
+            # 渲染该系列的数据标签
+            if x_positions and y_positions:
+                self._render_data_labels(svg, series, x_positions, y_positions, colors)
+
+        # 渲染图例和注释
+        self._render_common_chart_elements(svg, chart_data, series_list, colors)
         
         return self._format_svg(svg)
     
     def _render_line_chart(self, chart_data: Dict[str, Any]) -> str:
         """渲染折线图。"""
-        svg = self._create_svg_root(chart_data.get('title', ''))
+        title_style = chart_data.get('title_style')
+        svg = self._create_svg_root(chart_data.get('title', ''), title_style=title_style)
         series_list = chart_data.get('series', [])
         
         if not series_list:
@@ -377,13 +474,8 @@ class SVGChartRenderer:
                         'class': 'line-point'
                     })
         
-        # 只有在Excel明确设置显示图例时才绘制图例
-        show_legend = (
-            chart_data.get('show_legend', False) or
-            chart_data.get('legend', {}).get('show', False)
-        )
-        if show_legend:
-            self._draw_legend(svg, series_list, colors)
+        # 渲染图例和注释
+        self._render_common_chart_elements(svg, chart_data, series_list, colors)
         
         return self._format_svg(svg)
     
@@ -407,9 +499,12 @@ class SVGChartRenderer:
         if total == 0:
             return self._format_svg(svg)
         
-        center_x = self.width // 2
+        # 为图例预留空间，饼图偏左放置
+        legend_width = 100  # 图例区域宽度
+        pie_area_width = self.width - legend_width
+        center_x = pie_area_width // 2
         center_y = self.height // 2
-        radius = min(self.plot_width, self.plot_height) // 2 - 20
+        radius = min(pie_area_width, self.height) // 2 - 30
         
         # 优先使用从Excel提取的颜色
         colors = []
@@ -444,22 +539,52 @@ class SVGChartRenderer:
                 'class': 'pie-slice'
             })
             
-            # 添加标签
-            mid_angle = (current_angle + angle / 2) * 3.14159 / 180
-            label_x = center_x + (radius + 20) * cos(mid_angle)
-            label_y = center_y + (radius + 20) * sin(mid_angle)
-            
-            text = ET.SubElement(svg, 'text', {
-                'x': str(label_x),
-                'y': str(label_y),
-                'text-anchor': 'middle',
-                'class': 'axis-label'
-            })
-            percentage = (value / total) * 100
-            text.text = f"{label} ({percentage:.1f}%)"
+            # 添加数据标签（如果启用）
+            series_data = series_list[0] if series_list else {}
+            data_labels = series_data.get('data_labels', {})
+
+            if data_labels.get('enabled', True):  # 饼图默认显示标签
+                mid_angle = (current_angle + angle / 2) * 3.14159 / 180
+                label_x = center_x + (radius + 20) * cos(mid_angle)
+                label_y = center_y + (radius + 20) * sin(mid_angle)
+
+                # 构建标签文本
+                label_text = ""
+
+                if data_labels.get('show_category_name', True):  # 饼图默认显示分类名
+                    label_text = label
+
+                if data_labels.get('show_value', False):
+                    if label_text:
+                        label_text += f": {value}"
+                    else:
+                        label_text = str(value)
+
+                if data_labels.get('show_percent', True):  # 饼图默认显示百分比
+                    percentage = (value / total) * 100
+                    if label_text:
+                        label_text += f" ({percentage:.1f}%)"
+                    else:
+                        label_text = f"{percentage:.1f}%"
+
+                # 如果没有设置任何显示选项，默认显示标签和百分比
+                if not label_text:
+                    percentage = (value / total) * 100
+                    label_text = f"{label} ({percentage:.1f}%)"
+
+                text = ET.SubElement(svg, 'text', {
+                    'x': str(label_x),
+                    'y': str(label_y),
+                    'text-anchor': 'middle',
+                    'class': 'axis-label'
+                })
+                text.text = label_text
             
             current_angle += angle
-        
+
+        # 渲染图例和注释
+        self._render_common_chart_elements(svg, chart_data, series_list, colors)
+
         return self._format_svg(svg)
     
     def _render_area_chart(self, chart_data: Dict[str, Any]) -> str:
@@ -546,13 +671,8 @@ class SVGChartRenderer:
                         'class': 'area-point'
                     })
         
-        # 只有在Excel明确设置显示图例时才绘制图例
-        show_legend = (
-            chart_data.get('show_legend', False) or
-            chart_data.get('legend', {}).get('show', False)
-        )
-        if show_legend:
-            self._draw_legend(svg, series_list, colors)
+        # 渲染图例和注释
+        self._render_common_chart_elements(svg, chart_data, series_list, colors)
         
         return self._format_svg(svg)
     
@@ -700,21 +820,23 @@ class SVGChartRenderer:
     
     def _draw_x_axis_labels(self, svg: ET.Element, x_labels: List[str]):
         """只绘制X轴标签，不绘制坐标轴线和网格线。"""
-        # 获取所有标签（包括重复的）
-        all_labels = []
-        for series in self.current_series:
-            all_labels.extend(series.get('x_data', []))
+        # 使用传入的唯一标签，而不是重复的标签
+        unique_labels = x_labels
 
-        # 每个柱子都有自己的标签
-        bar_group_width = self.plot_width / len(all_labels)
+        # 计算标签组的宽度（每个标签对应多个系列的柱子）
+        if not unique_labels:
+            return
 
-        # X轴标签
-        for i, label in enumerate(all_labels):
-            # 计算标签位置（居中于每个柱子）
-            x_pos = self.margin['left'] + (i + 0.5) * bar_group_width
+        label_group_width = self.plot_width / len(unique_labels)
+        series_count = len(self.current_series)
+
+        # X轴标签 - 每个标签居中于对应的柱子组
+        for i, label in enumerate(unique_labels):
+            # 计算标签位置（居中于柱子组）
+            group_center = self.margin['left'] + (i + 0.5) * label_group_width
 
             text = ET.SubElement(svg, 'text', {
-                'x': str(x_pos),
+                'x': str(group_center),
                 'y': str(self.margin['top'] + self.plot_height + 15),
                 'text-anchor': 'middle',
                 'class': 'axis-label',
@@ -772,17 +894,48 @@ class SVGChartRenderer:
             })
             text.text = f"{y_value:.1f}"
     
-    def _draw_legend(self, svg: ET.Element, series_list: List[Dict], colors: List[str]):
-        """绘制图例。"""
-        legend_x = self.width - self.margin['right'] + 10
-        legend_y = self.margin['top']
+    def _draw_legend(self, svg: ET.Element, series_list: List[Dict], colors: List[str], legend_style: Optional[Dict[str, Any]] = None):
+        """
+        绘制图例，并应用指定的字体样式。
+
+        参数：
+            svg: SVG根元素
+            series_list: 系列数据列表
+            colors: 颜色列表
+            legend_style: 图例的字体样式字典
+        """
+        # 图例位置计算：根据图表类型调整
+        if hasattr(self, '_is_pie_chart') and self._is_pie_chart:
+            # 饼图：图例放在右侧预留区域
+            legend_x = self.width - 90  # 饼图右侧图例区域
+            legend_y = self.margin['top'] + 20
+        else:
+            # 其他图表：图例放在右上角
+            legend_text_width = 80
+            legend_x = max(10, self.width - legend_text_width - 20)
+            legend_y = self.margin['top']
         
+        # 准备基础样式
+        base_style = {'class': 'legend-item'}
+        
+        # 合并外部传入的样式
+        if legend_style:
+            style_str = ""
+            if 'font_family' in legend_style and legend_style['font_family']:
+                style_str += f"font-family: '{legend_style['font_family']}';"
+            if 'font_size' in legend_style and legend_style['font_size']:
+                style_str += f"font-size: {legend_style['font_size']}px;"
+            if 'color' in legend_style and legend_style['color']:
+                style_str += f"fill: {legend_style['color']};"
+            if style_str:
+                base_style['style'] = style_str
+
         for i, series in enumerate(series_list):
             color = normalize_color(colors[i % len(colors)])
             series_name = series.get('name', f'Series {i + 1}')
             
             # 图例色块
-            rect = ET.SubElement(svg, 'rect', {
+            ET.SubElement(svg, 'rect', {
                 'x': str(legend_x),
                 'y': str(legend_y + i * 20),
                 'width': '12',
@@ -790,19 +943,196 @@ class SVGChartRenderer:
                 'fill': color
             })
             
-            # 图例文字
-            text = ET.SubElement(svg, 'text', {
+            # 图例文字的属性
+            text_attrs = {
                 'x': str(legend_x + 16),
                 'y': str(legend_y + i * 20 + 9),
-                'class': 'legend-item'
-            })
+                **base_style
+            }
+            
+            text = ET.SubElement(svg, 'text', text_attrs)
             text.text = series_name
-    
+
+    def _render_data_labels(self, svg: ET.Element, series_data: dict, x_positions: list, y_positions: list, colors: list = None) -> None:
+        """
+        渲染数据标签。
+
+        参数：
+            svg: SVG根元素
+            series_data: 系列数据，包含data_labels信息
+            x_positions: X坐标位置列表
+            y_positions: Y坐标位置列表
+            colors: 颜色列表（可选）
+        """
+        data_labels = series_data.get('data_labels', {})
+        if not data_labels.get('enabled', False):
+            return
+
+        y_data = series_data.get('y_data', [])
+        x_data = series_data.get('x_data', [])
+
+        for i, (x_pos, y_pos) in enumerate(zip(x_positions, y_positions)):
+            if i >= len(y_data):
+                break
+
+            label_text = ""
+
+            # 根据设置决定显示什么内容
+            if data_labels.get('show_value', False) and i < len(y_data):
+                label_text = str(y_data[i])
+
+            if data_labels.get('show_category_name', False) and i < len(x_data):
+                if label_text:
+                    label_text += f" ({x_data[i]})"
+                else:
+                    label_text = str(x_data[i])
+
+            if data_labels.get('show_series_name', False):
+                series_name = series_data.get('name', '')
+                if series_name:
+                    if label_text:
+                        label_text = f"{series_name}: {label_text}"
+                    else:
+                        label_text = series_name
+
+            if data_labels.get('show_percent', False):
+                # 计算百分比
+                if 'total' in series_data:
+                    # 使用预计算的总数（主要用于饼图）
+                    total = series_data['total']
+                else:
+                    # 计算当前系列的总数
+                    total = sum(y_data) if y_data else 0
+
+                if total > 0 and i < len(y_data):
+                    percent = (y_data[i] / total) * 100
+                    if label_text:
+                        label_text += f" ({percent:.1f}%)"
+                    else:
+                        label_text = f"{percent:.1f}%"
+
+            # 如果没有设置任何显示选项，但数据标签已启用，默认显示值
+            if not label_text and data_labels.get('enabled', False) and i < len(y_data):
+                # 检查是否有任何显示选项被设置
+                has_any_show_option = any([
+                    data_labels.get('show_value', False),
+                    data_labels.get('show_category_name', False),
+                    data_labels.get('show_series_name', False),
+                    data_labels.get('show_percent', False)
+                ])
+
+                # 如果没有明确的显示选项，默认显示值
+                if not has_any_show_option:
+                    label_text = str(y_data[i])
+
+            if label_text:
+                # 调整标签位置，避免与数据点重叠
+                label_y = y_pos - 5  # 标签显示在数据点上方
+
+                text_elem = ET.SubElement(svg, 'text', {
+                    'x': str(x_pos),
+                    'y': str(label_y),
+                    'text-anchor': 'middle',
+                    'font-family': 'Arial, sans-serif',
+                    'font-size': '10',
+                    'fill': '#333'
+                })
+                text_elem.text = label_text
+
+    def _render_annotations(self, svg: ET.Element, chart_data: dict) -> None:
+        """
+        渲染图表注释（不包括标题，标题已在_create_svg_root中处理）。
+
+        参数：
+            svg: SVG根元素
+            chart_data: 图表数据，包含annotations信息
+        """
+        annotations = chart_data.get('annotations', [])
+        if not annotations:
+            return
+
+        for annotation in annotations:
+            annotation_type = annotation.get('type', '')
+            text = annotation.get('text', '')
+            position = annotation.get('position', '')
+
+            if not text:
+                continue
+
+            # 跳过标题类型的注释，因为标题已经在_create_svg_root中处理了
+            if annotation_type == 'title':
+                continue
+
+            # 根据注释类型和位置确定坐标
+            x, y = self._get_annotation_position(annotation_type, position)
+
+            text_elem = ET.SubElement(svg, 'text', {
+                'x': str(x),
+                'y': str(y),
+                'text-anchor': 'middle',
+                'font-family': 'Arial, sans-serif',
+                'font-size': '11',
+                'font-weight': 'normal',
+                'fill': '#666'
+            })
+            text_elem.text = text
+
+    def _get_annotation_position(self, annotation_type: str, position: str) -> tuple[int, int]:
+        """
+        根据注释类型和位置获取坐标。
+
+        参数：
+            annotation_type: 注释类型（title, axis_title等）
+            position: 位置（top, bottom, left, right等）
+
+        返回：
+            (x, y) 坐标元组
+        """
+        if annotation_type == 'title' and position == 'top':
+            return (self.width // 2, 15)
+        elif annotation_type == 'axis_title':
+            if position == 'bottom':
+                return (self.width // 2, self.height - 5)
+            elif position == 'left':
+                return (15, self.height // 2)
+            elif position == 'right':
+                return (self.width - 15, self.height // 2)
+
+        # 默认位置
+        return (self.width // 2, self.height // 2)
+
     def _format_svg(self, svg: ET.Element) -> str:
         """格式化SVG为字符串。"""
         rough_string = ET.tostring(svg, encoding='unicode')
         reparsed = minidom.parseString(rough_string)
         return reparsed.toprettyxml(indent="  ")[22:]  # 去掉XML声明
+
+    def _should_deduplicate_x_labels(self, series_list: list) -> bool:
+        """
+        判断是否应该去重X轴标签。
+
+        如果所有系列的X轴数据都相同，则应该去重（分组柱状图）。
+        如果系列的X轴数据不同，则不应该去重（连续柱状图）。
+
+        参数：
+            series_list: 系列数据列表
+
+        返回：
+            True表示应该去重，False表示不应该去重
+        """
+        if not series_list or len(series_list) <= 1:
+            return True  # 单系列或无系列，默认去重
+
+        # 获取第一个系列的X轴数据作为基准
+        first_x_data = series_list[0].get('x_data', [])
+
+        # 检查其他系列的X轴数据是否与第一个系列相同
+        for series in series_list[1:]:
+            x_data = series.get('x_data', [])
+            if x_data != first_x_data:
+                return False  # 发现不同的X轴数据，不应该去重
+
+        return True  # 所有系列的X轴数据都相同，应该去重
 
 
 def cos(angle_rad: float) -> float:

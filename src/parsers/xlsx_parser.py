@@ -14,7 +14,8 @@ from openpyxl.chart.bar_chart import BarChart
 from openpyxl.chart.line_chart import LineChart
 from openpyxl.chart.pie_chart import PieChart
 from openpyxl.chart.area_chart import AreaChart
-from typing import Iterator,Any, Optional
+from typing import Iterator, Any, Optional, Dict, Union, BinaryIO, cast
+from io import BytesIO
 from src.models.table_model import Sheet, Row, Cell, LazySheet, Chart, ChartPosition
 from src.parsers.base_parser import BaseParser
 from src.utils.style_parser import extract_style, extract_cell_value
@@ -225,7 +226,6 @@ class XlsxParser(BaseParser):
         # Extract images and charts
         charts = self._extract_charts(worksheet)
         images = self._extract_images(worksheet)
-        # Combine them, perhaps differentiating by type if needed in the model
         all_visuals = charts + images
 
         return Sheet(
@@ -253,25 +253,29 @@ class XlsxParser(BaseParser):
                     # 方法1：尝试从ref（BytesIO对象）读取
                     if hasattr(image, 'ref') and image.ref:
                         ref = image.ref
-                        if hasattr(ref, 'read'):
-                            # ref是文件对象（如BytesIO）
-                            ref.seek(0)  # 确保从开头读取
-                            img_data = ref.read()
-                        elif isinstance(ref, bytes):
-                            img_data = ref
-
-                    # 方法2：尝试调用_data方法
-                    if not img_data and hasattr(image, '_data') and callable(getattr(image, '_data', None)):
                         try:
-                            img_data = image._data()
-                        except Exception:
+                            # 检查是否是类文件对象（有read和seek方法）
+                            if hasattr(ref, 'read') and hasattr(ref, 'seek') and callable(getattr(ref, 'read', None)) and callable(getattr(ref, 'seek', None)):
+                                # ref是文件对象（如BytesIO），使用类型转换来避免类型检查错误
+                                file_like_ref = cast(BinaryIO, ref)
+                                file_like_ref.seek(0)  # 确保从开头读取
+                                img_data = file_like_ref.read()
+                            elif isinstance(ref, bytes):
+                                img_data = ref
+                        except (AttributeError, OSError, IOError, TypeError):
+                            # 如果seek或read操作失败，继续尝试其他方法
                             pass
 
-                    # 方法3：如果前面都失败，尝试从_data属性直接获取
+                    # 方法2：尝试从_data属性或方法获取
                     if not img_data and hasattr(image, '_data'):
-                        data_attr = getattr(image, '_data', None)
-                        if data_attr and not callable(data_attr):
-                            img_data = data_attr
+                        try:
+                            data_attr = getattr(image, '_data', None)
+                            if callable(data_attr):
+                                img_data = data_attr()
+                            elif data_attr and not callable(data_attr):
+                                img_data = data_attr
+                        except Exception:
+                            pass
 
                     # Get anchor position safely and create position info
                     anchor_str = "A1"  # 默认位置
@@ -379,8 +383,14 @@ class XlsxParser(BaseParser):
                 chart_data = self._extract_chart_data(chart_drawing, chart_type)
                 
                 
-                # Safely get chart title
-                chart_title = str(chart_drawing.title) if chart_drawing.title else f"Chart {len(charts) + 1}"
+                # Safely get chart title using the extractor
+                chart_title = None
+                if chart_drawing.title:
+                    chart_title = self.chart_extractor.extract_axis_title(chart_drawing.title)
+                
+                # If extraction fails or returns None, provide a meaningful fallback
+                if not chart_title:
+                    chart_title = f"Chart {len(charts) + 1}"
                 
                 # 提取详细的定位信息
                 anchor_value = "A1"  # 默认位置
@@ -476,13 +486,16 @@ class XlsxParser(BaseParser):
         """
         chart_data = {
             'type': chart_type,
-            'title': str(chart.title) if chart.title else '',
+            'title': self.chart_extractor.extract_axis_title(chart.title) if chart.title else '',
             'series': [],
             'x_axis_title': '',
             'y_axis_title': '',
             'position': {},  # 添加位置信息
             'size': {},      # 添加尺寸信息
-            'colors': []     # 添加原始颜色信息
+            'colors': [],    # 添加原始颜色信息
+            'legend': {},    # 添加图例信息
+            'annotations': [],  # 添加注释信息
+            'data_labels': {}   # 添加数据标签信息
         }
         
         # 提取位置和尺寸信息
@@ -548,8 +561,15 @@ class XlsxParser(BaseParser):
         # 提取系列数据
         if isinstance(chart, (BarChart, LineChart, AreaChart)):
             for series in chart.series:
+                # 使用chart_extractor来提取系列名称
+                series_name = None
+                if series.tx:
+                    series_name = self.chart_extractor.extract_axis_title(series.tx)
+                if not series_name:
+                    series_name = f"Series {len(chart_data['series']) + 1}"
+
                 series_data = {
-                    'name': series.tx.v if series.tx else f"Series {len(chart_data['series']) + 1}",
+                    'name': series_name,
                     'x_data': [],
                     'y_data': [],
                     'color': None  # 添加颜色信息
@@ -560,6 +580,11 @@ class XlsxParser(BaseParser):
                 if series_color:
                     series_data['color'] = series_color
                     chart_data['colors'].append(series_color)
+
+                # 提取数据标签信息
+                data_labels = self.chart_extractor.extract_data_labels(series)
+                if data_labels['enabled']:
+                    series_data['data_labels'] = data_labels
                 
                 # 获取y轴数据
                 y_data = self.chart_extractor.extract_series_y_data(series)
@@ -580,8 +605,15 @@ class XlsxParser(BaseParser):
         elif isinstance(chart, PieChart):
             if chart.series and len(chart.series) > 0:
                 series = chart.series[0]
+                # 使用chart_extractor来提取系列名称
+                series_name = None
+                if series.tx:
+                    series_name = self.chart_extractor.extract_axis_title(series.tx)
+                if not series_name:
+                    series_name = "Pie Series"
+
                 series_data = {
-                    'name': series.tx.v if series.tx else "Pie Series",
+                    'name': series_name,
                     'x_data': [],  # 标签
                     'y_data': [],   # 数值
                     'colors': []   # 饼图每个片段的颜色
@@ -602,6 +634,11 @@ class XlsxParser(BaseParser):
                 if pie_colors:
                     series_data['colors'] = pie_colors
                     chart_data['colors'] = pie_colors
+
+                # 提取数据标签信息
+                data_labels = self.chart_extractor.extract_data_labels(series)
+                if data_labels['enabled']:
+                    series_data['data_labels'] = data_labels
                 
                 # 如果没有标签，生成默认标签
                 if not series_data['x_data'] and series_data['y_data']:
@@ -609,5 +646,31 @@ class XlsxParser(BaseParser):
                 
                 if series_data['y_data']:
                     chart_data['series'].append(series_data)
-        
+
+        # 提取图例信息
+        legend_info = self.chart_extractor.extract_legend_info(chart)
+        if legend_info['enabled']:
+            # 如果图例条目没有文本，根据图表类型使用不同的策略
+            if isinstance(chart, PieChart) and chart_data['series']:
+                # 对于饼图，图例条目应该对应每个片段的标签
+                pie_series = chart_data['series'][0]
+                x_data = pie_series.get('x_data', [])
+                for i, entry in enumerate(legend_info.get('entries', [])):
+                    if not entry.get('text'):
+                        if i < len(x_data):
+                            entry['text'] = x_data[i]
+                        else:
+                            entry['text'] = f"Item {i + 1}"
+            else:
+                # 对于其他图表类型，使用系列名称
+                for i, entry in enumerate(legend_info.get('entries', [])):
+                    if not entry.get('text') and i < len(chart_data['series']):
+                        entry['text'] = chart_data['series'][i]['name']
+            chart_data['legend'] = legend_info
+
+        # 提取注释信息
+        annotations = self.chart_extractor.extract_chart_annotations(chart)
+        if annotations:
+            chart_data['annotations'] = annotations
+
         return chart_data

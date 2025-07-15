@@ -6,25 +6,28 @@
 
 import re
 from typing import Optional, Dict
+from functools import lru_cache
 
 # Excel主题颜色映射（Office 2016+ 默认主题）
 EXCEL_THEME_COLORS = {
-    'accent1': '#5B9BD5',  # 蓝色
-    'accent2': '#70AD47',  # 绿色  
-    'accent3': '#FFC000',  # 黄色/橙色
-    'accent4': '#E15759',  # 红色
-    'accent5': '#4472C4',  # 深蓝色
-    'accent6': '#70AD47',  # 绿色（在某些Excel文件中）
-    'dk1': '#000000',      # 深色1（黑色）
-    'lt1': '#FFFFFF',      # 浅色1（白色）
-    'dk2': '#44546A',      # 深色2（深灰蓝）
-    'lt2': '#E7E6E6',      # 浅色2（浅灰）
-    'bg1': '#FFFFFF',      # 背景1
-    'bg2': '#E7E6E6',      # 背景2
-    'tx1': '#000000',      # 文本1
-    'tx2': '#44546A',      # 文本2
-    'hlink': '#0563C1',    # 超链接
-    'folHlink': '#954F72', # 已访问超链接
+    'accent1': '#4F81BD',
+    'accent2': '#C0504D',
+    'accent3': '#9BBB59',
+    'accent4': '#8064A2',
+    'accent5': '#4BACC6',
+    'accent6': '#F79646',
+    'dk1': '#000000',
+    'lt1': '#FFFFFF',
+    'dk2': '#1F497D',
+    'lt2': '#EEECE1',
+    'hlink': '#0000FF',
+    'folHlink': '#800080',
+    # bg1, bg2, tx1, tx2 are not in the standard theme file, but are common.
+    # We will keep them for compatibility, using the most logical mappings.
+    'bg1': '#FFFFFF',      # Corresponds to lt1
+    'bg2': '#EEECE1',      # Corresponds to lt2
+    'tx1': '#000000',      # Corresponds to dk1
+    'tx2': '#1F497D',      # Corresponds to dk2
 }
 
 # 图表系列的默认颜色顺序
@@ -61,6 +64,7 @@ COLOR_NAMES = {
 }
 
 
+@lru_cache(maxsize=256)
 def normalize_color(color: str) -> str:
     """
     标准化颜色格式为#RRGGBB格式。
@@ -75,13 +79,15 @@ def normalize_color(color: str) -> str:
         return '#000000'
     
     # 移除前缀（如果有）
-    clean_color = color.replace('#', '').replace('00', '', 1) if color.startswith('00') else color.replace('#', '')
+    clean_color = color.lstrip('#')
+    
+    # 处理以'00'开头的8位颜色
+    if len(clean_color) == 8 and clean_color.startswith('00'):
+        clean_color = clean_color[2:]
     
     # 确保是6位十六进制
     if len(clean_color) == 6:
         return f'#{clean_color.upper()}'
-    elif len(clean_color) == 8 and clean_color.startswith('00'):
-        return f'#{clean_color[2:].upper()}'
     else:
         return '#000000'  # 默认黑色
 
@@ -127,6 +133,7 @@ def format_color(color: str, is_font_color: bool = False, is_border_color: bool 
     return formatted_color
 
 
+@lru_cache(maxsize=128)
 def convert_scheme_color_to_hex(scheme_color: str) -> str:
     """
     将Excel主题颜色转换为十六进制颜色。
