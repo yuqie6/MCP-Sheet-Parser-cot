@@ -25,7 +25,14 @@ class ChartConverter:
         charts_html_parts = []
         for chart in overlay_charts:
             css_pos = position_calculator.calculate_chart_css_position(chart.position)
-            dynamic_svg_renderer = SVGChartRenderer(width=int(css_pos.width), height=int(css_pos.height * 1.33))
+            # 修复：使用与定位器一致的高度计算，确保SVG与容器匹配
+            chart_width = max(200, int(css_pos.width))  # width已经是px
+            # 使用与chart_positioning.py一致的高度计算
+            if chart.type == 'image':
+                chart_height = max(150, int(css_pos.height * 1.333))  # 图片高度
+            else:
+                chart_height = max(150, int(css_pos.height * 1.333))  # 其他图表高度，与容器一致
+            dynamic_svg_renderer = SVGChartRenderer(width=chart_width, height=chart_height)
             chart_content = []
             if chart.chart_data:
                 try:

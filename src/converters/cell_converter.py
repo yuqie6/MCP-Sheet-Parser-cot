@@ -1,6 +1,7 @@
 from datetime import datetime as dt, timedelta
 
 from src.models.table_model import Cell, RichTextFragment
+from src.utils.html_utils import escape_html
 
 # Number format mapping constant
 NUMBER_FORMAT_MAP = {
@@ -86,7 +87,7 @@ class CellConverter:
             css_parts.append("text-decoration: underline;")
 
         style_attr = f'style="{" ".join(css_parts)}"' if css_parts else ""
-        return f'<span {style_attr}>{self._escape_html(fragment.text)}</span>'
+        return f'<span {style_attr}>{escape_html(fragment.text)}</span>'
 
     def _apply_number_format(self, value, number_format: str) -> str:
         """
@@ -115,15 +116,3 @@ class CellConverter:
         if isinstance(value, (int, float)) and "," in number_format:
             return f"{value:,.2f}"
         return str(value)
-
-    def _escape_html(self, text: str) -> str:
-        """
-        Escapes special HTML characters.
-        """
-        if not isinstance(text, str):
-            text = str(text)
-        return (text.replace('&', '&amp;')
-                .replace('<', '&lt;')
-                .replace('>', '&gt;')
-                .replace('"', '&quot;')
-                .replace("'", '&#x27;'))

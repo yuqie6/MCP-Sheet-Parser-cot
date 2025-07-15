@@ -5,6 +5,7 @@ from typing import Dict, Any
 from src.constants import StyleConstants
 from src.font_manager import get_font_manager
 from src.models.table_model import Sheet, Style
+from src.utils.color_utils import format_color
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +123,10 @@ class StyleConverter:
         css_rules = [
             """
         table {
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-family: Arial, sans-serif;
-            table-layout: fixed;
+            table-layout: auto;
             width: auto;
             margin: 20px 0;
         }
@@ -137,6 +139,21 @@ class StyleConverter:
             overflow: visible;
             white-space: normal;
             vertical-align: middle;
+        }
+
+        /* 为溢出单元格提供例外 */
+        td.text-overflow {
+            word-wrap: normal !important;
+            white-space: nowrap !important;
+            min-width: auto !important;
+            max-width: none !important;
+            width: auto !important;
+        }
+
+        /* 覆盖列宽限制，确保溢出单元格能够扩展 */
+        table td.text-overflow {
+            width: auto !important;
+            min-width: auto !important;
         }
         th {
             background-color: #f8f9fa;
@@ -161,7 +178,8 @@ class StyleConverter:
             line-height: 1.1;
         }
         .table-container {
-            overflow-x: auto;
+            position: relative;
+            overflow: visible;
             margin: 20px 0;
         }
         .formula-cell {
@@ -186,7 +204,7 @@ class StyleConverter:
                 font_size = self._format_font_size(style.font_size)
                 css_rule += f" font-size: {font_size};"
             if style.font_color:
-                formatted_color = self._format_color(style.font_color, is_font_color=True)
+                formatted_color = format_color(style.font_color, is_font_color=True)
                 css_rule += f" color: {formatted_color} !important;"
             if style.bold:
                 css_rule += " font-weight: bold;"
@@ -195,8 +213,8 @@ class StyleConverter:
             if style.underline:
                 css_rule += " text-decoration: underline;"
             if style.background_color:
-                formatted_bg_color = self._format_color(style.background_color, is_font_color=False,
-                                                        is_border_color=False)
+                formatted_bg_color = format_color(style.background_color, is_font_color=False,
+                                                 is_border_color=False)
                 if formatted_bg_color:
                     css_rule += f" background-color: {formatted_bg_color};"
             if style.text_align:
@@ -218,8 +236,59 @@ class StyleConverter:
             css_rules.append(self._generate_dimension_css(sheet))
 
         css_rules.append(self._generate_chart_css())
+        css_rules.append(self._generate_text_overflow_css())
 
         return "\n".join(css_rules)
+
+    def _generate_text_overflow_css(self) -> str:
+        """
+        生成文字溢出显示的CSS样式（模拟Excel行为）。
+        """
+        return """
+        /* Excel文字溢出显示效果 - 使用最高优先级 */
+        table tr td.text-overflow,
+        table tbody tr td.text-overflow,
+        td.text-overflow {
+            overflow: visible !important;
+            white-space: nowrap !important;
+            position: relative !important;
+            z-index: 5 !important;
+            max-width: none !important;
+            width: auto !important;
+            word-wrap: normal !important;
+            min-width: auto !important;
+        }
+
+        /* 覆盖所有可能的列宽限制 */
+        table tr td.text-overflow,
+        table tbody tr td.text-overflow,
+        table td.text-overflow {
+            width: auto !important;
+            min-width: auto !important;
+        }
+
+        /* 覆盖nth-child列宽限制 - 扩展到所有列 */
+        table td:nth-child(n).text-overflow {
+            width: auto !important;
+            min-width: auto !important;
+            max-width: none !important;
+            white-space: nowrap !important;
+            word-wrap: normal !important;
+            overflow: visible !important;
+            position: relative !important;
+            z-index: 5 !important;
+        }
+
+        /* 确保溢出文字显示在其他单元格之上 */
+        td.text-overflow:hover {
+            z-index: 10 !important;
+        }
+
+        /* 确保表格单元格不会裁剪溢出内容 */
+        table {
+            table-layout: auto !important;
+        }
+        """
 
     def _generate_dimension_css(self, sheet: Sheet) -> str:
         """
@@ -231,41 +300,38 @@ class StyleConverter:
             if width > 0:
                 width_px = width * excel_to_px
                 css_rules.append(
-                    f"table td:nth-child({col_idx + 1}), table th:nth-child({col_idx + 1}) {{ width: {width_px:.0f}px; min-width: {width_px:.0f}px; }}")
+                    f"table td:nth-child({col_idx + 1}):not(.text-overflow), table th:nth-child({col_idx + 1}) {{ width: {width_px:.0f}px; min-width: {width_px:.0f}px; }}")
         for row_idx, height in sheet.row_heights.items():
             if height > 0:
-                css_rules.append(f"table tr:nth-child({row_idx + 1}) {{ height: {height}pt; }}")
+                # 确保行高至少能容纳内容，避免文字被截断
+                min_height = max(height, 18.0)  # 最小18pt行高
+                css_rules.append(f"table tr:nth-child({row_idx + 1}) {{ height: {min_height}pt; min-height: {min_height}pt; }}")
         return "\n".join(css_rules)
 
     def _generate_chart_css(self) -> str:
         """Generates CSS for charts."""
         return """
-        .table-container {
-            position: relative;
-            overflow: visible;
-            margin: 20px 0;
-        }
         .chart-overlay {
             position: absolute;
             z-index: 10;
             pointer-events: auto;
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 8px;
+            background: none;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 0;
         }
         .chart-overlay:hover {
             z-index: 20;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            box-shadow: none;
         }
         .chart-container {
             margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            background-color: #fafafa;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            background-color: transparent;
+            box-shadow: none;
         }
         .chart-container h3 {
             margin: 0 0 15px 0;
@@ -383,29 +449,4 @@ class StyleConverter:
         else:
             return f"{pt_size}pt"
 
-    def _format_color(self, color: str, is_font_color: bool = False, is_border_color: bool = False) -> str | None:
-        """
-        Formats a color string.
-        """
-        if not color:
-            return StyleConstants.DEFAULT_FONT_COLOR if is_font_color else None
-        color = color.strip().upper()
-        if re.match(r'^#[0-9A-F]{6}$', color):
-            formatted_color = color
-        elif re.match(r'^#[0-9A-F]{3}$', color):
-            formatted_color = f"#{color[1]}{color[1]}{color[2]}{color[2]}{color[3]}{color[3]}"
-        elif re.match(r'^[0-9A-F]{6}$', color):
-            formatted_color = f"#{color}"
-        elif re.match(r'^[0-9A-F]{3}$', color):
-            formatted_color = f"#{color[0]}{color[0]}{color[1]}{color[1]}{color[2]}{color[2]}"
-        elif color in StyleConstants.COLOR_NAMES:
-            formatted_color = StyleConstants.COLOR_NAMES[color]
-        else:
-            return StyleConstants.DEFAULT_FONT_COLOR if is_font_color else None
-
-        if is_border_color:
-            if formatted_color.upper() in ['#FFFFFF', '#FFF', 'WHITE', '#FEFEFE', '#FDFDFD']:
-                return '#E0E0E0'
-            elif formatted_color.upper() in ['#D8D8D8', '#DADADA', '#DBDBDB']:
-                return '#E0E0E0'
         return formatted_color

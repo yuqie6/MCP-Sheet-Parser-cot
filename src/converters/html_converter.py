@@ -84,11 +84,13 @@ class HTMLConverter:
         standalone_charts_html = self.chart_converter.generate_standalone_charts_html(sheet.charts)
 
         html_template = self._get_html_template()
+        # 修复：将图表覆盖层放在表格容器内部，确保正确的相对定位
+        table_with_charts = f'<div class="table-container">\n{table_html}\n{overlay_charts_html}\n</div>'
         html_content = html_template.format(
             title=f"Table: {sheet.name}",
             css_styles=css_content,
-            table_content=f'<div class="table-container">\n{table_html}\n</div>',
-            overlay_charts_content=overlay_charts_html,
+            table_content=table_with_charts,
+            overlay_charts_content="",  # 已经包含在table_content中
             charts_content=standalone_charts_html,
             sheet_name=sheet.name
         )
@@ -117,6 +119,22 @@ class HTMLConverter:
 {table_content}
 {overlay_charts_content}
 {charts_content}
+    <script>
+        // 强制应用文字溢出样式
+        document.addEventListener('DOMContentLoaded', function() {{
+            const overflowCells = document.querySelectorAll('.text-overflow');
+            overflowCells.forEach(function(cell) {{
+                cell.style.setProperty('overflow', 'visible', 'important');
+                cell.style.setProperty('white-space', 'nowrap', 'important');
+                cell.style.setProperty('width', 'auto', 'important');
+                cell.style.setProperty('min-width', 'auto', 'important');
+                cell.style.setProperty('word-wrap', 'normal', 'important');
+                cell.style.setProperty('position', 'relative', 'important');
+                cell.style.setProperty('z-index', '5', 'important');
+                console.log('Applied overflow styles to:', cell.textContent.trim());
+            }});
+        }});
+    </script>
 </body>
 </html>"""
 

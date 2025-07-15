@@ -11,51 +11,30 @@ SVG图表渲染器 - 将Excel图表转换为高质量的SVG格式。
 from typing import Any, Dict, List, Optional, Tuple
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-
-
-# Excel主题颜色映射（Office 2016+ 默认主题）
-EXCEL_THEME_COLORS = {
-    'accent1': '#5B9BD5',  # 蓝色
-    'accent2': '#70AD47',  # 绿色  
-    'accent3': '#FFC000',  # 橙色
-    'accent4': '#E15759',  # 红色
-    'accent5': '#4472C4',  # 深蓝色
-    'accent6': '#FF6B35',  # 橙红色
-    'dk1': '#000000',      # 深色1（黑色）
-    'lt1': '#FFFFFF',      # 浅色1（白色）
-    'dk2': '#44546A',      # 深色2（深灰蓝）
-    'lt2': '#E7E6E6',      # 浅色2（浅灰）
-    'bg1': '#FFFFFF',      # 背景1
-    'bg2': '#E7E6E6',      # 背景2
-    'tx1': '#000000',      # 文本1
-    'tx2': '#44546A',      # 文本2
-}
-
-# 图表系列的默认颜色顺序（基于Excel主题）
-DEFAULT_CHART_COLORS = [
-    EXCEL_THEME_COLORS['accent1'],  # 蓝色
-    EXCEL_THEME_COLORS['accent2'],  # 绿色
-    EXCEL_THEME_COLORS['accent3'],  # 橙色
-    EXCEL_THEME_COLORS['accent4'],  # 红色
-    EXCEL_THEME_COLORS['accent5'],  # 深蓝色
-    EXCEL_THEME_COLORS['accent6'],  # 橙红色
-]
+from src.utils.color_utils import DEFAULT_CHART_COLORS, normalize_color
 
 
 class SVGChartRenderer:
     """将Excel图表数据转换为SVG的渲染器。"""
     
-    def __init__(self, width: int = 400, height: int = 300):
+    def __init__(self, width: int = 800, height: int = 500, show_axes: bool = False):  # 默认不显示坐标轴
         """
         初始化SVG渲染器。
-        
+
         参数：
-            width: SVG图表宽度（像素）
-            height: SVG图表高度（像素）
+            width: SVG图表宽度（像素）- 基于Excel默认15cm
+            height: SVG图表高度（像素）- 基于Excel默认7.5cm
+            show_axes: 是否显示坐标轴和网格线（默认False，匹配Excel简洁样式）
         """
+        # 基于搜索结果：Excel默认图表大小15x7.5cm
         self.width = width
         self.height = height
-        self.margin = {'top': 40, 'right': 40, 'bottom': 60, 'left': 80}
+        self.show_axes = show_axes
+        # 调整边距：如果不显示坐标轴，减少边距
+        if show_axes:
+            self.margin = {'top': 50, 'right': 80, 'bottom': 60, 'left': 80}
+        else:
+            self.margin = {'top': 20, 'right': 20, 'bottom': 20, 'left': 20}  # 简洁模式，最小边距
         self.plot_width = width - self.margin['left'] - self.margin['right']
         self.plot_height = height - self.margin['top'] - self.margin['bottom']
         
@@ -106,8 +85,8 @@ class SVGChartRenderer:
     def _create_svg_root(self, title: str = "") -> ET.Element:
         """创建SVG根元素。"""
         svg = ET.Element('svg', {
-            'width': str(self.width),
-            'height': str(self.height),
+            'width': f'{self.width}px',
+            'height': f'{self.height}px',
             'viewBox': f'0 0 {self.width} {self.height}',
             'xmlns': 'http://www.w3.org/2000/svg',
             'class': 'excel-chart-svg'
@@ -131,19 +110,11 @@ class SVGChartRenderer:
     
     def _get_series_colors(self, chart_data: Dict[str, Any]) -> List[str]:
         """
-        获取系列颜色，优先使用Excel原始颜色。
-        
-        参数：
-            chart_data: 图表数据
-            
-        返回：
-            颜色列表
+        Gets series colors, prioritizing original Excel colors.
         """
-        # 优先使用从Excel提取的颜色
         if 'colors' in chart_data and chart_data['colors']:
             return chart_data['colors']
         
-        # 从系列数据中提取颜色
         colors = []
         for series in chart_data.get('series', []):
             if 'color' in series and series['color']:
@@ -152,7 +123,6 @@ class SVGChartRenderer:
         if colors:
             return colors
         
-        # 回退到默认颜色
         return DEFAULT_CHART_COLORS
     
     def _get_chart_css(self) -> str:
@@ -162,7 +132,7 @@ class SVGChartRenderer:
             font-family: 'Microsoft YaHei', 'SimHei', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Segoe UI', Arial, sans-serif;
         }
         .chart-title {
-            font-size: 16px;
+            font-size: 18px;  /* 基于搜索结果：Excel默认18pt */
             font-weight: bold;
             fill: #333;
         }
@@ -171,7 +141,7 @@ class SVGChartRenderer:
             fill: #666;
         }
         .axis-label {
-            font-size: 10px;
+            font-size: 11px;
             fill: #666;
         }
         .grid-line {
@@ -220,20 +190,27 @@ class SVGChartRenderer:
             stroke-width: 2;
         }
         .legend-item {
-            font-size: 10px;
+            font-size: 11px;
             fill: #666;
         }
         """
     
     def _render_bar_chart(self, chart_data: Dict[str, Any]) -> str:
-        """渲染柱状图。"""
+        """Renders a bar chart."""
         svg = self._create_svg_root(chart_data.get('title', ''))
         series_list = chart_data.get('series', [])
-        
+
+        # 保存当前系列，供其他方法使用
+        self.current_series = series_list
+
+        # 修复：确保颜色列表与系列列表匹配
+        colors = self._get_series_colors(chart_data)
+        if len(colors) < len(series_list):
+            colors.extend(DEFAULT_CHART_COLORS * (len(series_list) - len(colors)))
+
         if not series_list:
             return self._format_svg(svg)
-        
-        # 获取所有数据点
+
         all_x_labels = []
         all_y_values = []
         for series in series_list:
@@ -241,76 +218,88 @@ class SVGChartRenderer:
             y_data = series.get('y_data', [])
             all_x_labels.extend(x_data)
             all_y_values.extend(y_data)
-        
+
         if not all_x_labels or not all_y_values:
             return self._format_svg(svg)
-        
-        # 去重并排序x标签
-        unique_x_labels = list(dict.fromkeys(all_x_labels))  # 保持顺序的去重
-        
-        # 计算y轴范围，确保从0开始显示
-        y_min = 0  # 强制从0开始，这样所有数值都能正确显示高度
-        y_max = max(all_y_values) if all_y_values else 1
+
+        unique_x_labels = list(dict.fromkeys(all_x_labels))
+        # 修复：Y轴从0开始，这样所有柱子都有合理的高度
+        y_min = 0  # 强制从0开始
+        y_max = chart_data.get('y_axis_max') if chart_data.get('y_axis_max') is not None else max(all_y_values) if all_y_values else 1
+        # 确保y_min和y_max是数值类型
+        y_min = float(y_min)
+        y_max = float(y_max)
         y_range = y_max - y_min if y_max != y_min else 1
-        
-        # 绘制坐标轴
-        self._draw_axes(svg, unique_x_labels, y_min, y_max)
-        
-        # 绘制数据系列
+
+        # 绘制X轴标签（保持Excel样式）
+        self._draw_x_axis_labels(svg, unique_x_labels)
+
         colors = self._get_series_colors(chart_data)
-        # 修复：正确计算柱子宽度
-        total_bar_space = self.plot_width * 0.8  # 怰80%的空间用于柱子
-        bar_group_width = total_bar_space / len(unique_x_labels)
-        single_bar_width = bar_group_width / len(series_list) * 0.8  # 柱子之间留空隙
+        # 修复：每个数据点都是独立的柱子，不按标签分组
+        total_bars = len(all_x_labels)  # 总柱子数
+        bar_group_width = self.plot_width / total_bars
+        bar_width = bar_group_width * 0.5  # 减小柱子宽度，使其更苗条
         
+        # 重新设计：每个数据点都是独立的柱子，按顺序排列
+        bar_index = 0  # 全局柱子索引
+
         for series_idx, series in enumerate(series_list):
-            color = colors[series_idx % len(colors)]
             x_data = series.get('x_data', [])
             y_data = series.get('y_data', [])
-            
+
             for i, (x_label, y_value) in enumerate(zip(x_data, y_data)):
-                if x_label in unique_x_labels:
-                    x_pos = unique_x_labels.index(x_label)
-                    # 修复：正确计算柱子位置
-                    group_start = self.margin['left'] + x_pos * (self.plot_width / len(unique_x_labels))
-                    group_center = group_start + (self.plot_width / len(unique_x_labels)) / 2
-                    total_series_width = single_bar_width * len(series_list)
-                    bar_x = group_center - total_series_width / 2 + series_idx * single_bar_width
-                    
-                    # 修复：确保非零值有可见的柱子高度
-                    if y_value == 0:
-                        bar_height = 0
-                    else:
-                        # 计算柱子高度，确保最小可见高度
-                        calculated_height = (y_value - y_min) / y_range * self.plot_height
-                        bar_height = max(calculated_height, 3)  # 最小3像素高度
-                    
-                    bar_y = self.margin['top'] + self.plot_height - bar_height
-                    
-                    # 创建柱子
-                    rect = ET.SubElement(svg, 'rect', {
-                        'x': str(bar_x),
-                        'y': str(bar_y),
-                        'width': str(single_bar_width),
-                        'height': str(bar_height),
-                        'fill': color,
-                        'class': 'bar-rect'
+                # 每个柱子都有独立的位置，不按标签分组
+                color = normalize_color(series.get('color') or colors[series_idx % len(colors)])
+
+                # 计算柱子位置：按数据顺序排列
+                bar_center_x = self.margin['left'] + (bar_index + 0.5) * bar_group_width
+                bar_x = bar_center_x - bar_width / 2
+
+                # 计算柱子高度
+                y_value_norm = max(0, y_value - y_min)  # 确保非负
+                bar_height = (y_value_norm / y_range) * self.plot_height if y_range > 0 else 0
+                bar_height = max(5, bar_height)  # 确保至少5像素高度，让柱子可见
+
+                bar_y = self.margin['top'] + self.plot_height - bar_height
+
+                # 绘制柱子
+                rect = ET.SubElement(svg, 'rect', {
+                    'x': str(bar_x),
+                    'y': str(bar_y),
+                    'width': str(bar_width),
+                    'height': str(bar_height),
+                    'fill': color,
+                    'class': 'bar-rect'
+                })
+
+                # 只有在Excel明确设置显示数据标签时才显示数字
+                show_data_labels = (
+                    chart_data.get('show_data_labels', False) or
+                    series.get('show_data_labels', False) or
+                    chart_data.get('data_labels', {}).get('show', False)
+                )
+
+                if show_data_labels and bar_height > 8:
+                    text = ET.SubElement(svg, 'text', {
+                        'x': str(bar_x + bar_width / 2),
+                        'y': str(bar_y + 10),
+                        'text-anchor': 'middle',
+                        'alignment-baseline': 'middle',
+                        'class': 'axis-label',
+                        'fill': 'white',
+                        'font-size': '10px'
                     })
-                    
-                    # 添加数值标签
-                    if bar_height > 15:  # 只在足够高的柱子上显示标签
-                        text = ET.SubElement(svg, 'text', {
-                            'x': str(bar_x + single_bar_width / 2),
-                            'y': str(bar_y + bar_height / 2),
-                            'text-anchor': 'middle',
-                            'alignment-baseline': 'middle',
-                            'class': 'axis-label',
-                            'fill': 'white'
-                        })
-                        text.text = str(y_value)
+                    text.text = str(int(y_value))
+
+                bar_index += 1  # 下一个柱子
         
-        # 绘制图例
-        self._draw_legend(svg, series_list, colors)
+        # 只有在Excel明确设置显示图例时才绘制图例
+        show_legend = (
+            chart_data.get('show_legend', False) or
+            chart_data.get('legend', {}).get('show', False)
+        )
+        if show_legend:
+            self._draw_legend(svg, series_list, colors)
         
         return self._format_svg(svg)
     
@@ -346,7 +335,7 @@ class SVGChartRenderer:
         colors = self._get_series_colors(chart_data)
         
         for series_idx, series in enumerate(series_list):
-            color = colors[series_idx % len(colors)]
+            color = normalize_color(colors[series_idx % len(colors)])
             x_data = series.get('x_data', [])
             y_data = series.get('y_data', [])
             
@@ -383,12 +372,18 @@ class SVGChartRenderer:
                     circle = ET.SubElement(svg, 'circle', {
                         'cx': str(x),
                         'cy': str(y),
+                        'r': '3',  # 添加半径属性
                         'fill': color,
                         'class': 'line-point'
                     })
         
-        # 绘制图例
-        self._draw_legend(svg, series_list, colors)
+        # 只有在Excel明确设置显示图例时才绘制图例
+        show_legend = (
+            chart_data.get('show_legend', False) or
+            chart_data.get('legend', {}).get('show', False)
+        )
+        if show_legend:
+            self._draw_legend(svg, series_list, colors)
         
         return self._format_svg(svg)
     
@@ -428,7 +423,7 @@ class SVGChartRenderer:
         current_angle = 0
         for i, (label, value) in enumerate(zip(labels, values)):
             angle = (value / total) * 360
-            color = colors[i % len(colors)]
+            color = normalize_color(colors[i % len(colors)])
             
             # 计算扇形路径
             start_angle_rad = current_angle * 3.14159 / 180
@@ -500,7 +495,7 @@ class SVGChartRenderer:
         baseline_y = self.margin['top'] + self.plot_height  # 基线位置
         
         for series_idx, series in enumerate(series_list):
-            color = colors[series_idx % len(colors)]
+            color = normalize_color(colors[series_idx % len(colors)])
             x_data = series.get('x_data', [])
             y_data = series.get('y_data', [])
             
@@ -551,15 +546,61 @@ class SVGChartRenderer:
                         'class': 'area-point'
                     })
         
-        # 绘制图例
-        self._draw_legend(svg, series_list, colors)
+        # 只有在Excel明确设置显示图例时才绘制图例
+        show_legend = (
+            chart_data.get('show_legend', False) or
+            chart_data.get('legend', {}).get('show', False)
+        )
+        if show_legend:
+            self._draw_legend(svg, series_list, colors)
         
         return self._format_svg(svg)
     
     def _render_image_chart(self, chart_data: Dict[str, Any]) -> str:
-        """渲染图像占位符。"""
-        svg = self._create_svg_root(chart_data.get('title', 'Image'))
+        """渲染图像 - 支持真实图片和占位符。"""
+        # 检查是否有有效的图片数据 - 支持多种数据结构
+        img_data = None
         
+        # 尝试从不同的位置获取图片数据
+        if isinstance(chart_data, dict):
+            # 方式1：直接从chart_data中获取
+            img_data = chart_data.get('image_data')
+            
+            # 方式2：从嵌套字典中获取（这是xlsx_parser存储的方式）
+            if not img_data and 'image_data' in chart_data:
+                nested_data = chart_data['image_data']
+                if isinstance(nested_data, dict):
+                    img_data = nested_data.get('image_data')
+                else:
+                    img_data = nested_data
+        
+        if img_data and isinstance(img_data, bytes) and len(img_data) > 10:
+            # 有真实图片数据，渲染为HTML img标签而不是SVG
+            import base64
+
+            # 检测图片格式
+            img_format = 'png'  # 默认
+            if img_data.startswith(b'\x89PNG'):
+                img_format = 'png'
+            elif img_data.startswith(b'\xff\xd8\xff'):
+                img_format = 'jpeg'
+            elif img_data.startswith(b'GIF'):
+                img_format = 'gif'
+
+            # 转换为Base64
+            img_base64 = base64.b64encode(img_data).decode('utf-8')
+            data_url = f"data:image/{img_format};base64,{img_base64}"
+
+            # 返回HTML img标签 - 正常显示，无背景
+            return f'''
+            <div class="chart-svg-wrapper" style="background: none; padding: 0; min-height: auto;">
+                <img src="{data_url}" alt="Excel Image" style="max-width: 100%; height: auto; border-radius: 4px; background: transparent;" />
+            </div>
+            '''
+
+        # 没有有效图片数据，渲染占位符SVG
+        svg = self._create_svg_root(chart_data.get('title', 'Image'))
+
         # 绘制图像占位符（移除不必要的背景框）
         placeholder_rect = ET.SubElement(svg, 'rect', {
             'x': str(self.margin['left']),
@@ -619,7 +660,7 @@ class SVGChartRenderer:
         text.text = "图像内容"
         
         # 如果有图像数据，显示额外信息（优化颜色）
-        if chart_data.get('image_data'):
+        if img_data:
             info_text = ET.SubElement(svg, 'text', {
                 'x': str(self.width // 2),
                 'y': str(text_y + 20),
@@ -657,8 +698,33 @@ class SVGChartRenderer:
         
         return self._format_svg(svg)
     
+    def _draw_x_axis_labels(self, svg: ET.Element, x_labels: List[str]):
+        """只绘制X轴标签，不绘制坐标轴线和网格线。"""
+        # 获取所有标签（包括重复的）
+        all_labels = []
+        for series in self.current_series:
+            all_labels.extend(series.get('x_data', []))
+
+        # 每个柱子都有自己的标签
+        bar_group_width = self.plot_width / len(all_labels)
+
+        # X轴标签
+        for i, label in enumerate(all_labels):
+            # 计算标签位置（居中于每个柱子）
+            x_pos = self.margin['left'] + (i + 0.5) * bar_group_width
+
+            text = ET.SubElement(svg, 'text', {
+                'x': str(x_pos),
+                'y': str(self.margin['top'] + self.plot_height + 15),
+                'text-anchor': 'middle',
+                'class': 'axis-label',
+                'fill': '#666',  # 确保标签可见
+                'font-size': '10px'  # 稍微减小字体，避免重叠
+            })
+            text.text = str(label)
+
     def _draw_axes(self, svg: ET.Element, x_labels: List[str], y_min: float, y_max: float):
-        """绘制坐标轴。"""
+        """绘制完整坐标轴，包括轴线、网格线和标签。"""
         # X轴
         x_axis = ET.SubElement(svg, 'line', {
             'x1': str(self.margin['left']),
@@ -667,7 +733,7 @@ class SVGChartRenderer:
             'y2': str(self.margin['top'] + self.plot_height),
             'class': 'axis-line'
         })
-        
+
         # Y轴
         y_axis = ET.SubElement(svg, 'line', {
             'x1': str(self.margin['left']),
@@ -676,22 +742,9 @@ class SVGChartRenderer:
             'y2': str(self.margin['top'] + self.plot_height),
             'class': 'axis-line'
         })
-        
-        # X轴标签
-        for i, label in enumerate(x_labels):
-            # 修复：正确计算X轴标签位置
-            if len(x_labels) == 1:
-                x_pos = self.margin['left'] + self.plot_width / 2
-            else:
-                x_pos = self.margin['left'] + i * (self.plot_width / (len(x_labels) - 1))
-            
-            text = ET.SubElement(svg, 'text', {
-                'x': str(x_pos),
-                'y': str(self.margin['top'] + self.plot_height + 15),
-                'text-anchor': 'middle',
-                'class': 'axis-label'
-            })
-            text.text = str(label)
+
+        # 复用X轴标签绘制
+        self._draw_x_axis_labels(svg, x_labels)
         
         # Y轴标签
         y_range = y_max - y_min if y_max != y_min else 1
@@ -725,7 +778,7 @@ class SVGChartRenderer:
         legend_y = self.margin['top']
         
         for i, series in enumerate(series_list):
-            color = colors[i % len(colors)]
+            color = normalize_color(colors[i % len(colors)])
             series_name = series.get('name', f'Series {i + 1}')
             
             # 图例色块

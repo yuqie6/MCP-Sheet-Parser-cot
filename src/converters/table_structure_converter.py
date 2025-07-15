@@ -1,5 +1,6 @@
 from src.models.table_model import Sheet
 from src.utils.range_parser import parse_range_string
+from src.utils.html_utils import escape_html
 
 
 class TableStructureConverter:
@@ -33,7 +34,7 @@ class TableStructureConverter:
 
         table_parts = [f'<table role="table" aria-label="Table: {sheet.name}">']
         if sheet.name and sheet.name.strip():
-            table_parts.append(f'<caption>Table: {self.cell_converter._escape_html(sheet.name)}</caption>')
+            table_parts.append(f'<caption>Table: {escape_html(sheet.name)}</caption>')
 
         style_key_to_id_map = {self.style_converter.get_style_key(style_obj): style_id for style_id, style_obj in
                                styles.items()}
@@ -72,6 +73,13 @@ class TableStructureConverter:
                         css_classes.append(style_id)
                     if cell.style.wrap_text:
                         css_classes.append("wrap-text")
+                # 检查是否需要文字溢出显示（Excel特性）
+                overflow_style = ""
+                if self._should_overflow_text(cell, row, c_idx):
+                    css_classes.append("text-overflow")
+                    # 添加内联样式确保最高优先级
+                    overflow_style = ' style="overflow: visible !important; white-space: nowrap !important; width: auto !important; min-width: auto !important; word-wrap: normal !important; position: relative; z-index: 5;"'
+
                 if css_classes:
                     style_class = f' class="{" ".join(css_classes)}"'
 
@@ -82,23 +90,23 @@ class TableStructureConverter:
                         span_attrs += f' rowspan="{spans["rowspan"]}"'
                     if spans["colspan"] > 1:
                         span_attrs += f' colspan="{spans["colspan"]}"'
-                cell_html = self._generate_cell_html(cell, style_class, span_attrs, is_header)
+                cell_html = self._generate_cell_html(cell, style_class, span_attrs, is_header, overflow_style)
                 table_parts.append(cell_html)
             table_parts.append('</tr>')
 
-    def _generate_cell_html(self, cell, style_class, span_attrs, is_header):
+    def _generate_cell_html(self, cell, style_class, span_attrs, is_header, overflow_style=""):
         cell_content = self.cell_converter.convert(cell)
 
         if cell.style and cell.style.hyperlink:
-            href = self.cell_converter._escape_html(cell.style.hyperlink)
+            href = escape_html(cell.style.hyperlink)
             cell_content = f'<a href="{href}">{cell_content}</a>'
 
         title_attr = ""
         if cell.style and cell.style.comment:
-            comment = self.cell_converter._escape_html(cell.style.comment)
+            comment = escape_html(cell.style.comment)
             title_attr = f' title="{comment}"'
         if cell.formula:
-            formula_escaped = self.cell_converter._escape_html(cell.formula)
+            formula_escaped = escape_html(cell.formula)
             if title_attr:
                 title_attr = f'{title_attr} | Formula: {formula_escaped}"'
             else:
@@ -106,7 +114,40 @@ class TableStructureConverter:
 
         data_attr = ""
         if cell.style and cell.style.number_format:
-            number_format = self.cell_converter._escape_html(cell.style.number_format)
+            number_format = escape_html(cell.style.number_format)
             data_attr = f' data-number-format="{number_format}"'
         tag = 'th' if is_header else 'td'
-        return f'<{tag}{style_class}{span_attrs}{title_attr}{data_attr}>{cell_content}</{tag}>'
+        return f'<{tag}{style_class}{span_attrs}{title_attr}{data_attr}{overflow_style}>{cell_content}</{tag}>'
+
+    def _should_overflow_text(self, cell, row, col_idx):
+        """
+        检查单元格是否应该应用文字溢出显示（模拟Excel行为）。
+
+        条件：
+        1. 单元格有文字内容
+        2. 文字长度超过一定阈值（比如10个字符）
+        3. 右边的单元格为空
+        4. 单元格没有设置文字换行
+        """
+        if not cell.value:
+            return False
+
+        # 检查文字长度 (中文字符按2倍计算)
+        cell_text = str(cell.value).strip()
+        # 计算显示宽度：中文字符按2倍计算，英文字符按1倍计算
+        display_width = sum(2 if ord(c) > 127 else 1 for c in cell_text)
+        if display_width <= 8:  # 短文字不需要溢出 (降低阈值以适应中文)
+            return False
+
+        # 检查是否设置了文字换行
+        if cell.style and cell.style.wrap_text:
+            return False  # 如果设置了换行，不应该溢出
+
+        # 检查右边的单元格是否为空
+        next_col_idx = col_idx + 1
+        if next_col_idx < len(row.cells):
+            next_cell = row.cells[next_col_idx]
+            if next_cell.value:  # 右边有内容，不应该溢出
+                return False
+
+        return True  # 满足所有条件，应该溢出显示

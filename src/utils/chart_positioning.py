@@ -29,9 +29,10 @@ class ChartPositionCalculator:
     - 1英寸 = 914,400 EMUs = 96像素（96 DPI）
     """
     
-    # 常量定义
-    EXCEL_TO_PX = 8.43  # Excel列宽单位到像素的转换系数
-    EMU_TO_PX = 96 / 914400  # EMU到像素的转换系数（96 DPI）
+    # 常量定义 - 基于实际HTML输出分析的精确转换
+    EXCEL_TO_PX = 8.45  # Excel列宽单位到像素的转换系数（通过对比HTML输出计算得出）
+    EMU_TO_PX = 96 / 914400  # EMU到像素的转换系数（914400 EMUs per inch）
+    EMU_TO_PT = 72 / 914400  # EMU到点的转换系数（72 points per inch）
     
     def __init__(self, sheet: Sheet):
         """
@@ -45,37 +46,25 @@ class ChartPositionCalculator:
     def calculate_chart_css_position(self, position: ChartPosition) -> ChartCSSPosition:
         """
         计算图表的CSS定位信息。
-        
+
         参数：
             position: 图表的Excel定位信息
-            
+
         返回：
             ChartCSSPosition: CSS定位信息
         """
-        # 使用更保守的定位策略，避免图表超出可视区域
-        # 计算相对于表格的位置，而不是绝对累计位置
+        # 使用实际的起始位置计算
+        start_x, start_y = self._calculate_cell_position(position.from_col, position.from_row)
+
+        # 添加单元格内偏移
+        col_offset_px = position.from_col_offset * self.EMU_TO_PX
+        row_offset_pt = position.from_row_offset * self.EMU_TO_PT
+
+        # 计算最终位置 - 使用实际单元格位置而不是硬编码的M列位置
+        final_x = start_x + col_offset_px
+        final_y = start_y + row_offset_pt
         
-        # 计算起始列的相对位置（大幅减少偏移）
-        start_col_width = self.sheet.column_widths.get(position.from_col, self.sheet.default_column_width)
-        relative_x = position.from_col * start_col_width * self.EXCEL_TO_PX * 0.1  # 大幅减少为10%
-        
-        # 计算起始行的相对位置
-        start_row_height = self.sheet.row_heights.get(position.from_row, self.sheet.default_row_height)
-        relative_y = position.from_row * start_row_height * 0.3  # 减少垂直偏移
-        
-        # 添加单元格内偏移（转换并大幅限制）
-        col_offset_px = position.from_col_offset * self.EMU_TO_PX * 0.1  # 大幅减少EMU偏移影响
-        row_offset_px = position.from_row_offset * self.EMU_TO_PX * 0.1  # 大幅减少EMU偏移影响
-        
-        # 限制偏移量，防止图表跑出可视区域
-        max_offset_x = 200  # 减少最大水平偏移
-        max_offset_y = 100  # 减少最大垂直偏移
-        
-        final_x = min(relative_x + col_offset_px, max_offset_x)
-        final_y = min(relative_y + row_offset_px, max_offset_y)
-        
-        # 计算图表尺寸（使用Excel原始尺寸信息）
-        # 优先使用EMU尺寸，如果不可用则回退到行列跨度计算
+        # 计算图表尺寸
         width = self._calculate_chart_width(position)
         height = self._calculate_chart_height(position)
         
@@ -114,60 +103,72 @@ class ChartPositionCalculator:
     def _calculate_chart_width(self, position: ChartPosition) -> float:
         """
         计算图表宽度。
-        
-        参数：
-            position: 图表定位信息
-            
-        返回：
-            float: 图表宽度（像素）
         """
-        # 计算跨越的列数和总宽度
-        col_span = max(1, position.to_col - position.from_col + 1)
+        # 修复：精确计算图表宽度
+        start_x, _ = self._calculate_cell_position(position.from_col, 0)
+        end_x, _ = self._calculate_cell_position(position.to_col, 0)
         
-        # 使用平均列宽计算，避免过大的宽度
-        avg_col_width = self.sheet.default_column_width
-        if self.sheet.column_widths:
-            total_width = sum(self.sheet.column_widths.values())
-            avg_col_width = total_width / len(self.sheet.column_widths)
+        start_offset = position.from_col_offset * self.EMU_TO_PX
+        end_offset = position.to_col_offset * self.EMU_TO_PX
         
-        # 基础宽度 + 列偏移
-        base_width = col_span * avg_col_width * self.EXCEL_TO_PX * 0.7  # 减少宽度倍数
-        col_offset_width = (position.to_col_offset - position.from_col_offset) * self.EMU_TO_PX
+        # 结束列的宽度
+        end_col_width = self.sheet.column_widths.get(position.to_col, self.sheet.default_column_width) * self.EXCEL_TO_PX
         
-        # 限制最大宽度，避免图表过大
-        max_width = 500
-        total_width = min(base_width + col_offset_width, max_width)
+        width = (end_x - start_x) + end_offset - start_offset
         
-        return max(200, total_width)  # 最小宽度200px
+        # 如果图表在单个单元格内
+        if position.from_col == position.to_col:
+            width = end_offset - start_offset
+        else:
+            # 跨多个单元格的情况
+            middle_cols_width = 0
+            for i in range(position.from_col + 1, position.to_col):
+                middle_cols_width += self.sheet.column_widths.get(i, self.sheet.default_column_width) * self.EXCEL_TO_PX
+
+            from_col_width = self.sheet.column_widths.get(position.from_col, self.sheet.default_column_width) * self.EXCEL_TO_PX
+            to_col_width = self.sheet.column_widths.get(position.to_col, self.sheet.default_column_width) * self.EXCEL_TO_PX
+
+            # 修复：如果to_col_offset为0，表示占满整个目标单元格
+            actual_end_offset = end_offset if end_offset > 0 else to_col_width
+
+            width = (from_col_width - start_offset) + middle_cols_width + actual_end_offset
+
+        return max(50, width) # 恢复原始最小宽度，按实际尺寸显示
     
     def _calculate_chart_height(self, position: ChartPosition) -> float:
         """
         计算图表高度。
-        
-        参数：
-            position: 图表定位信息
-            
-        返回：
-            float: 图表高度（点）
         """
-        # 计算跨越的行数和总高度
-        row_span = max(1, position.to_row - position.from_row + 1)
+        # 修复：精确计算图表高度
+        _, start_y = self._calculate_cell_position(0, position.from_row)
+        _, end_y = self._calculate_cell_position(0, position.to_row)
+
+        start_offset = position.from_row_offset * self.EMU_TO_PT
+        end_offset = position.to_row_offset * self.EMU_TO_PT
         
-        # 使用平均行高计算
-        avg_row_height = self.sheet.default_row_height
-        if self.sheet.row_heights:
-            total_height = sum(self.sheet.row_heights.values())
-            avg_row_height = total_height / len(self.sheet.row_heights)
-        
-        # 基础高度 + 行偏移（转换为点）
-        base_height = row_span * avg_row_height * 0.8  # 减少高度倍数
-        row_offset_height = (position.to_row_offset - position.from_row_offset) * self.EMU_TO_PX * 0.75
-        
-        # 限制最大高度
-        max_height = 300
-        total_height = min(base_height + row_offset_height, max_height)
-        
-        return max(150, total_height)  # 最小高度150pt
+        if position.from_row == position.to_row:
+            height = end_offset - start_offset
+        else:
+            # 计算跨多行的总高度
+            total_height = 0
+
+            # 起始行：从偏移位置到行末
+            from_row_height = self.sheet.row_heights.get(position.from_row, self.sheet.default_row_height)
+            total_height += (from_row_height - start_offset)
+
+            # 中间完整行
+            for i in range(position.from_row + 1, position.to_row):
+                row_height = self.sheet.row_heights.get(i, self.sheet.default_row_height)
+                total_height += row_height
+
+            # 结束行：如果to_row_offset为0，表示占满整个目标行
+            to_row_height = self.sheet.row_heights.get(position.to_row, self.sheet.default_row_height)
+            actual_end_offset = end_offset if end_offset > 0 else to_row_height
+            total_height += actual_end_offset
+
+            height = total_height
+
+        return max(50, height) # 恢复原始最小高度，按实际尺寸显示
     
     def get_chart_overlay_css(self, position: ChartPosition, container_id: str = "table-container") -> str:
         """
@@ -200,35 +201,123 @@ class ChartPositionCalculator:
     def generate_chart_html_with_positioning(self, chart, chart_html: str) -> str:
         """
         为图表HTML添加定位信息。
-        
+
         参数：
             chart: Chart对象
             chart_html: 原始图表HTML
-            
+
         返回：
             str: 带定位的图表HTML
         """
         if not chart.position:
             # 没有定位信息，使用原始HTML
             return chart_html
-            
-        css_pos = self.calculate_chart_css_position(chart.position)
-        
+
+        # 根据图表类型使用不同的定位逻辑
+        if chart.type == 'image':
+            # 图片使用原始位置计算（不应用柱状图的M列调整）
+            css_pos = self._calculate_image_position(chart.position)
+        else:
+            # 其他图表（如柱状图）使用调整后的位置计算
+            css_pos = self.calculate_chart_css_position(chart.position)
+
         # 添加内联样式进行精确定位
+        # 修复：统一使用px单位，避免pt和px混用导致的尺寸不匹配
+        # 将pt转换为px (1pt = 1.333px)
+        top_px = css_pos.top * 1.333
+
+        # 根据图表类型调整高度 - 修复容器与SVG高度不匹配问题
+        if chart.type == 'image':
+            height_px = css_pos.height * 1.333  # 图片不需要额外增加高度
+        else:
+            height_px = css_pos.height * 1.333  # 移除30%增加，保持与SVG高度一致
+
+        # 使用绝对定位，但基于表格容器的相对位置
+        # 这样可以保持Excel的覆盖效果，同时相对于表格定位
+        # 根据图表类型进行不同的位置调整
+        if chart.type == 'image':
+            # 图片位置通常是正确的，不需要调整
+            left_adjusted = css_pos.left
+            top_adjusted = top_px
+        else:
+            # 其他图表使用计算出的位置，不需要额外调整
+            left_adjusted = css_pos.left
+            top_adjusted = top_px
+
         positioned_html = f"""
         <div class="chart-overlay" style="
             position: absolute;
-            left: {css_pos.left:.1f}px;
-            top: {css_pos.top:.1f}pt;
+            left: {left_adjusted:.1f}px;
+            top: {top_adjusted:.1f}px;
             width: {css_pos.width:.1f}px;
-            height: {css_pos.height:.1f}pt;
+            height: {height_px:.1f}px;
             z-index: 10;
+            pointer-events: auto;
         ">
             {chart_html}
         </div>
         """
-        
+
         return positioned_html
+
+    def _calculate_image_position(self, position: ChartPosition) -> ChartCSSPosition:
+        """
+        计算图片的CSS定位信息（使用原始位置，不应用柱状图的调整）。
+
+        参数：
+            position: 图片的Excel定位信息
+
+        返回：
+            ChartCSSPosition: CSS定位信息
+        """
+        # 使用原始位置计算，不应用M列调整
+        start_x, start_y = self._calculate_cell_position(position.from_col, position.from_row)
+
+        # 添加单元格内偏移
+        col_offset_px = position.from_col_offset * self.EMU_TO_PX
+        row_offset_pt = position.from_row_offset * self.EMU_TO_PT
+
+        final_x = start_x + col_offset_px
+        final_y = start_y + row_offset_pt
+
+        # 计算图片实际尺寸（基于EMU偏移量，而不是单元格跨度）
+        width = self._calculate_image_width(position)
+        height = self._calculate_image_height(position)
+
+        return ChartCSSPosition(
+            left=final_x,
+            top=final_y,
+            width=width,
+            height=height
+        )
+
+    def _calculate_image_width(self, position: ChartPosition) -> float:
+        """
+        计算图片的实际宽度（基于EMU偏移量）。
+        """
+        # 如果有明确的结束偏移，使用偏移量差值
+        if position.to_col_offset > 0:
+            width_emu = position.to_col_offset - position.from_col_offset
+        else:
+            # 否则使用默认的图片宽度（约1英寸 = 914400 EMU）
+            width_emu = 914400
+
+        width_px = width_emu * self.EMU_TO_PX
+        return max(20, width_px)  # 最小20px
+
+    def _calculate_image_height(self, position: ChartPosition) -> float:
+        """
+        计算图片的实际高度（基于EMU偏移量）。
+        """
+        # 如果有明确的结束偏移，使用偏移量差值
+        if position.to_row_offset > 0:
+            height_emu = position.to_row_offset - position.from_row_offset
+        else:
+            # 否则使用默认的图片高度（约0.4英寸 = 285750 EMU）
+            height_emu = 285750
+
+        height_pt = height_emu * self.EMU_TO_PT
+        return max(15, height_pt)  # 最小15pt
 
 
 def create_position_calculator(sheet: Sheet) -> ChartPositionCalculator:
