@@ -15,9 +15,7 @@ from openpyxl.chart.line_chart import LineChart
 from openpyxl.chart.pie_chart import PieChart
 from openpyxl.chart.area_chart import AreaChart
 from typing import Iterator,Any
-import io
-import matplotlib.pyplot as plt
-from src.models.table_model import Sheet, Row, Cell, LazySheet, Chart
+from src.models.table_model import Sheet, Row, Cell, LazySheet, Chart, ChartPosition
 from src.parsers.base_parser import BaseParser
 from src.utils.style_parser import extract_style, extract_cell_value
 
@@ -229,7 +227,7 @@ class XlsxParser(BaseParser):
             name=worksheet.title,
             rows=rows,
             merged_cells=merged_cells,
-            charts=all_visuals, # Use the combined list
+            charts=all_visuals,
             column_widths=column_widths,
             row_heights=row_heights,
             default_column_width=default_col_width,
@@ -244,21 +242,43 @@ class XlsxParser(BaseParser):
         for image in worksheet_images:
             if isinstance(image, OpenpyxlImage):
                 try:
-                    # Get image data - use a simple approach for type safety
-                    img_data = getattr(image, 'ref', None)
-                    if img_data and not isinstance(img_data, bytes):
-                        img_data = str(img_data).encode('utf-8')
+                    # Get image data safely
+                    img_data = None
+                    if hasattr(image, 'ref') and image.ref:
+                        img_data = image.ref
+                        if not isinstance(img_data, bytes):
+                            img_data = str(img_data).encode('utf-8')
+                    elif hasattr(image, '_data') and getattr(image, '_data', None):
+                        img_data = getattr(image, '_data', None)
 
-                    # Get anchor position safely - use string representation
-                    anchor_str = str(getattr(image, 'anchor', 'A1'))
+                    # Get anchor position safely
+                    anchor_str = "A1"  # 默认位置
+                    if hasattr(image, 'anchor') and image.anchor:
+                        try:
+                            # 安全地处理anchor对象
+                            anchor = image.anchor
+                            if hasattr(anchor, '_from') and getattr(anchor, '_from', None):
+                                # TwoCellAnchor类型
+                                from_cell = getattr(anchor, '_from', None)
+                                if from_cell and hasattr(from_cell, 'col') and hasattr(from_cell, 'row'):
+                                    # 转换为Excel单元格引用
+                                    from openpyxl.utils import get_column_letter
+                                    col_letter = get_column_letter(from_cell.col + 1)  # openpyxl使用0基索引
+                                    anchor_str = f"{col_letter}{from_cell.row + 1}"
+                            else:
+                                # 其他类型的anchor，转换为字符串
+                                anchor_str = str(anchor)
+                        except Exception:
+                            anchor_str = "A1"
 
                     # Create a Chart object to represent the image
                     image_chart = Chart(
                         name=f"Image {len(images) + 1}",
                         type="image",
-                        image_data=img_data,
                         anchor=anchor_str
                     )
+                    # Store image data in chart_data for consistency
+                    image_chart.chart_data = {'image_data': img_data, 'type': 'image'}
                     images.append(image_chart)
                 except Exception as e:
                     import logging
@@ -269,7 +289,7 @@ class XlsxParser(BaseParser):
 
     
     def _extract_charts(self, worksheet) -> list[Chart]:
-        """提取工作表中的图表并渲染为图片。"""
+        """提取工作表中的图表并保存原始数据。"""
         charts = []
         for chart_drawing in worksheet._charts:
             chart_type = "unknown"
@@ -283,93 +303,83 @@ class XlsxParser(BaseParser):
                 chart_type = 'area'
 
             try:
-                img_data = self._render_chart(chart_drawing)
+                # 提取原始图表数据
+                chart_data = self._extract_chart_data(chart_drawing, chart_type)
+                
+                
                 # Safely get chart title
                 chart_title = str(chart_drawing.title) if chart_drawing.title else f"Chart {len(charts) + 1}"
-                # Safely get anchor
-                anchor_value = str(getattr(chart_drawing.anchor, 'cell', 'A1'))
+                
+                # 提取详细的定位信息
+                anchor_value = "A1"  # 默认位置
+                position = None
+                
+                if hasattr(chart_drawing, 'anchor') and chart_drawing.anchor:
+                    try:
+                        anchor = chart_drawing.anchor
+                        if hasattr(anchor, '_from') and getattr(anchor, '_from', None) and hasattr(anchor, 'to') and getattr(anchor, 'to', None):
+                            # TwoCellAnchor类型 - 提取完整定位数据
+                            from_cell = getattr(anchor, '_from', None)
+                            to_cell = getattr(anchor, 'to', None)
+                            
+                            if (from_cell and to_cell and 
+                                hasattr(from_cell, 'col') and hasattr(from_cell, 'row') and
+                                hasattr(to_cell, 'col') and hasattr(to_cell, 'row')):
+                                
+                                # EMU到像素转换（96 DPI）
+                                EMU_TO_PX = 96 / 914400
+                                
+                                # 提取位置数据
+                                from_col = from_cell.col
+                                from_row = from_cell.row
+                                from_col_offset = getattr(from_cell, 'colOff', 0) * EMU_TO_PX
+                                from_row_offset = getattr(from_cell, 'rowOff', 0) * EMU_TO_PX
+                                
+                                to_col = to_cell.col
+                                to_row = to_cell.row  
+                                to_col_offset = getattr(to_cell, 'colOff', 0) * EMU_TO_PX
+                                to_row_offset = getattr(to_cell, 'rowOff', 0) * EMU_TO_PX
+                                
+                                # 创建详细定位对象
+                                position = ChartPosition(
+                                    from_col=from_col,
+                                    from_row=from_row,
+                                    from_col_offset=from_col_offset,
+                                    from_row_offset=from_row_offset,
+                                    to_col=to_col,
+                                    to_row=to_row,
+                                    to_col_offset=to_col_offset,
+                                    to_row_offset=to_row_offset
+                                )
+                                
+                                # 生成简单的anchor字符串用于向后兼容
+                                from openpyxl.utils import get_column_letter
+                                col_letter = get_column_letter(from_col + 1)  # openpyxl使用0基索引
+                                anchor_value = f"{col_letter}{from_row + 1}"
+                                
+                        elif hasattr(anchor, 'cell'):
+                            # 其他类型的anchor
+                            anchor_value = str(getattr(anchor, 'cell', 'A1'))
+                    except Exception as e:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Failed to extract positioning for chart {chart_title}: {e}")
+                        anchor_value = "A1"
+                        
                 charts.append(Chart(
                     name=chart_title,
                     type=chart_type,
-                    image_data=img_data,
-                    anchor=anchor_value
+                    anchor=anchor_value,
+                    chart_data=chart_data,  # 原始数据
+                    position=position  # 新增：详细定位信息
                 ))
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.error(f"Failed to render chart {chart_drawing.title}: {e}")
+                logger.error(f"Failed to extract chart {chart_drawing.title}: {e}")
 
         return charts
 
-    def _render_chart(self, chart) ->bytes | None:
-        """使用matplotlib将图表渲染为图片。"""
-        fig, ax = plt.subplots()
-
-        try:
-            if isinstance(chart, (BarChart, LineChart, AreaChart)):
-                for series in chart.series:
-                    # 确保xVal和yVal存在且包含数据
-                    if series.xVal and series.xVal.numRef:
-                        x = [p.v for p in series.xVal.numRef.get_rows()]
-                    elif series.xVal and series.xVal.strRef:
-                        x = [str(p.v) for p in series.xVal.strRef.get_rows()]
-                    else:
-                        # 如果没有x轴数据，则使用默认的序列
-                        x = range(len(series.yVal.numRef.get_rows()))
-
-                    if series.yVal and series.yVal.numRef:
-                        y = [p.v for p in series.yVal.numRef.get_rows()]
-                    else:
-                        # 没有y轴数据，无法绘制
-                        continue
-                    
-                    series_label = series.tx.v if series.tx else f"Series {len(ax.lines) + 1}"
-
-                    if isinstance(chart, BarChart):
-                        ax.bar(x, y, label=series_label)
-                    elif isinstance(chart, LineChart):
-                        ax.plot(x, y, label=series_label)
-                    elif isinstance(chart, AreaChart):
-                        ax.fill_between(x, y, label=series_label, alpha=0.4)
-
-                ax.set_title(str(chart.title) if chart.title else "Chart")
-                # Safely extract axis titles
-                if chart.x_axis and chart.x_axis.title:
-                    x_title = self._extract_axis_title(chart.x_axis.title)
-                    if x_title:
-                        ax.set_xlabel(x_title)
-                if chart.y_axis and chart.y_axis.title:
-                    y_title = self._extract_axis_title(chart.y_axis.title)
-                    if y_title:
-                        ax.set_ylabel(y_title)
-                ax.legend()
-
-            elif isinstance(chart, PieChart):
-                if chart.series and chart.series[0].xVal and chart.series[0].yVal:
-                    labels = [p.v for p in chart.series[0].xVal.strRef.get_rows()]
-                    sizes = [p.v for p in chart.series[0].yVal.numRef.get_rows()]
-                    ax.pie(sizes, labels=labels, autopct='%1.1f%%')
-                    ax.set_title(str(chart.title) if chart.title else "Chart")
-                else:
-                    raise ValueError("Pie chart data is missing or invalid.")
-
-            else:
-                # 不支持的图表类型
-                plt.close(fig)
-                return None
-
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png')
-            plt.close(fig)
-            buf.seek(0)
-            return buf.getvalue()
-        
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to render chart '{chart.title}': {e}")
-            plt.close(fig)  # 确保在异常时关闭图形
-            return None
 
     
     def supports_streaming(self) -> bool:
@@ -417,3 +427,387 @@ class XlsxParser(BaseParser):
             return str(title_obj) if title_obj else None
         except Exception:
             return None
+    
+    def _extract_chart_data(self, chart, chart_type: str) -> dict:
+        """
+        提取图表的原始数据，用于SVG渲染。
+        
+        参数：
+            chart: openpyxl图表对象
+            chart_type: 图表类型
+            
+        返回：
+            包含图表数据的字典
+        """
+        chart_data = {
+            'type': chart_type,
+            'title': str(chart.title) if chart.title else '',
+            'series': [],
+            'x_axis_title': '',
+            'y_axis_title': '',
+            'position': {},  # 添加位置信息
+            'size': {},      # 添加尺寸信息
+            'colors': []     # 添加原始颜色信息
+        }
+        
+        # 提取位置和尺寸信息
+        if hasattr(chart, 'anchor') and chart.anchor:
+            try:
+                anchor = chart.anchor
+                if hasattr(anchor, '_from') and getattr(anchor, '_from', None):
+                    from_cell = getattr(anchor, '_from', None)
+                    if from_cell:
+                        chart_data['position']['from_col'] = getattr(from_cell, 'col', 0)
+                        chart_data['position']['from_row'] = getattr(from_cell, 'row', 0)
+                        chart_data['position']['from_col_offset'] = getattr(from_cell, 'colOff', 0)
+                        chart_data['position']['from_row_offset'] = getattr(from_cell, 'rowOff', 0)
+                
+                if hasattr(anchor, 'to') and getattr(anchor, 'to', None):
+                    to_cell = getattr(anchor, 'to', None)
+                    if to_cell:
+                        chart_data['position']['to_col'] = getattr(to_cell, 'col', 0)
+                        chart_data['position']['to_row'] = getattr(to_cell, 'row', 0)
+                        chart_data['position']['to_col_offset'] = getattr(to_cell, 'colOff', 0)
+                        chart_data['position']['to_row_offset'] = getattr(to_cell, 'rowOff', 0)
+                
+                if hasattr(anchor, 'ext') and anchor.ext:
+                    ext = anchor.ext
+                    chart_data['size']['width_emu'] = ext.cx
+                    chart_data['size']['height_emu'] = ext.cy
+                    # EMU转像素 (1 EMU = 1/914400 inch, 1 inch = 96 px)
+                    chart_data['size']['width_px'] = int(ext.cx / 914400 * 96)
+                    chart_data['size']['height_px'] = int(ext.cy / 914400 * 96)
+            except Exception:
+                pass
+        
+        # 提取轴标题
+        try:
+            if chart.x_axis and chart.x_axis.title:
+                x_title = self._extract_axis_title(chart.x_axis.title)
+                if x_title:
+                    chart_data['x_axis_title'] = x_title
+            if chart.y_axis and chart.y_axis.title:
+                y_title = self._extract_axis_title(chart.y_axis.title)
+                if y_title:
+                    chart_data['y_axis_title'] = y_title
+        except Exception:
+            pass
+        
+        # 提取系列数据
+        if isinstance(chart, (BarChart, LineChart, AreaChart)):
+            for series in chart.series:
+                series_data = {
+                    'name': series.tx.v if series.tx else f"Series {len(chart_data['series']) + 1}",
+                    'x_data': [],
+                    'y_data': [],
+                    'color': None  # 添加颜色信息
+                }
+                
+                # 提取系列颜色
+                series_color = self._extract_series_color(series)
+                if series_color:
+                    series_data['color'] = series_color
+                    chart_data['colors'].append(series_color)
+                
+                # 获取y轴数据
+                y_data = self._extract_series_y_data(series)
+                if y_data:
+                    series_data['y_data'] = y_data
+                
+                # 获取x轴数据
+                x_data = self._extract_series_x_data(series)
+                if x_data:
+                    series_data['x_data'] = x_data
+                elif y_data:
+                    # 如果没有x轴数据，生成默认标签
+                    series_data['x_data'] = [f"Item {i+1}" for i in range(len(y_data))]
+                
+                if series_data['y_data']:
+                    chart_data['series'].append(series_data)
+                    
+        elif isinstance(chart, PieChart):
+            if chart.series and len(chart.series) > 0:
+                series = chart.series[0]
+                series_data = {
+                    'name': series.tx.v if series.tx else "Pie Series",
+                    'x_data': [],  # 标签
+                    'y_data': [],   # 数值
+                    'colors': []   # 饼图每个片段的颜色
+                }
+                
+                # 获取标签数据
+                x_data = self._extract_series_x_data(series)
+                if x_data:
+                    series_data['x_data'] = x_data
+                
+                # 获取数值数据
+                y_data = self._extract_series_y_data(series)
+                if y_data:
+                    series_data['y_data'] = y_data
+                
+                # 提取饼图颜色（每个数据点可能有不同颜色）
+                pie_colors = self._extract_pie_chart_colors(series)
+                if pie_colors:
+                    series_data['colors'] = pie_colors
+                    chart_data['colors'] = pie_colors
+                
+                # 如果没有标签，生成默认标签
+                if not series_data['x_data'] and series_data['y_data']:
+                    series_data['x_data'] = [f"Item {i+1}" for i in range(len(series_data['y_data']))]
+                
+                if series_data['y_data']:
+                    chart_data['series'].append(series_data)
+        
+        return chart_data
+    
+    def _extract_series_y_data(self, series) -> list:
+        """提取系列的Y轴数据。"""
+        y_data = []
+        
+        # 方法1：从series.val获取数值数据
+        if hasattr(series, 'val') and series.val:
+            if hasattr(series.val, 'numRef') and series.val.numRef:
+                try:
+                    if hasattr(series.val.numRef, 'numCache') and series.val.numRef.numCache:
+                        # 从缓存中获取数据
+                        y_data = [float(pt.v) for pt in series.val.numRef.numCache.pt if pt.v is not None]
+                    else:
+                        # 从引用中获取数据
+                        y_data = [float(p.v) for p in series.val.numRef.get_rows() if p.v is not None]
+                except (AttributeError, TypeError, ValueError):
+                    pass
+
+        # 方法2：从series.yVal获取（备用方法）
+        if not y_data and hasattr(series, 'yVal') and series.yVal and hasattr(series.yVal, 'numRef') and series.yVal.numRef:
+            try:
+                y_data = [float(p.v) for p in series.yVal.numRef.get_rows() if p.v is not None]
+            except (AttributeError, TypeError, ValueError):
+                pass
+        
+        return y_data
+    
+    def _extract_series_x_data(self, series) -> list:
+        """提取系列的X轴数据。"""
+        x_data = []
+        
+        # 方法1：从series.cat获取分类数据
+        if hasattr(series, 'cat') and series.cat:
+            if hasattr(series.cat, 'strRef') and series.cat.strRef:
+                try:
+                    if hasattr(series.cat.strRef, 'strCache') and series.cat.strRef.strCache:
+                        # 从缓存中获取数据
+                        x_data = [str(pt.v) for pt in series.cat.strRef.strCache.pt if pt.v is not None]
+                    else:
+                        # 从引用中获取数据
+                        x_data = [str(p.v) for p in series.cat.strRef.get_rows() if p.v is not None]
+                except (AttributeError, TypeError):
+                    pass
+            elif hasattr(series.cat, 'numRef') and series.cat.numRef:
+                try:
+                    if hasattr(series.cat.numRef, 'numCache') and series.cat.numRef.numCache:
+                        x_data = [str(pt.v) for pt in series.cat.numRef.numCache.pt if pt.v is not None]
+                    else:
+                        x_data = [str(p.v) for p in series.cat.numRef.get_rows() if p.v is not None]
+                except (AttributeError, TypeError):
+                    pass
+
+        # 方法2：从series.xVal获取（备用方法）
+        if not x_data and hasattr(series, 'xVal') and series.xVal:
+            if hasattr(series.xVal, 'numRef') and series.xVal.numRef:
+                try:
+                    x_data = [str(p.v) for p in series.xVal.numRef.get_rows() if p.v is not None]
+                except (AttributeError, TypeError):
+                    pass
+            elif hasattr(series.xVal, 'strRef') and series.xVal.strRef:
+                try:
+                    x_data = [str(p.v) for p in series.xVal.strRef.get_rows() if p.v is not None]
+                except (AttributeError, TypeError):
+                    pass
+        
+        return x_data
+    
+    def _extract_series_color(self, series) -> str | None:
+        """
+        提取系列的颜色信息。
+        
+        参数：
+            series: openpyxl图表系列对象
+            
+        返回：
+            颜色的十六进制字符串，提取失败时返回None
+        """
+        try:
+            # 尝试从图形属性中获取颜色
+            if hasattr(series, 'graphicalProperties') and series.graphicalProperties:
+                graphic_props = series.graphicalProperties
+                
+                # 检查solidFill
+                if hasattr(graphic_props, 'solidFill') and graphic_props.solidFill:
+                    solid_fill = graphic_props.solidFill
+                    
+                    # RGB颜色
+                    if hasattr(solid_fill, 'srgbClr') and solid_fill.srgbClr:
+                        rgb = solid_fill.srgbClr.val
+                        if rgb:
+                            return f"#{rgb.upper()}"
+                    
+                    # 主题颜色
+                    if hasattr(solid_fill, 'schemeClr') and solid_fill.schemeClr:
+                        scheme_color = solid_fill.schemeClr.val
+                        return self._convert_scheme_color_to_hex(scheme_color)
+                
+                # 检查线条属性中的颜色
+                if hasattr(graphic_props, 'ln') and graphic_props.ln:
+                    line = graphic_props.ln
+                    if hasattr(line, 'solidFill') and line.solidFill:
+                        solid_fill = line.solidFill
+                        if hasattr(solid_fill, 'srgbClr') and solid_fill.srgbClr:
+                            rgb = solid_fill.srgbClr.val
+                            if rgb:
+                                return f"#{rgb.upper()}"
+            
+            # 尝试从spPr属性获取
+            if hasattr(series, 'spPr') and series.spPr:
+                sp_pr = series.spPr
+                if hasattr(sp_pr, 'solidFill') and sp_pr.solidFill:
+                    solid_fill = sp_pr.solidFill
+                    if hasattr(solid_fill, 'srgbClr') and solid_fill.srgbClr:
+                        rgb = solid_fill.srgbClr.val
+                        if rgb:
+                            return f"#{rgb.upper()}"
+                    if hasattr(solid_fill, 'schemeClr') and solid_fill.schemeClr:
+                        scheme_color = solid_fill.schemeClr.val
+                        return self._convert_scheme_color_to_hex(scheme_color)
+            
+            return None
+            
+        except Exception:
+            return None
+    
+    def _extract_pie_chart_colors(self, series) -> list[str]:
+        """
+        提取饼图各片段的颜色。
+        
+        参数：
+            series: openpyxl饼图系列对象
+            
+        返回：
+            颜色列表
+        """
+        colors = []
+        try:
+            # 检查数据点的个别颜色设置
+            if hasattr(series, 'dPt') and series.dPt:
+                for data_point in series.dPt:
+                    color = self._extract_data_point_color(data_point)
+                    if color:
+                        colors.append(color)
+            
+            # 如果没有找到个别颜色，使用系列默认颜色
+            if not colors:
+                series_color = self._extract_series_color(series)
+                if series_color:
+                    # 生成基于主色的渐变色
+                    colors = self._generate_pie_color_variants(series_color, len(series.val.numRef.numCache.pt) if hasattr(series, 'val') and series.val and hasattr(series.val, 'numRef') and series.val.numRef and hasattr(series.val.numRef, 'numCache') else 3)
+            
+        except Exception:
+            pass
+        
+        return colors
+    
+    def _extract_data_point_color(self, data_point) -> str | None:
+        """
+        提取数据点的颜色。
+        
+        参数：
+            data_point: 数据点对象
+            
+        返回：
+            颜色的十六进制字符串
+        """
+        try:
+            if hasattr(data_point, 'spPr') and data_point.spPr:
+                sp_pr = data_point.spPr
+                if hasattr(sp_pr, 'solidFill') and sp_pr.solidFill:
+                    solid_fill = sp_pr.solidFill
+                    if hasattr(solid_fill, 'srgbClr') and solid_fill.srgbClr:
+                        rgb = solid_fill.srgbClr.val
+                        if rgb:
+                            return f"#{rgb.upper()}"
+                    if hasattr(solid_fill, 'schemeClr') and solid_fill.schemeClr:
+                        scheme_color = solid_fill.schemeClr.val
+                        return self._convert_scheme_color_to_hex(scheme_color)
+            return None
+        except Exception:
+            return None
+    
+    def _convert_scheme_color_to_hex(self, scheme_color: str) -> str:
+        """
+        将Excel主题颜色转换为十六进制颜色。
+        
+        参数：
+            scheme_color: Excel主题颜色名称
+            
+        返回：
+            十六进制颜色字符串
+        """
+        # Excel主题颜色映射
+        excel_theme_colors = {
+            'accent1': '#5B9BD5',  # 蓝色
+            'accent2': '#70AD47',  # 绿色  
+            'accent3': '#FFC000',  # 橙色
+            'accent4': '#E15759',  # 红色
+            'accent5': '#4472C4',  # 深蓝色
+            'accent6': '#FF6B35',  # 橙红色
+            'dk1': '#000000',      # 深色1（黑色）
+            'lt1': '#FFFFFF',      # 浅色1（白色）
+            'dk2': '#44546A',      # 深色2（深灰蓝）
+            'lt2': '#E7E6E6',      # 浅色2（浅灰）
+            'bg1': '#FFFFFF',      # 背景1
+            'bg2': '#E7E6E6',      # 背景2
+            'tx1': '#000000',      # 文本1
+            'tx2': '#44546A',      # 文本2
+        }
+        
+        return excel_theme_colors.get(scheme_color, '#5B9BD5')  # 默认蓝色
+    
+    def _generate_pie_color_variants(self, base_color: str, count: int) -> list[str]:
+        """
+        基于基础颜色生成饼图的颜色变体。
+        
+        参数：
+            base_color: 基础颜色（十六进制）
+            count: 需要的颜色数量
+            
+        返回：
+            颜色列表
+        """
+        if count <= 1:
+            return [base_color]
+        
+        # 从基础颜色生成HSL变体
+        try:
+            # 简单的颜色变体算法：调整亮度和饱和度
+            base_rgb = base_color.lstrip('#')
+            r = int(base_rgb[:2], 16)
+            g = int(base_rgb[2:4], 16)
+            b = int(base_rgb[4:6], 16)
+            
+            colors = [base_color]
+            
+            for i in range(1, count):
+                # 调整亮度
+                factor = 0.8 + (i * 0.4 / count)  # 0.8 到 1.2
+                new_r = min(255, int(r * factor))
+                new_g = min(255, int(g * factor))
+                new_b = min(255, int(b * factor))
+                
+                new_color = f"#{new_r:02X}{new_g:02X}{new_b:02X}"
+                colors.append(new_color)
+            
+            return colors
+            
+        except Exception:
+            # 如果转换失败，返回默认颜色序列
+            default_colors = ['#5B9BD5', '#70AD47', '#FFC000', '#E15759', '#4472C4', '#FF6B35']
+            return (default_colors * ((count // len(default_colors)) + 1))[:count]

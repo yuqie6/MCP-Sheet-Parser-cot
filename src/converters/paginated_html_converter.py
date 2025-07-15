@@ -5,6 +5,7 @@
 """
 
 import logging
+from typing import Any
 
 from .html_converter import HTMLConverter
 from ..models.table_model import Sheet
@@ -83,7 +84,12 @@ class PaginatedHTMLConverter(HTMLConverter):
         paginated_sheet = Sheet(
             name=sheet.name,
             rows=paginated_rows,
-            merged_cells=sheet.merged_cells  # 保留合并单元格信息
+            merged_cells=sheet.merged_cells,  # 保留合并单元格信息
+            charts=sheet.charts,  # 保留图表信息
+            column_widths=sheet.column_widths,  # 保留列宽信息
+            row_heights=sheet.row_heights,  # 保留行高信息
+            default_column_width=sheet.default_column_width,
+            default_row_height=sheet.default_row_height
         )
         
         return paginated_sheet

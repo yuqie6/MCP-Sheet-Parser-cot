@@ -119,12 +119,38 @@ class Row:
 
 
 @dataclass
+class ChartPosition:
+    """图表的精确定位信息。"""
+    from_col: int  # 起始列索引（0基）
+    from_row: int  # 起始行索引（0基）
+    from_col_offset: float  # 起始列内偏移（像素）
+    from_row_offset: float  # 起始行内偏移（像素）
+    to_col: int  # 结束列索引（0基）
+    to_row: int  # 结束行索引（0基）
+    to_col_offset: float  # 结束列内偏移（像素）
+    to_row_offset: float  # 结束行内偏移（像素）
+    
+    def get_width_in_columns(self) -> int:
+        """获取图表占用的列数。"""
+        return self.to_col - self.from_col + 1
+    
+    def get_height_in_rows(self) -> int:
+        """获取图表占用的行数。"""
+        return self.to_row - self.from_row + 1
+
+@dataclass
 class Chart:
     """表格中的图表对象。"""
     name: str
     type: str  # 如 'bar', 'line', 'pie'
-    image_data: Optional[bytes] = None  # 图表渲染后的图片字节
     anchor: Optional[str] = None  # 锚点位置，如 'A1'
+    
+    # 原始图表数据，用于SVG渲染
+    chart_data: Optional[dict] = None  # 原始图表数据，包含系列、标题等
+    svg_data: Optional[str] = None  # 渲染后的SVG字符串
+    
+    # 精确定位信息
+    position: Optional[ChartPosition] = None  # 详细的定位和尺寸信息
 
 
 
@@ -205,4 +231,8 @@ class LazySheet:
     def to_sheet(self) -> Sheet:
         """将惰性表全部加载为常规 Sheet 对象。"""
         rows = list(self.iter_rows())
-        return Sheet(name=self.name, rows=rows, merged_cells=self.merged_cells)
+        return Sheet(
+            name=self.name, 
+            rows=rows, 
+            merged_cells=self.merged_cells
+        )
