@@ -8,7 +8,7 @@ SVG图表渲染器 - 将Excel图表转换为高质量的SVG格式。
 4. 响应式设计
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from src.utils.color_utils import DEFAULT_CHART_COLORS, normalize_color
@@ -30,11 +30,11 @@ class SVGChartRenderer:
         self.width = width
         self.height = height
         self.show_axes = show_axes
-        # 调整边距：如果不显示坐标轴，减少边距
+        # 调整边距：如果不显示坐标轴，减少边距，整体往下移动
         if show_axes:
-            self.margin = {'top': 50, 'right': 80, 'bottom': 60, 'left': 80}
+            self.margin = {'top': 70, 'right': 80, 'bottom': 60, 'left': 80}  # 增加top边距
         else:
-            self.margin = {'top': 20, 'right': 20, 'bottom': 20, 'left': 20}  # 简洁模式，最小边距
+            self.margin = {'top': 40, 'right': 20, 'bottom': 20, 'left': 20}  # 简洁模式，增加top边距
         self.plot_width = width - self.margin['left'] - self.margin['right']
         self.plot_height = height - self.margin['top'] - self.margin['bottom']
         
@@ -114,6 +114,55 @@ class SVGChartRenderer:
         self._render_legend_if_needed(svg, chart_data, series_list, colors)
         self._render_annotations(svg, chart_data)
     
+    def _should_show_data_labels(self, chart_data: Dict[str, Any], series_data: Dict[str, Any] = None) -> bool:
+        """判断是否应该显示数据标签的通用方法。"""
+        return (
+            chart_data.get('show_data_labels', False) or
+            (series_data and series_data.get('show_data_labels', False)) or
+            chart_data.get('data_labels', {}).get('show', False)
+        )
+    
+    def _create_data_label_element(self, svg: ET.Element, x: float, y: float, text: str, 
+                                   font_size: str = '10px', fill: str = 'white', 
+                                   text_anchor: str = 'middle') -> None:
+        """创建数据标签元素的通用方法。"""
+        text_elem = ET.SubElement(svg, 'text', {
+            'x': str(x),
+            'y': str(y),
+            'text-anchor': text_anchor,
+            'alignment-baseline': 'middle',
+            'class': 'axis-label',
+            'fill': fill,
+            'font-size': font_size
+        })
+        text_elem.text = text
+    
+    def _handle_chart_error(self, chart_type: str, error: Exception) -> str:
+        """处理图表渲染错误，返回错误占位符。"""
+        svg = self._create_svg_root(f"Chart Error: {chart_type}")
+        
+        # 绘制错误占位符
+        ET.SubElement(svg, 'rect', {
+            'x': str(self.margin['left']),
+            'y': str(self.margin['top']),
+            'width': str(self.plot_width),
+            'height': str(self.plot_height),
+            'fill': '#ffebee',
+            'stroke': '#f44336',
+            'stroke-dasharray': '5,5'
+        })
+        
+        text = ET.SubElement(svg, 'text', {
+            'x': str(self.width // 2),
+            'y': str(self.height // 2),
+            'text-anchor': 'middle',
+            'class': 'axis-label',
+            'fill': '#d32f2f'
+        })
+        text.text = f"Error rendering {chart_type}: {str(error)}"
+        
+        return self._format_svg(svg)
+    
     def _create_svg_root(self, title: str = "", title_style: Optional[Dict[str, Any]] = None) -> ET.Element:
         """
         创建SVG根元素，并为标题应用指定的字体样式。
@@ -138,7 +187,7 @@ class SVGChartRenderer:
         if title:
             title_attrs = {
                 'x': str(self.width // 2),
-                'y': '25',
+                'y': '35',  # 往下移动10px
                 'text-anchor': 'middle',
                 'class': 'chart-title'
             }
@@ -367,24 +416,14 @@ class SVGChartRenderer:
                 x_positions.append(bar_center_x)
                 y_positions.append(bar_y)
 
-                # 只有在Excel明确设置显示数据标签时才显示数字
-                show_data_labels = (
-                    chart_data.get('show_data_labels', False) or
-                    series.get('show_data_labels', False) or
-                    chart_data.get('data_labels', {}).get('show', False)
-                )
-
-                if show_data_labels and bar_height > 8:
-                    text = ET.SubElement(svg, 'text', {
-                        'x': str(bar_x + bar_width / 2),
-                        'y': str(bar_y + 10),
-                        'text-anchor': 'middle',
-                        'alignment-baseline': 'middle',
-                        'class': 'axis-label',
-                        'fill': 'white',
-                        'font-size': '10px'
-                    })
-                    text.text = str(int(y_value))
+                # 使用新的通用方法显示数据标签
+                if self._should_show_data_labels(chart_data, series) and bar_height > 8:
+                    self._create_data_label_element(
+                        svg, 
+                        bar_x + bar_width / 2, 
+                        bar_y + 10, 
+                        str(int(y_value))
+                    )
 
                 # 只在连续模式下更新bar_index
                 if not should_deduplicate:
@@ -481,7 +520,18 @@ class SVGChartRenderer:
     
     def _render_pie_chart(self, chart_data: Dict[str, Any]) -> str:
         """渲染饼图。"""
-        svg = self._create_svg_root(chart_data.get('title', ''))
+        # 设置饼图标志，供图例位置计算使用
+        self._is_pie_chart = True
+
+        # 饼图标题：优先使用图表标题，如果没有则使用系列名称
+        title = chart_data.get('title', '')
+        if not title or title.startswith('Chart '):
+            series_list = chart_data.get('series', [])
+            if series_list and series_list[0].get('name'):
+                title = series_list[0]['name']
+
+        # 饼图需要特殊的标题位置处理，先创建不带标题的SVG
+        svg = self._create_svg_root("")
         series_list = chart_data.get('series', [])
         
         if not series_list or not series_list[0].get('y_data'):
@@ -503,8 +553,10 @@ class SVGChartRenderer:
         legend_width = 100  # 图例区域宽度
         pie_area_width = self.width - legend_width
         center_x = pie_area_width // 2
-        center_y = self.height // 2
-        radius = min(pie_area_width, self.height) // 2 - 30
+        # 调整垂直位置，考虑标题空间，避免过于偏上
+        title_height = 40 if chart_data.get('title') else 20
+        center_y = title_height + (self.height - title_height) // 2
+        radius = min(pie_area_width, self.height - title_height) // 2 - 30
         
         # 优先使用从Excel提取的颜色
         colors = []
@@ -514,6 +566,15 @@ class SVGChartRenderer:
             colors = chart_data['colors']
         else:
             colors = DEFAULT_CHART_COLORS + ['#A5A5A5', '#70E000']  # 扩展颜色用于多系列饼图
+
+        # 确保有足够的不重复颜色用于所有片段
+        unique_colors = list(dict.fromkeys(colors))  # 去重但保持顺序
+        if len(unique_colors) < len(values):
+            # 生成更多不同的颜色
+            additional_colors = self._generate_distinct_colors(len(values) - len(unique_colors), unique_colors)
+            unique_colors.extend(additional_colors)
+            # 重新构建颜色列表，确保每个片段都有不同的颜色
+            colors = unique_colors[:len(values)]
         
         current_angle = 0
         for i, (label, value) in enumerate(zip(labels, values)):
@@ -582,16 +643,84 @@ class SVGChartRenderer:
             
             current_angle += angle
 
-        # 渲染图例和注释
-        self._render_common_chart_elements(svg, chart_data, series_list, colors)
+        # 渲染图例和注释 - 饼图使用分类标签作为图例
+        pie_legend_series = []
+        for i, label in enumerate(labels):
+            pie_legend_series.append({'name': label})
+
+        # 使用分类标签创建图例，而不是系列名称
+        show_legend = chart_data.get('legend', {}).get('enabled', True)
+        if show_legend:
+            legend_style = chart_data.get('legend_style')
+            self._draw_legend(svg, pie_legend_series, colors, legend_style=legend_style)
+
+        # 添加饼图标题（在饼图上方）
+        if title:
+            title_y = 20  # 标题位置在饼图上方
+            title_attrs = {
+                'x': str(self.width // 2),
+                'y': str(title_y),
+                'text-anchor': 'middle',
+                'class': 'chart-title'
+            }
+            title_elem = ET.SubElement(svg, 'text', title_attrs)
+            title_elem.text = title
+
+        # 渲染注释
+        self._render_annotations(svg, chart_data)
+
+        # 清除饼图标志
+        self._is_pie_chart = False
 
         return self._format_svg(svg)
-    
+
+    def _generate_distinct_colors(self, count: int, existing_colors: list) -> list:
+        """
+        生成与现有颜色不同的新颜色。
+
+        参数：
+            count: 需要生成的颜色数量
+            existing_colors: 已存在的颜色列表
+
+        返回：
+            新颜色列表
+        """
+        # 预定义的颜色池，确保视觉上有足够的区分度
+        color_pool = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+            '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2',
+            '#A3E4D7', '#F9E79F', '#D5A6BD', '#AED6F1', '#A9DFBF',
+            '#FAD7A0', '#E8DAEF', '#D1F2EB', '#FCF3CF', '#FADBD8'
+        ]
+
+        # 过滤掉已存在的颜色
+        available_colors = [c for c in color_pool if c not in existing_colors]
+
+        # 如果可用颜色不够，生成更多颜色
+        if len(available_colors) < count:
+            # 使用HSV色彩空间生成更多颜色
+            import colorsys
+            additional_needed = count - len(available_colors)
+            for i in range(additional_needed):
+                # 在HSV空间中均匀分布色相
+                hue = (i * 137.5) % 360 / 360  # 使用黄金角度分布
+                saturation = 0.7 + (i % 3) * 0.1  # 0.7, 0.8, 0.9
+                value = 0.8 + (i % 2) * 0.1  # 0.8, 0.9
+
+                rgb = colorsys.hsv_to_rgb(hue, saturation, value)
+                hex_color = f"#{int(rgb[0]*255):02X}{int(rgb[1]*255):02X}{int(rgb[2]*255):02X}"
+
+                if hex_color not in existing_colors and hex_color not in available_colors:
+                    available_colors.append(hex_color)
+
+        return available_colors[:count]
+
     def _render_area_chart(self, chart_data: Dict[str, Any]) -> str:
         """渲染面积图。"""
         svg = self._create_svg_root(chart_data.get('title', ''))
         series_list = chart_data.get('series', [])
-        
+
         if not series_list:
             return self._format_svg(svg)
         
@@ -906,9 +1035,11 @@ class SVGChartRenderer:
         """
         # 图例位置计算：根据图表类型调整
         if hasattr(self, '_is_pie_chart') and self._is_pie_chart:
-            # 饼图：图例放在右侧预留区域
-            legend_x = self.width - 90  # 饼图右侧图例区域
-            legend_y = self.margin['top'] + 20
+            # 饼图：图例放在右侧
+            legend_width = 100  # 与饼图布局中的legend_width保持一致
+            pie_area_width = self.width - legend_width
+            legend_x = pie_area_width + 10  # 饼图区域右侧，留10px间距
+            legend_y = self.height // 2 - (len(series_list) * 20) // 2  # 垂直居中
         else:
             # 其他图表：图例放在右上角
             legend_text_width = 80
@@ -933,7 +1064,7 @@ class SVGChartRenderer:
         for i, series in enumerate(series_list):
             color = normalize_color(colors[i % len(colors)])
             series_name = series.get('name', f'Series {i + 1}')
-            
+
             # 图例色块
             ET.SubElement(svg, 'rect', {
                 'x': str(legend_x),
@@ -942,14 +1073,14 @@ class SVGChartRenderer:
                 'height': '12',
                 'fill': color
             })
-            
+
             # 图例文字的属性
             text_attrs = {
                 'x': str(legend_x + 16),
                 'y': str(legend_y + i * 20 + 9),
                 **base_style
             }
-            
+
             text = ET.SubElement(svg, 'text', text_attrs)
             text.text = series_name
 

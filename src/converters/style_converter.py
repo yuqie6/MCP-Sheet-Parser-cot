@@ -1,6 +1,5 @@
 import logging
 import re
-from typing import Dict, Any
 
 from src.constants import StyleConstants
 from src.font_manager import get_font_manager
@@ -448,5 +447,3 @@ class StyleConverter:
             return f"{int(pt_size)}pt"
         else:
             return f"{pt_size}pt"
-
-        return formatted_color

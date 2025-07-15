@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .utils.range_parser import parse_range_string
+from .utils.style_parser import style_to_dict
 from .parsers.factory import ParserFactory
 from .models.table_model import Sheet
 from .converters.html_converter import HTMLConverter
@@ -561,7 +562,7 @@ class CoreService:
                 for cell in row.cells:
                     cell_data = {"value": self._value_to_json_serializable(cell.value)}
                     if include_styles and cell.style:
-                        cell_data["style"] = self._style_to_dict(cell.style)
+                        cell_data["style"] = style_to_dict(cell.style)
                     row_data.append(cell_data)
                 data_rows.append(row_data)
 
@@ -637,7 +638,7 @@ class CoreService:
                 for cell in sheet.rows[i].cells:
                     cell_data = {
                         "value": self._value_to_json_serializable(cell.value),
-                        "style": self._style_to_dict(cell.style) if cell.style else None
+                        "style": style_to_dict(cell.style) if cell.style else None
                     }
                     row_data.append(cell_data)
                 sample_rows.append(row_data)
@@ -701,65 +702,6 @@ class CoreService:
             }
         }
 
-    def _style_to_dict(self, style) -> dict[str, Any]:
-        """
-        将Style对象转换为字典格式。
-
-        Args:
-            style: Style对象
-
-        Returns:
-            样式字典
-        """
-        if not style:
-            return {}
-
-        style_dict = {}
-
-        # 字体属性
-        if style.font_name:
-            style_dict["font_name"] = style.font_name
-        if style.font_size:
-            style_dict["font_size"] = style.font_size
-        if style.font_color:
-            style_dict["font_color"] = style.font_color
-        if style.bold:
-            style_dict["bold"] = style.bold
-        if style.italic:
-            style_dict["italic"] = style.italic
-        if style.underline:
-            style_dict["underline"] = style.underline
-
-        # 背景和对齐
-        if style.background_color:
-            style_dict["background_color"] = style.background_color
-        if style.text_align:
-            style_dict["text_align"] = style.text_align
-        if style.vertical_align:
-            style_dict["vertical_align"] = style.vertical_align
-
-        # 边框
-        if style.border_top:
-            style_dict["border_top"] = style.border_top
-        if style.border_bottom:
-            style_dict["border_bottom"] = style.border_bottom
-        if style.border_left:
-            style_dict["border_left"] = style.border_left
-        if style.border_right:
-            style_dict["border_right"] = style.border_right
-
-        # 其他属性
-        if style.wrap_text:
-            style_dict["wrap_text"] = style.wrap_text
-        if style.number_format:
-            style_dict["number_format"] = style.number_format
-        if style.hyperlink:
-            style_dict["hyperlink"] = style.hyperlink
-        if style.comment:
-            style_dict["comment"] = style.comment
-
-        return style_dict
-
     def _value_to_json_serializable(self, value):
         """Converts a cell value to a JSON serializable format."""
         if isinstance(value, (datetime, date)):
@@ -797,7 +739,7 @@ class CoreService:
                         "value": self._value_to_json_serializable(cell.value)
                     }
                     if include_styles:
-                        cell_data["style"] = self._style_to_dict(cell.style) if cell.style else None
+                        cell_data["style"] = style_to_dict(cell.style) if cell.style else None
                 else:
                     cell_data = {"value": None}
                     if include_styles:
@@ -842,7 +784,7 @@ class CoreService:
             for cell in row.cells:
                 cell_data = {
                     "value": self._value_to_json_serializable(cell.value),
-                    "style": self._style_to_dict(cell.style) if cell.style else None
+                    "style": style_to_dict(cell.style) if cell.style else None
                 }
                 row_data.append(cell_data)
 
@@ -916,7 +858,7 @@ class CoreService:
                 for cell in row.cells:
                     cell_data = {
                         "value": self._value_to_json_serializable(cell.value),
-                        "style": self._style_to_dict(cell.style) if cell.style else None
+                        "style": style_to_dict(cell.style) if cell.style else None
                     }
                     row_data.append(cell_data)
                 data_rows.append(row_data)
@@ -1024,7 +966,7 @@ class CoreService:
                         for cell in row.cells:
                             cell_data = {
                                 "value": self._value_to_json_serializable(cell.value),
-                                "style": self._style_to_dict(cell.style) if cell.style else None
+                                "style": style_to_dict(cell.style) if cell.style else None
                             }
                             row_data.append(cell_data)
                         all_rows.append(row_data)
@@ -1091,7 +1033,7 @@ class CoreService:
                 for cell in row.cells:
                     cell_data = {
                         "value": self._value_to_json_serializable(cell.value),
-                        "style": self._style_to_dict(cell.style) if cell.style else None
+                        "style": style_to_dict(cell.style) if cell.style else None
                     }
                     row_data.append(cell_data)
                 sample_rows.append(row_data)

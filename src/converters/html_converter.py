@@ -7,6 +7,7 @@ from src.converters.chart_converter import ChartConverter
 from src.converters.style_converter import StyleConverter
 from src.converters.table_structure_converter import TableStructureConverter
 from src.models.table_model import Sheet
+from src.utils.html_utils import compact_html
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ class HTMLConverter:
             sheet_name=sheet.name
         )
         if self.compact_mode:
-            html_content = self._compact_html(html_content)
+            html_content = compact_html(html_content)
         return html_content
 
     def _get_html_template(self) -> str:
@@ -137,15 +138,3 @@ class HTMLConverter:
     </script>
 </body>
 </html>"""
-
-    def _compact_html(self, html: str) -> str:
-        """
-        Compacts the HTML content.
-        Args:
-            html: The original HTML.
-        Returns:
-            The compacted HTML.
-        """
-        lines = html.split('\n')
-        compact_lines = [line.strip() for line in lines if line.strip()]
-        return '\n'.join(compact_lines)

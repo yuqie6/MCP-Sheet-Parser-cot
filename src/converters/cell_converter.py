@@ -1,7 +1,8 @@
 from datetime import datetime as dt, timedelta
 
 from src.models.table_model import Cell, RichTextFragment
-from src.utils.html_utils import escape_html
+from src.utils.html_utils import escape_html, create_html_element
+from src.utils.color_utils import format_color
 
 # Number format mapping constant
 NUMBER_FORMAT_MAP = {
@@ -72,22 +73,22 @@ class CellConverter:
         Formats a single rich text fragment into a styled HTML span.
         """
         style = fragment.style
-        css_parts = []
+        inline_styles = {}
+        
         if style.font_name:
-            css_parts.append(f"font-family: {self.style_converter._format_font_family(style.font_name)};")
+            inline_styles['font-family'] = self.style_converter._format_font_family(style.font_name)
         if style.font_size:
-            css_parts.append(f"font-size: {self.style_converter._format_font_size(style.font_size)};")
+            inline_styles['font-size'] = self.style_converter._format_font_size(style.font_size)
         if style.font_color:
-            css_parts.append(f"color: {self.style_converter._format_color(style.font_color, is_font_color=True)};")
+            inline_styles['color'] = format_color(style.font_color, is_font_color=True)
         if style.bold:
-            css_parts.append("font-weight: bold;")
+            inline_styles['font-weight'] = 'bold'
         if style.italic:
-            css_parts.append("font-style: italic;")
+            inline_styles['font-style'] = 'italic'
         if style.underline:
-            css_parts.append("text-decoration: underline;")
+            inline_styles['text-decoration'] = 'underline'
 
-        style_attr = f'style="{" ".join(css_parts)}"' if css_parts else ""
-        return f'<span {style_attr}>{escape_html(fragment.text)}</span>'
+        return create_html_element('span', escape_html(fragment.text), inline_styles=inline_styles)
 
     def _apply_number_format(self, value, number_format: str) -> str:
         """
