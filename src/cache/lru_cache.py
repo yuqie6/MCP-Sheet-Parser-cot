@@ -1,5 +1,5 @@
 """
-LRU Cache for row block caching.
+用于行块缓存的 LRU 缓存。
 """
 
 from cachetools import LRUCache

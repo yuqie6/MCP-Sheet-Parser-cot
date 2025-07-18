@@ -18,10 +18,6 @@ from ..core_service import CoreService
 
 logger = logging.getLogger(__name__)
 
-
-
-
-
 def register_tools(server: Server) -> None:
     """向服务器注册3个核心MCP工具。"""
 
@@ -239,19 +235,38 @@ async def _handle_convert_to_html(arguments: dict[str, Any], core_service: CoreS
 
 
 async def _handle_parse_sheet(arguments: dict[str, Any], core_service: CoreService) -> list[TextContent]:
-    """处理 parse_sheet 工具调用 - 优化版本，避免上下文爆炸。"""
+    """处理 parse_sheet 工具调用，避免上下文爆炸。"""
 
     try:
-        # 获取参数
+        # 获取和验证参数
         file_path = arguments["file_path"]
-        sheet_name = arguments.get("sheet_name")
-        range_string = arguments.get("range_string")
-        include_full_data = arguments.get("include_full_data", False)
-        include_styles = arguments.get("include_styles", False)
-        preview_rows = arguments.get("preview_rows", 5)
-        max_rows = arguments.get("max_rows")
+        if not isinstance(file_path, str) or not file_path.strip():
+            raise ValueError("file_path必须是非空字符串")
 
-        # 调用优化后的解析方法
+        sheet_name = arguments.get("sheet_name")
+        if sheet_name is not None and not isinstance(sheet_name, str):
+            raise ValueError("sheet_name必须是字符串")
+
+        range_string = arguments.get("range_string")
+        if range_string is not None and not isinstance(range_string, str):
+            raise ValueError("range_string必须是字符串")
+
+        include_full_data = arguments.get("include_full_data", False)
+        if not isinstance(include_full_data, bool):
+            raise ValueError("include_full_data必须是布尔值")
+
+        include_styles = arguments.get("include_styles", False)
+        if not isinstance(include_styles, bool):
+            raise ValueError("include_styles必须是布尔值")
+
+        preview_rows = arguments.get("preview_rows", 5)
+        if not isinstance(preview_rows, int) or preview_rows <= 0:
+            raise ValueError("preview_rows必须是正整数")
+
+        max_rows = arguments.get("max_rows")
+        if max_rows is not None and (not isinstance(max_rows, int) or max_rows <= 0):
+            raise ValueError("max_rows必须是正整数或None")
+
         result = core_service.parse_sheet_optimized(
             file_path=file_path,
             sheet_name=sheet_name,

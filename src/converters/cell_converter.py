@@ -4,7 +4,7 @@ from src.models.table_model import Cell, RichTextFragment
 from src.utils.html_utils import escape_html, create_html_element
 from src.utils.color_utils import format_color
 
-# Number format mapping constant
+ # 数字格式映射常量
 NUMBER_FORMAT_MAP = {
     "General": lambda v: str(v),
     "0": lambda v: f"{v:.0f}" if isinstance(v, (int, float)) else str(v),
@@ -18,7 +18,7 @@ NUMBER_FORMAT_MAP = {
     "0.00%": lambda v: f"{v:.2%}" if isinstance(v, (int, float)) else str(v),
 }
 
-# Date format mapping constant
+ # 日期格式映射常量
 DATE_FORMAT_MAP = {
     "yyyy-mm-dd": "%Y-%m-%d",
     "mm/dd/yyyy": "%m/%d/%Y",
@@ -30,7 +30,7 @@ DATE_FORMAT_MAP = {
 
 
 def format_chinese_date(date_obj: dt, format_str: str) -> str:
-    """Formats a Chinese date."""
+    """格式化中文日期。"""
     if 'm"月"d"日"' in format_str:
         return f"{date_obj.month}月{date_obj.day}日"
     elif 'yyyy"年"m"月"d"日"' in format_str:
@@ -40,14 +40,14 @@ def format_chinese_date(date_obj: dt, format_str: str) -> str:
 
 
 class CellConverter:
-    """Handles the HTML content generation for a single cell."""
+    """处理单元格的 HTML 内容生成。"""
 
     def __init__(self, style_converter):
         self.style_converter = style_converter
 
     def convert(self, cell: Cell) -> str:
         """
-        Converts a Cell object to its HTML representation.
+        将 Cell 对象转换为 HTML 表现形式。
         """
         if isinstance(cell.value, list):
             return self._format_rich_text(cell.value)
@@ -64,13 +64,13 @@ class CellConverter:
 
     def _format_rich_text(self, fragments: list[RichTextFragment]) -> str:
         """
-        Formats rich text fragments into a single HTML string.
+        将富文本片段格式化为单一 HTML 字符串。
         """
         return "".join(self._format_rich_text_fragment(f) for f in fragments)
 
     def _format_rich_text_fragment(self, fragment: RichTextFragment) -> str:
         """
-        Formats a single rich text fragment into a styled HTML span.
+        将单个富文本片段格式化为带样式的 HTML span。
         """
         style = fragment.style
         inline_styles = {}
@@ -92,14 +92,20 @@ class CellConverter:
 
     def _apply_number_format(self, value, number_format: str) -> str:
         """
-        Applies a number format to a value.
+        对值应用数字格式。
         """
         if number_format in NUMBER_FORMAT_MAP:
             return NUMBER_FORMAT_MAP[number_format](value)
         if isinstance(value, (int, float)) and ("月" in number_format and "日" in number_format):
             try:
+                # 使用更精确的Excel日期转换，避免精度损失
+                from decimal import Decimal
                 excel_epoch = dt(1899, 12, 30)
-                date_obj = excel_epoch + timedelta(days=value)
+                # 使用Decimal保持精度，然后转换为timedelta
+                days_decimal = Decimal(str(value))
+                days_int = int(days_decimal)
+                microseconds = int((days_decimal - days_int) * 86400 * 1000000)
+                date_obj = excel_epoch + timedelta(days=days_int, microseconds=microseconds)
                 return format_chinese_date(date_obj, number_format)
             except Exception:
                 pass

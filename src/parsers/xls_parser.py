@@ -52,13 +52,13 @@ class XlsParser(BaseParser):
         """
         解析XLS文件并返回Sheet对象列表。
 
-        Args:
+        参数:
             file_path: XLS文件路径
 
-        Returns:
+        返回:
             包含完整数据和样式的Sheet对象列表
 
-        Raises:
+        异常:
             RuntimeError: 当解析失败时
         """
         try:
@@ -125,7 +125,6 @@ class XlsParser(BaseParser):
             elif cell_type == xlrd.XL_CELL_TEXT:
                 return str(cell_value)
             elif cell_type == xlrd.XL_CELL_NUMBER:
-                # xlrd 2.0版本中，需要手动检查是否为日期
                 # 通过检查单元格的数字格式来判断是否为日期
                 try:
                     # 获取单元格的格式信息
@@ -164,13 +163,13 @@ class XlsParser(BaseParser):
         """
         从XLS单元格提取样式信息。
         
-        Args:
+        参数:
             workbook: xlrd工作簿对象
             worksheet: xlrd工作表对象
             row_idx: 行索引
             col_idx: 列索引
             
-        Returns:
+        返回:
             Style对象
         """
         style = Style()
@@ -294,11 +293,11 @@ class XlsParser(BaseParser):
         将XLS颜色索引转换为RGB十六进制字符串。
         优先从工作簿的实际调色板获取，回退到默认调色板。
 
-        Args:
+        参数:
             workbook: xlrd工作簿对象
             color_index: XLS颜色索引
 
-        Returns:
+        返回:
             RGB颜色字符串，如 "#FF0000"
         """
         # 首先尝试从工作簿的调色板获取
@@ -323,10 +322,10 @@ class XlsParser(BaseParser):
         """
         提取合并单元格信息。
         
-        Args:
+        参数:
             worksheet: xlrd工作表对象
-            
-        Returns:
+
+        返回:
             合并单元格范围列表，格式如 ["A1:B2", "C3:D4"]
         """
         merged_cells = []
@@ -351,11 +350,11 @@ class XlsParser(BaseParser):
         """
         将行列索引转换为Excel单元格引用格式。
         
-        Args:
+        参数:
             row: 行索引（0开始）
             col: 列索引（0开始）
             
-        Returns:
+        返回:
             Excel单元格引用，如 "A1", "B2"
         """
         # 转换列索引为字母

@@ -5,7 +5,15 @@ XLSX解析器模块
 包含完整的样式提取、颜色处理、边框识别等功能，支持流式读取。
 """
 
+import logging
 import openpyxl
+import zipfile
+import re
+import os
+from tempfile import NamedTemporaryFile
+import shutil
+
+logger = logging.getLogger(__name__)
 from openpyxl.utils import get_column_letter
 from openpyxl.cell.cell import Cell as OpenpyxlCell
 from openpyxl.worksheet.worksheet import Worksheet
@@ -14,7 +22,8 @@ from openpyxl.chart.bar_chart import BarChart
 from openpyxl.chart.line_chart import LineChart
 from openpyxl.chart.pie_chart import PieChart
 from openpyxl.chart.area_chart import AreaChart
-from typing import Iterator, Any, Optional, Dict, Union, BinaryIO, cast
+from typing import BinaryIO, cast
+from collections.abc import Iterator
 from io import BytesIO
 from src.models.table_model import Sheet, Row, Cell, LazySheet, Chart, ChartPosition
 from src.parsers.base_parser import BaseParser
@@ -36,26 +45,39 @@ class XlsxRowProvider:
     def _get_worksheet_info(self):
         """无需读取全部数据即可获取工作表信息。"""
         if self._worksheet_title_cache is None:
-            workbook = openpyxl.load_workbook(self.file_path, read_only=True)
-            worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
-            if worksheet is not None:
-                self._worksheet_title_cache = worksheet.title
-            else:
+            workbook = None
+            try:
+                workbook = openpyxl.load_workbook(self.file_path, read_only=True)
+                worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+                if worksheet is not None:
+                    self._worksheet_title_cache = worksheet.title
+                else:
+                    self._worksheet_title_cache = ""
+            except Exception as e:
+                logger.warning(f"Failed to get worksheet info: {e}")
                 self._worksheet_title_cache = ""
-            workbook.close()
+            finally:
+                if workbook is not None:
+                    workbook.close()
         return self._worksheet_title_cache
     
     def _get_merged_cells(self) -> list[str]:
         """获取合并单元格信息。"""
         if self._merged_cells_cache is None:
-            # Read merged cells from non-read-only workbook (required for merged_cells access)
-            workbook = openpyxl.load_workbook(self.file_path)
-            worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
-            if worksheet is not None and hasattr(worksheet, "merged_cells"):
-                self._merged_cells_cache = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
-            else:
+            workbook = None
+            try:
+                workbook = openpyxl.load_workbook(self.file_path)
+                worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+                if worksheet is not None and hasattr(worksheet, "merged_cells"):
+                    self._merged_cells_cache = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
+                else:
+                    self._merged_cells_cache = []
+            except Exception as e:
+                logger.warning(f"Failed to get merged cells: {e}")
                 self._merged_cells_cache = []
-            workbook.close()
+            finally:
+                if workbook is not None:
+                    workbook.close()
         return self._merged_cells_cache
     
     def _parse_row(self, row_cells: tuple) -> Row:
@@ -73,9 +95,11 @@ class XlsxRowProvider:
 
     def iter_rows(self, start_row: int = 0, max_rows: int | None = None) -> Iterator[Row]:
         """按需产出完整结构的行。"""
-        workbook = openpyxl.load_workbook(self.file_path, read_only=True)
-        worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+        workbook = None
         try:
+            workbook = openpyxl.load_workbook(self.file_path, read_only=True)
+            worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
+
             if worksheet is not None:
                 # 获取工作表的完整尺寸
                 max_row = worksheet.max_row or 0
@@ -87,18 +111,17 @@ class XlsxRowProvider:
                     end_row = min(start_row + max_rows, max_row)
 
                 # 使用坐标访问确保完整的行结构
-                for row_idx in range(start_row + 1, end_row + 1):  # openpyxl使用1基索引
+                for row_idx in range(start_row + 1, end_row + 1):
                     cells = []
                     for col_idx in range(1, max_col + 1):
                         cell = worksheet.cell(row=row_idx, column=col_idx)
                         cells.append(cell)
                     yield self._parse_row(tuple(cells))
         except Exception as e:
-            # 确保在出现异常时也能正确关闭工作簿
-            workbook.close()
             raise RuntimeError(f"流式读取XLSX文件失败: {str(e)}") from e
         finally:
-            workbook.close()
+            if workbook is not None:
+                workbook.close()
     
     def get_row(self, row_index: int) -> Row:
         """按索引获取完整结构的指定行。"""
@@ -115,7 +138,7 @@ class XlsxRowProvider:
                 # 使用坐标访问获取完整的行
                 cells = []
                 for col_idx in range(1, max_col + 1):
-                    cell = worksheet.cell(row=row_index + 1, column=col_idx)  # openpyxl使用1基索引
+                    cell = worksheet.cell(row=row_index + 1, column=col_idx)
                     cells.append(cell)
                 return self._parse_row(tuple(cells))
             raise IndexError(f"Row index {row_index} out of range")
@@ -136,11 +159,13 @@ class XlsxRowProvider:
             workbook = openpyxl.load_workbook(self.file_path, read_only=True)
             worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
             try:
-                # Count rows using worksheet.max_row property
                 if worksheet is not None and hasattr(worksheet, "max_row"):
                     self._total_rows_cache = worksheet.max_row or 0
                 else:
                     self._total_rows_cache = 0
+            except Exception as e:
+                logger.warning(f"获取工作表行数失败: {e}")
+                self._total_rows_cache = 0
             finally:
                 workbook.close()
         return self._total_rows_cache
@@ -161,20 +186,88 @@ class XlsxParser(BaseParser):
         """
         解析XLSX文件，返回每个工作表对应的Sheet对象列表。
         """
-        try:
-            workbook = openpyxl.load_workbook(file_path, data_only=False)
-            data_only_workbook = openpyxl.load_workbook(file_path, data_only=True)
-        except Exception as e:
-            raise IOError(f"无法加载Excel文件: {e}")
+        workbook = None
+        data_only_workbook = None
+
+        # 尝试多种加载方式
+        load_attempts = [
+            {"data_only": False, "keep_vba": False, "keep_links": False},
+            {"data_only": True, "keep_vba": False, "keep_links": False},
+            {"data_only": True, "keep_vba": False, "keep_links": False, "read_only": True},
+        ]
+
+        last_error = None
+        for i, kwargs in enumerate(load_attempts):
+            try:
+                logger.info(f"尝试加载方式 {i+1}: {kwargs}")
+                workbook = openpyxl.load_workbook(file_path, **kwargs)
+
+                # 如果成功加载，尝试获取data_only版本
+                if not kwargs.get("data_only", False):
+                    try:
+                        data_only_workbook = openpyxl.load_workbook(file_path, data_only=True, keep_vba=False, keep_links=False)
+                    except Exception as e:
+                        logger.debug(f"无法加载data_only版本，使用原始工作簿: {e}")
+                        data_only_workbook = workbook
+                else:
+                    data_only_workbook = workbook
+
+                logger.info(f"成功使用方式 {i+1} 加载文件")
+                break
+
+            except Exception as e:
+                last_error = e
+                logger.warning(f"加载方式 {i+1} 失败: {e}")
+                continue
+
+        if workbook is None:
+            # 检查是否是样式兼容性问题
+            if last_error and "Fill" in str(last_error):
+                logger.warning(f"检测到样式兼容性问题，尝试修复Excel文件: {last_error}")
+                try:
+                    fixed_file = self._fix_excel_styles(file_path)
+                    logger.info(f"样式修复成功，重新尝试解析: {fixed_file}")
+
+                    # 使用修复后的文件重新尝试解析
+                    for i, kwargs in enumerate(load_attempts):
+                        try:
+                            workbook = openpyxl.load_workbook(fixed_file, **kwargs)
+                            if not kwargs.get("data_only", False):
+                                try:
+                                    data_only_workbook = openpyxl.load_workbook(fixed_file, data_only=True, keep_vba=False, keep_links=False)
+                                except Exception as e:
+                                    logger.debug(f"修复文件无法加载data_only版本，使用原始工作簿: {e}")
+                                    data_only_workbook = workbook
+                            else:
+                                data_only_workbook = workbook
+                            logger.info(f"修复后文件解析成功")
+                            break
+                        except Exception as e:
+                            continue
+
+                    if workbook is None:
+                        logger.error("修复后的文件仍然无法解析")
+
+                except Exception as fix_error:
+                    logger.error(f"样式修复失败: {fix_error}")
+
+            if workbook is None:
+                logger.error(f"openpyxl所有加载方式都失败，尝试使用XLS解析器作为备选")
+                try:
+                    # 尝试使用XLS解析器作为备选
+                    from .xls_parser import XlsParser
+                    xls_parser = XlsParser()
+                    logger.info("使用XLS解析器作为备选方案")
+                    return xls_parser.parse(file_path)
+                except Exception as xls_error:
+                    logger.error(f"XLS解析器也失败: {xls_error}")
+                    raise IOError(f"无法加载Excel文件 (openpyxl: {last_error}, xlrd: {xls_error})")
 
         sheets = []
         for sheet_name in workbook.sheetnames:
             worksheet = workbook[sheet_name]
-            data_only_worksheet = data_only_workbook[sheet_name]
-            
-            # ... (rest of the parsing logic for a single sheet)
-            # This part needs to be encapsulated into a helper method
-            
+            data_only_worksheet = data_only_workbook[sheet_name] if data_only_workbook else worksheet
+
             sheet = self._parse_sheet(worksheet, data_only_worksheet)
             sheets.append(sheet)
             
@@ -182,11 +275,9 @@ class XlsxParser(BaseParser):
 
     def _parse_sheet(self, worksheet: Worksheet, data_only_worksheet: Worksheet) -> Sheet:
         """解析单个工作表的辅助方法。"""
-        # Get sheet dimensions
         max_row = worksheet.max_row or 0
         max_col = worksheet.max_column or 0
 
-        # Parse rows and cells
         rows = []
         for row_idx in range(1, max_row + 1):
             cells = []
@@ -211,7 +302,6 @@ class XlsxParser(BaseParser):
                 cells.append(parsed_cell)
             rows.append(Row(cells=cells))
 
-        # Extract other sheet properties
         merged_cells = [str(merged_cell_range) for merged_cell_range in worksheet.merged_cells.ranges]
         
         column_widths = {col_idx - 1: worksheet.column_dimensions[get_column_letter(col_idx)].width 
@@ -223,7 +313,6 @@ class XlsxParser(BaseParser):
         default_col_width = worksheet.sheet_format.defaultColWidth or 8.43
         default_row_height = worksheet.sheet_format.defaultRowHeight or 18.0
         
-        # Extract images and charts
         charts = self._extract_charts(worksheet)
         images = self._extract_images(worksheet)
         all_visuals = charts + images
@@ -242,12 +331,10 @@ class XlsxParser(BaseParser):
     def _extract_images(self, worksheet: Worksheet) -> list[Chart]:
         """提取工作表中的嵌入图片。"""
         images = []
-        # Use getattr to safely access _images attribute
         worksheet_images = getattr(worksheet, '_images', [])
         for image in worksheet_images:
             if isinstance(image, OpenpyxlImage):
                 try:
-                    # Get image data safely - 修复图片数据提取
                     img_data = None
 
                     # 方法1：尝试从ref（BytesIO对象）读取
@@ -277,7 +364,6 @@ class XlsxParser(BaseParser):
                         except Exception:
                             pass
 
-                    # Get anchor position safely and create position info
                     anchor_str = "A1"  # 默认位置
                     position = None
 
@@ -329,14 +415,12 @@ class XlsxParser(BaseParser):
                         except Exception:
                             anchor_str = "A1"
 
-                    # Create a Chart object to represent the image
                     image_chart = Chart(
                         name=f"Image {len(images) + 1}",
                         type="image",
                         anchor=anchor_str,
                         position=position  # 添加位置信息
                     )
-                    # Store image data in chart_data for consistency
                     image_chart.chart_data = {'image_data': img_data, 'type': 'image'}
                     images.append(image_chart)
                 except Exception as e:
@@ -400,7 +484,7 @@ class XlsxParser(BaseParser):
                     try:
                         anchor = chart_drawing.anchor
                         if hasattr(anchor, '_from') and getattr(anchor, '_from', None) and hasattr(anchor, 'to') and getattr(anchor, 'to', None):
-                            # TwoCellAnchor类型 - 提取完整定位数据
+                            # 提取完整定位数据
                             from_cell = getattr(anchor, '_from', None)
                             to_cell = getattr(anchor, 'to', None)
                             
@@ -556,7 +640,7 @@ class XlsxParser(BaseParser):
                 if hasattr(scaling, 'max') and scaling.max is not None:
                     chart_data['x_axis_max'] = float(scaling.max)
         except (ValueError, TypeError, AttributeError):
-            pass # Ignore if scaling info is not available or not numeric
+            pass 
         
         # 提取系列数据
         if isinstance(chart, (BarChart, LineChart, AreaChart)):
@@ -674,3 +758,99 @@ class XlsxParser(BaseParser):
             chart_data['annotations'] = annotations
 
         return chart_data
+
+    def _fix_excel_styles(self, file_path: str) -> str:
+        """
+        修复Excel文件中的样式兼容性问题
+
+        参数:
+            file_path: 原始Excel文件路径
+
+        返回:
+            修复后的Excel文件路径
+        """
+        # 生成修复后的文件名
+        name, ext = os.path.splitext(file_path)
+        fixed_file = f"{name}_fixed{ext}"
+
+        logger.info(f"正在修复Excel样式兼容性问题: {file_path} -> {fixed_file}")
+
+        with NamedTemporaryFile(delete=False) as tmp:
+            tmp_name = tmp.name
+
+        try:
+            zin = zipfile.ZipFile(file_path, "r")
+            zout = zipfile.ZipFile(tmp_name, "w")
+
+            for item in zin.infolist():
+                buffer = zin.read(item.filename)
+
+                if item.filename == "xl/styles.xml":
+                    logger.debug("修复 xl/styles.xml 文件...")
+                    styles = buffer.decode("utf-8")
+
+                    # 1. 移除问题的独立空标签
+                    styles = styles.replace("<x:fill />", "")
+
+                    # 2. 修复fills部分中的空fill标签
+                    pattern = re.compile(r'(<fills count="\d+">)(.*?)(</fills>)', re.DOTALL)
+
+                    def fix_fills_section(match):
+                        start_tag = match.group(1)
+                        content = match.group(2)
+                        end_tag = match.group(3)
+
+                        # 移除空的fill标签
+                        content = re.sub(r'<fill\s*/>', '', content)
+                        content = re.sub(r'<fill></fill>', '', content)
+                        content = re.sub(r'<fill>\s*</fill>', '', content)
+
+                        # 如果内容为空或只有空白，添加一个默认的fill
+                        if not content.strip():
+                            content = '<fill><patternFill patternType="none"/></fill>'
+
+                        return start_tag + content + end_tag
+
+                    styles = pattern.sub(fix_fills_section, styles)
+
+                    # 3. 额外的清理：移除任何剩余的空fill标签
+                    styles = re.sub(r'<fill\s*/>', '', styles)
+                    styles = re.sub(r'<fill></fill>', '', styles)
+                    styles = re.sub(r'<fill>\s*</fill>', '', styles)
+
+                    # 4. 确保fills部分有正确的count属性
+                    fills_pattern = re.compile(r'<fills count="(\d+)">(.*?)</fills>', re.DOTALL)
+
+                    def fix_fills_count(match):
+                        old_count = match.group(1)
+                        content = match.group(2)
+
+                        # 计算实际的fill元素数量
+                        actual_count = len(re.findall(r'<fill[^>]*>', content))
+
+                        if int(old_count) != actual_count:
+                            logger.debug(f"修正fills count: {old_count} -> {actual_count}")
+                            return f'<fills count="{actual_count}">{content}</fills>'
+
+                        return match.group(0)
+
+                    styles = fills_pattern.sub(fix_fills_count, styles)
+                    buffer = styles.encode("utf-8")
+
+                zout.writestr(item, buffer)
+
+            zin.close()
+            zout.close()
+
+            # 将临时文件移动到目标位置
+            shutil.move(tmp_name, fixed_file)
+            logger.info(f"Excel样式修复完成: {fixed_file}")
+
+            return fixed_file
+
+        except Exception as e:
+            logger.error(f"Excel样式修复失败: {e}")
+            # 清理临时文件
+            if os.path.exists(tmp_name):
+                os.unlink(tmp_name)
+            raise

@@ -7,7 +7,6 @@ XLSM本质上是带宏的XLSX，样式提取与XLSX完全相同。
 
 import logging
 import openpyxl
-from typing import Optional
 from src.models.table_model import Sheet, Row, Cell, LazySheet
 from src.parsers.xlsx_parser import XlsxParser
 from src.utils.style_parser import extract_style
@@ -27,13 +26,13 @@ class XlsmParser(XlsxParser):
         """
         解析XLSM文件并返回Sheet对象列表。
 
-        Args:
+        参数:
             file_path: XLSM文件路径
 
-        Returns:
+        返回:
             包含完整数据和样式的Sheet对象列表
 
-        Raises:
+        异常:
             RuntimeError: 当解析失败时
         """
         try:
@@ -95,7 +94,7 @@ class XlsmParser(XlsxParser):
         """
         记录宏文件的相关信息，用于调试和日志。
         
-        Args:
+        参数:
             workbook: openpyxl工作簿对象
             file_path: 文件路径
         """
@@ -130,10 +129,10 @@ class XlsmParser(XlsxParser):
         """
         获取XLSM文件的宏信息摘要。
         
-        Args:
+        参数:
             file_path: XLSM文件路径
-            
-        Returns:
+
+        返回:
             包含宏信息的字典
         """
         macro_info = {
@@ -173,8 +172,8 @@ class XlsmParser(XlsxParser):
     def supports_streaming(self) -> bool:
         """XLSM解析器支持流式处理（继承自XLSX）。"""
         return True
-    
-    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> LazySheet:
+
+    def create_lazy_sheet(self, file_path: str, sheet_name: str | None = None) -> LazySheet:
         """
         为XLSM创建可按需流式读取的惰性表对象。
         XLSM文件的流式处理方式与XLSX完全一致。
@@ -198,10 +197,10 @@ class XlsmParser(XlsxParser):
         """
         检查文件是否为启用宏的Excel文件。
         
-        Args:
+        参数:
             file_path: 文件路径
-            
-        Returns:
+
+        返回:
             如果文件包含宏则返回True，否则返回False
         """
         try:

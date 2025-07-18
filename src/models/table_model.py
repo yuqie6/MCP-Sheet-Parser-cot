@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any, Iterator, Optional, Protocol, Union
+from typing import Any, Protocol
+from collections.abc import Iterable
 from abc import ABC, abstractmethod
 
 @dataclass
@@ -9,9 +10,9 @@ class RichTextFragmentStyle:
     bold: bool = False
     italic: bool = False
     underline: bool = False
-    font_color: Optional[str] = None
-    font_size: Optional[float] = None
-    font_name: Optional[str] = None
+    font_color: str | None = None
+    font_size: float | None = None
+    font_name: str | None = None
 
 @dataclass
 # 富文本片段定义
@@ -21,12 +22,12 @@ class RichTextFragment:
     style: RichTextFragmentStyle
 
 # 单元格的值可以是简单类型或富文本片段列表
-CellValue = Union[Any, list[RichTextFragment]]
+CellValue = Any | list[RichTextFragment]
 
 class LazyRowProvider(Protocol):
     """惰性行提供者协议，可按需流式获取行。"""
 
-    def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator['Row']:
+    def iter_rows(self, start_row: int = 0, max_rows: int | None = None) -> Iterable['Row']:
         """从 start_row 开始按需生成行。"""
         ...
 
@@ -47,7 +48,7 @@ class StreamingCapable(ABC):
         return False
 
     @abstractmethod
-    def create_lazy_sheet(self, file_path: str, sheet_name: Optional[str] = None) -> 'LazySheet':
+    def create_lazy_sheet(self, file_path: str, sheet_name: str | None = None) -> 'LazySheet':
         """创建可按需流式读取数据的惰性表对象。"""
         pass
 
@@ -64,32 +65,32 @@ class Style:
     bold: bool = False
     italic: bool = False
     underline: bool = False
-    font_color: Optional[str] = None
-    font_size: Optional[float] = None
-    font_name: Optional[str] = None
+    font_color: str | None = None
+    font_size: float | None = None
+    font_name: str | None = None
 
     # 背景与填充
-    background_color: Optional[str] = None
+    background_color: str | None = None
 
     # 文本对齐
-    text_align: Optional[str] = None  # 可选：left, center, right, justify
-    vertical_align: Optional[str] = None  # 可选：top, middle, bottom
+    text_align: str | None = None  # 可选：left, center, right, justify
+    vertical_align: str | None = None  # 可选：top, middle, bottom
 
     # 边框属性
-    border_top: Optional[str] = None
-    border_bottom: Optional[str] = None
-    border_left: Optional[str] = None
-    border_right: Optional[str] = None
-    border_color: Optional[str] = None
+    border_top: str | None = None
+    border_bottom: str | None = None
+    border_left: str | None = None
+    border_right: str | None = None
+    border_color: str | None = None
 
     # 自动换行与格式
     wrap_text: bool = False
-    number_format: Optional[str] = None
+    number_format: str | None = None
 
     # 高级特性
-    formula: Optional[str] = None     # 单元格公式字符串
-    hyperlink: Optional[str] = None  # 超链接 URL
-    comment: Optional[str] = None    # 单元格批注
+    formula: str | None = None     # 单元格公式字符串
+    hyperlink: str | None = None  # 超链接 URL
+    comment: str | None = None    # 单元格批注
 
 
 
@@ -104,7 +105,7 @@ class Cell:
     style: Style | None = None
     row_span: int = 1
     col_span: int = 1
-    formula: Optional[str] = None
+    formula: str | None = None
 
 
 
@@ -143,14 +144,14 @@ class Chart:
     """表格中的图表对象。"""
     name: str
     type: str  # 如 'bar', 'line', 'pie'
-    anchor: Optional[str] = None  # 锚点位置，如 'A1'
+    anchor: str | None = None  # 锚点位置，如 'A1'
     
     # 原始图表数据，用于SVG渲染
-    chart_data: Optional[dict] = None  # 原始图表数据，包含系列、标题等
-    svg_data: Optional[str] = None  # 渲染后的SVG字符串
-    
+    chart_data: dict | None = None  # 原始图表数据，包含系列、标题等
+    svg_data: str | None = None  # 渲染后的SVG字符串
+
     # 精确定位信息
-    position: Optional[ChartPosition] = None  # 详细的定位和尺寸信息
+    position: ChartPosition | None = None  # 详细的定位和尺寸信息
 
 
 
@@ -169,7 +170,7 @@ class Sheet:
     default_column_width: float = 8.43  # Excel默认列宽
     default_row_height: float = 18.0    # Excel默认行高
 
-    def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
+    def iter_rows(self, start_row: int = 0, max_rows: int | None = None) -> Iterable[Row]:
         """
         遍历表格中的部分行。
 
@@ -196,13 +197,13 @@ class Sheet:
 class LazySheet:
     """惰性表对象，可按需流式读取数据，无需一次性加载全部内容到内存。"""
 
-    def __init__(self, name: str, provider: LazyRowProvider, merged_cells: Optional[list[str]] = None):
+    def __init__(self, name: str, provider: LazyRowProvider, merged_cells: list[str] |None = None):
         self.name = name
         self._provider = provider
         self.merged_cells = merged_cells or []
-        self._total_rows_cache: Optional[int] = None
+        self._total_rows_cache: int | None = None
 
-    def iter_rows(self, start_row: int = 0, max_rows: Optional[int] = None) -> Iterator[Row]:
+    def iter_rows(self, start_row: int = 0, max_rows: int | None = None) -> Iterable[Row]:
         """按需遍历行。"""
         return self._provider.iter_rows(start_row, max_rows)
 

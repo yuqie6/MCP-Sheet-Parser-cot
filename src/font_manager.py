@@ -28,8 +28,8 @@ class FontManager:
     def __init__(self, config_file: str | None = None):
         """
         初始化字体管理器
-        
-        Args:
+
+        参数：
             config_file: 字体配置文件路径
         """
         self.config_file = config_file or self._get_default_config_path()
@@ -118,10 +118,10 @@ class FontManager:
         """
         自动检测字体类型
         
-        Args:
+        参数:
             font_name: 字体名称
             
-        Returns:
+        返回:
             字体类型: 'chinese', 'monospace', 'serif', 'sans_serif'
         """
         if not font_name:
@@ -155,10 +155,10 @@ class FontManager:
         """
         判断字体名称是否需要引号包围
         
-        Args:
+        参数:
             font_name: 字体名称
             
-        Returns:
+        返回:
             是否需要引号
         """
         if not font_name:
@@ -173,10 +173,10 @@ class FontManager:
         """
         格式化字体名称
         
-        Args:
+        参数:
             font_name: 原始字体名称
             
-        Returns:
+        返回:
             格式化后的字体名称
         """
         if not font_name:
@@ -199,10 +199,10 @@ class FontManager:
         """
         获取回退字体列表
         
-        Args:
+        参数:
             font_type: 字体类型
-            
-        Returns:
+
+        返回:
             回退字体列表
         """
         return self.font_database['fallback_chains'].get(font_type, 
@@ -212,10 +212,10 @@ class FontManager:
         """
         生成完整的font-family字符串
         
-        Args:
+        参数:
             font_name: 主字体名称
-            
-        Returns:
+
+        返回:
             完整的font-family字符串
         """
         if not font_name:
@@ -239,7 +239,7 @@ class FontManager:
         """
         学习新字体（添加到数据库）
         
-        Args:
+        参数:
             font_name: 字体名称
             font_type: 字体类型
         """
@@ -261,10 +261,10 @@ class FontManager:
         """
         从字体名称中提取关键词
         
-        Args:
+        参数:
             font_name: 字体名称
             
-        Returns:
+        返回:
             关键词列表
         """
         keywords = []
@@ -289,23 +289,34 @@ class FontManager:
                 'font_database': self.font_database,
                 'custom_mappings': self.custom_mappings
             }
-            
+
             # 确保配置目录存在
             config_path = Path(self.config_file)
             config_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(config_data, f, ensure_ascii=False, indent=2)
-            
-            logger.info(f"字体配置已保存到: {self.config_file}")
-        except Exception as e:
+
+            # 使用临时文件确保原子性写入
+            temp_file = config_path.with_suffix('.tmp')
+            try:
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, ensure_ascii=False, indent=2)
+                # 原子性地替换原文件
+                temp_file.replace(config_path)
+                logger.info(f"字体配置已保存到: {self.config_file}")
+            except Exception as e:
+                # 清理临时文件
+                if temp_file.exists():
+                    temp_file.unlink()
+                raise e
+        except (OSError, TypeError) as e:
             logger.error(f"保存字体配置失败: {e}")
+        except Exception as e:
+            logger.error(f"保存字体配置时发生未预期的错误: {e}")
     
     def add_custom_mapping(self, original_name: str, mapped_name: str) -> None:
         """
         添加自定义字体映射
         
-        Args:
+        参数:
             original_name: 原始字体名称
             mapped_name: 映射后的字体名称
         """
@@ -316,10 +327,10 @@ class FontManager:
         """
         获取字体的详细信息
         
-        Args:
+        参数:
             font_name: 字体名称
-            
-        Returns:
+
+        返回:
             字体信息字典
         """
         font_type = self.detect_font_type(font_name)
@@ -336,12 +347,17 @@ class FontManager:
         }
 
 
-# 全局字体管理器实例
+# 全局字体管理器实例（线程安全）
+import threading
 _font_manager = None
+_font_manager_lock = threading.Lock()
 
 def get_font_manager() -> FontManager:
-    """获取全局字体管理器实例"""
+    """获取全局字体管理器实例（线程安全）"""
     global _font_manager
     if _font_manager is None:
-        _font_manager = FontManager()
+        with _font_manager_lock:
+            # 双重检查锁定模式
+            if _font_manager is None:
+                _font_manager = FontManager()
     return _font_manager

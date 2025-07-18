@@ -1,36 +1,34 @@
 """
-SVG图表渲染器 - 将Excel图表转换为高质量的SVG格式。
-
-这个模块替代了原有的matplotlib PNG渲染方案，提供：
-1. 矢量图形质量
-2. 更好的位置控制
-3. CSS样式支持
-4. 响应式设计
+SVG图表渲染器：将Excel图表转换为高质量SVG格式。
 """
 
-from typing import Any, Dict, List, Optional
+import math
+from typing import Any
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from src.utils.color_utils import DEFAULT_CHART_COLORS, normalize_color, ensure_distinct_colors
 
 
 class SVGChartRenderer:
-    """将Excel图表数据转换为SVG的渲染器。"""
+    """Excel图表数据到SVG的渲染器。"""
     
-    def __init__(self, width: int = 800, height: int = 500, show_axes: bool = False):  # 默认不显示坐标轴
+    # 默认图表尺寸常量
+    DEFAULT_WIDTH = 800
+    DEFAULT_HEIGHT = 500
+
+    def __init__(self, width: int = DEFAULT_WIDTH, height: int = DEFAULT_HEIGHT, show_axes: bool = False):
         """
         初始化SVG渲染器。
-
         参数：
-            width: SVG图表宽度（像素）- 基于Excel默认15cm
-            height: SVG图表高度（像素）- 基于Excel默认7.5cm
-            show_axes: 是否显示坐标轴和网格线（默认False，匹配Excel简洁样式）
+            width: SVG宽度（像素）
+            height: SVG高度（像素）
+            show_axes: 是否显示坐标轴和网格线
         """
-        # 基于搜索结果：Excel默认图表大小15x7.5cm
+        # Excel默认图表大小15x7.5cm
         self.width = width
         self.height = height
         self.show_axes = show_axes
-        # 调整边距：如果不显示坐标轴，减少边距，整体往下移动
+        # 如果不显示坐标轴，减少边距，整体往下移动
         if show_axes:
             self.margin = {'top': 70, 'right': 80, 'bottom': 60, 'left': 80}  # 增加top边距
         else:
@@ -38,25 +36,11 @@ class SVGChartRenderer:
         self.plot_width = width - self.margin['left'] - self.margin['right']
         self.plot_height = height - self.margin['top'] - self.margin['bottom']
         
-    def render_chart_to_svg(self, chart_data: Dict[str, Any]) -> str:
+    def render_chart_to_svg(self, chart_data: dict[str, Any]) -> str:
         """
-        将图表数据渲染为SVG字符串。
-
+        渲染图表数据为SVG字符串。
         参数：
-            chart_data: 包含图表类型、数据、标题等信息的字典
-                {
-                    'type': 'bar'|'line'|'pie'|'area',
-                    'title': '图表标题',
-                    'series': [{'name': '系列名', 'x_data': [...], 'y_data': [...], 'color': '#RRGGBB', 'data_labels': {...}}],
-                    'x_axis_title': 'X轴标题',
-                    'y_axis_title': 'Y轴标题',
-                    'colors': ['#RRGGBB', ...],  # 原始Excel颜色
-                    'size': {'width_px': 400, 'height_px': 300},  # 原始Excel尺寸
-                    'legend': {'enabled': True, 'position': 'right', 'entries': [...]},  # 图例信息
-                    'annotations': [{'type': 'title', 'text': '...', 'position': '...'}],  # 注释信息
-                    'data_labels': {'enabled': True, 'show_value': True, ...}  # 数据标签信息
-                }
-
+            chart_data 图表数据字典
         返回：
             SVG字符串
         """
@@ -84,9 +68,9 @@ class SVGChartRenderer:
             return self._render_image_chart(chart_data)
         else:
             return self._render_fallback_chart(chart_data)
-    
-    def _render_legend_if_needed(self, svg: ET.Element, chart_data: Dict[str, Any], series_list: List[Dict], colors: List[str]) -> None:
-        """统一处理图例渲染逻辑。"""
+
+    def _render_legend_if_needed(self, svg: ET.Element, chart_data: dict[str, Any], series_list: list[dict], colors: list[str]) -> None:
+        """渲染图例。"""
         show_legend = (
             chart_data.get('show_legend', False) or
             chart_data.get('legend', {}).get('show', False) or
@@ -109,13 +93,13 @@ class SVGChartRenderer:
                 # 使用系列信息创建图例
                 self._draw_legend(svg, series_list, colors, legend_style=legend_style)
     
-    def _render_common_chart_elements(self, svg: ET.Element, chart_data: Dict[str, Any], series_list: List[Dict], colors: List[str]) -> None:
-        """渲染通用的图表元素（图例和注释）。"""
+    def _render_common_chart_elements(self, svg: ET.Element, chart_data: dict[str, Any], series_list: list[dict], colors: list[str]) -> None:
+        """渲染通用图表元素（图例和注释）。"""
         self._render_legend_if_needed(svg, chart_data, series_list, colors)
         self._render_annotations(svg, chart_data)
-    
-    def _should_show_data_labels(self, chart_data: Dict[str, Any], series_data: Optional[Dict[str, Any]] = None) -> bool:
-        """判断是否应该显示数据标签的通用方法。"""
+
+    def _should_show_data_labels(self, chart_data: dict[str, Any], series_data: dict[str, Any] | None = None) -> bool:
+        """判断是否显示数据标签。"""
         # 检查图表级别的数据标签设置
         if chart_data.get('show_data_labels', False):
             return True
@@ -134,7 +118,7 @@ class SVGChartRenderer:
     def _create_data_label_element(self, svg: ET.Element, x: float, y: float, text: str, 
                                    font_size: str = '10px', fill: str = 'white', 
                                    text_anchor: str = 'middle') -> None:
-        """创建数据标签元素的通用方法。"""
+        """创建数据标签元素。"""
         text_elem = ET.SubElement(svg, 'text', {
             'x': str(x),
             'y': str(y),
@@ -147,7 +131,7 @@ class SVGChartRenderer:
         text_elem.text = text
     
     def _handle_chart_error(self, chart_type: str, error: Exception) -> str:
-        """处理图表渲染错误，返回错误占位符。"""
+        """处理渲染错误，返回错误占位符。"""
         svg = self._create_svg_root(f"Chart Error: {chart_type}")
         
         # 绘制错误占位符
@@ -171,14 +155,11 @@ class SVGChartRenderer:
         text.text = f"Error rendering {chart_type}: {str(error)}"
         
         return self._format_svg(svg)
-    
-    def _create_svg_root(self, title: str = "", title_style: Optional[Dict[str, Any]] = None) -> ET.Element:
-        """
-        创建SVG根元素，并为标题应用指定的字体样式。
 
-        参数：
-            title: 图表标题
-            title_style: 标题的字体样式字典
+    def _create_svg_root(self, title: str = "", title_style: dict[str, Any] | None = None) -> ET.Element:
+        """
+        创建SVG根元素。
+        参数：title 图表标题，title_style 标题样式
         """
         svg = ET.Element('svg', {
             'width': f'{self.width}px',
@@ -219,10 +200,10 @@ class SVGChartRenderer:
             title_elem.text = title
         
         return svg
-    
-    def _get_series_colors(self, chart_data: Dict[str, Any]) -> List[str]:
+
+    def _get_series_colors(self, chart_data: dict[str, Any]) -> list[str]:
         """
-        Gets series colors, prioritizing original Excel colors.
+        获取系列颜色，优先使用Excel原色。
         """
         if 'colors' in chart_data and chart_data['colors']:
             return chart_data['colors']
@@ -238,7 +219,7 @@ class SVGChartRenderer:
         return DEFAULT_CHART_COLORS
     
     def _get_chart_css(self) -> str:
-        """获取图表的CSS样式。"""
+        """获取图表CSS样式。"""
         return """
         .excel-chart-svg {
             font-family: 'Microsoft YaHei', 'SimHei', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Segoe UI', Arial, sans-serif;
@@ -307,8 +288,8 @@ class SVGChartRenderer:
         }
         """
     
-    def _render_bar_chart(self, chart_data: Dict[str, Any]) -> str:
-        """Renders a bar chart."""
+    def _render_bar_chart(self, chart_data: dict[str, Any]) -> str:
+        """渲染柱状图。"""
         title_style = chart_data.get('title_style')
         svg = self._create_svg_root(chart_data.get('title', ''), title_style=title_style)
         series_list = chart_data.get('series', [])
@@ -319,7 +300,7 @@ class SVGChartRenderer:
         # 保存当前系列，供其他方法使用
         self.current_series = series_list
 
-        # 修复：确保颜色列表与系列列表匹配
+        # 确保颜色列表与系列列表匹配
         colors = self._get_series_colors(chart_data)
         if len(colors) < len(series_list):
             colors.extend(DEFAULT_CHART_COLORS * (len(series_list) - len(colors)))
@@ -347,21 +328,43 @@ class SVGChartRenderer:
             # 连续柱状图：保留所有X轴标签
             unique_x_labels = list(dict.fromkeys(all_x_labels))  # 仍需要用于计算范围
             display_x_labels = all_x_labels
-        # 修复：Y轴从0开始，这样所有柱子都有合理的高度
-        y_min = 0  # 强制从0开始
-        
-        # 修复类型安全问题：确保y_max在传递给float()之前绝不为None
+        # 修复：支持负数值，Y轴范围应该包含所有数据
+        y_min = min(all_y_values) if all_y_values else 0
+
+        # 确保y_max在传递给float()之前绝不为None
         y_val = chart_data.get('y_axis_max')
-        if y_val is None:
+        if y_val is None or not isinstance(y_val, (int, float)):
             y_val = max(all_y_values) if all_y_values else 1
-        
-        # 确保y_min和y_max是数值类型
-        y_min = float(y_min)
-        y_max = float(y_val)
+
+        # 确保y_min和y_max是数值类型，并处理可能的转换错误
+        try:
+            y_min = float(y_min)
+            y_max = float(y_val)
+        except (ValueError, TypeError):
+            y_min = 0.0
+            y_max = 1.0
+
+        # 如果所有值都是正数，从0开始；如果有负数，包含负数范围
+        if y_min > 0:
+            y_min = 0  # 正数图表从0开始更直观
+
         y_range = y_max - y_min if y_max != y_min else 1
 
         # 绘制X轴标签（保持Excel样式）
         self._draw_x_axis_labels(svg, display_x_labels)
+
+        # 如果有负数，绘制零线
+        if y_min < 0 and y_range > 0:
+            zero_line_y = self.margin['top'] + self.plot_height - ((-y_min) / y_range) * self.plot_height
+            zero_line = ET.SubElement(svg, 'line', {
+                'x1': str(self.margin['left']),
+                'y1': str(zero_line_y),
+                'x2': str(self.margin['left'] + self.plot_width),
+                'y2': str(zero_line_y),
+                'stroke': '#666',
+                'stroke-width': '1',
+                'class': 'zero-line'
+            })
 
         colors = self._get_series_colors(chart_data)
 
@@ -404,12 +407,28 @@ class SVGChartRenderer:
                     bar_center_x = self.margin['left'] + (bar_index + 0.5) * bar_group_width
                     bar_x = bar_center_x - bar_width / 2
 
-                # 计算柱子高度
-                y_value_norm = max(0, y_value - y_min)  # 确保非负
-                bar_height = (y_value_norm / y_range) * self.plot_height if y_range > 0 else 0
-                bar_height = max(5, bar_height)  # 确保至少5像素高度，让柱子可见
+                # 计算柱子高度和位置，支持负数
+                if y_range > 0:
+                    # 计算零线位置（基准线）
+                    zero_line_y = self.margin['top'] + self.plot_height - ((-y_min) / y_range) * self.plot_height
 
-                bar_y = self.margin['top'] + self.plot_height - bar_height
+                    # 计算柱子的顶部和底部位置
+                    value_y = self.margin['top'] + self.plot_height - ((y_value - y_min) / y_range) * self.plot_height
+
+                    if y_value >= 0:
+                        # 正数：从零线向上
+                        bar_y = value_y
+                        bar_height = zero_line_y - value_y
+                    else:
+                        # 负数：从零线向下
+                        bar_y = zero_line_y
+                        bar_height = value_y - zero_line_y
+
+                    # 确保柱子至少有最小高度可见
+                    bar_height = max(2, abs(bar_height))
+                else:
+                    bar_height = 5
+                    bar_y = self.margin['top'] + self.plot_height - bar_height
 
                 # 绘制柱子
                 rect = ET.SubElement(svg, 'rect', {
@@ -425,12 +444,20 @@ class SVGChartRenderer:
                 x_positions.append(bar_center_x)
                 y_positions.append(bar_y)
 
-                # 使用新的通用方法显示数据标签
+                # 使用新的通用方法显示数据标签，支持正负数
                 if self._should_show_data_labels(chart_data, series) and bar_height > 8:
+                    # 根据正负值调整标签位置
+                    if y_value >= 0:
+                        # 正数：标签在柱子顶部上方
+                        label_y = bar_y - 5
+                    else:
+                        # 负数：标签在柱子底部下方
+                        label_y = bar_y + bar_height + 15
+
                     self._create_data_label_element(
-                        svg, 
-                        bar_x + bar_width / 2, 
-                        bar_y + 10, 
+                        svg,
+                        bar_x + bar_width / 2,
+                        label_y,
                         str(int(y_value))
                     )
 
@@ -446,8 +473,8 @@ class SVGChartRenderer:
         self._render_common_chart_elements(svg, chart_data, series_list, colors)
         
         return self._format_svg(svg)
-    
-    def _render_line_chart(self, chart_data: Dict[str, Any]) -> str:
+
+    def _render_line_chart(self, chart_data: dict[str, Any]) -> str:
         """渲染折线图。"""
         title_style = chart_data.get('title_style')
         svg = self._create_svg_root(chart_data.get('title', ''), title_style=title_style)
@@ -491,8 +518,7 @@ class SVGChartRenderer:
             points = []
             for x_label, y_value in zip(x_data, y_data):
                 if x_label in unique_x_labels:
-                    x_pos = unique_x_labels.index(x_label)
-                    # 修复：正确计算点的x坐标
+                    x_pos = unique_x_labels.index(x_label)                    
                     if len(unique_x_labels) == 1:
                         x_coord = self.margin['left'] + self.plot_width / 2
                     else:
@@ -527,7 +553,7 @@ class SVGChartRenderer:
         
         return self._format_svg(svg)
     
-    def _render_pie_chart(self, chart_data: Dict[str, Any]) -> str:
+    def _render_pie_chart(self, chart_data: dict[str, Any]) -> str:
         """渲染饼图。"""
         # 设置饼图标志，供图例位置计算使用
         self._is_pie_chart = True
@@ -577,7 +603,6 @@ class SVGChartRenderer:
             colors = DEFAULT_CHART_COLORS + ['#A5A5A5', '#70E000']  # 扩展颜色用于多系列饼图
 
         # 确保有足够的不重复颜色用于所有片段
-        # 修复：即使有足够的颜色，也要确保它们不重复
         colors = ensure_distinct_colors(colors, len(values))
         
         current_angle = 0
@@ -589,10 +614,10 @@ class SVGChartRenderer:
             start_angle_rad = current_angle * 3.14159 / 180
             end_angle_rad = (current_angle + angle) * 3.14159 / 180
             
-            start_x = center_x + radius * cos(start_angle_rad)
-            start_y = center_y + radius * sin(start_angle_rad)
-            end_x = center_x + radius * cos(end_angle_rad)
-            end_y = center_y + radius * sin(end_angle_rad)
+            start_x = center_x + radius * math.cos(start_angle_rad)
+            start_y = center_y + radius * math.sin(start_angle_rad)
+            end_x = center_x + radius * math.cos(end_angle_rad)
+            end_y = center_y + radius * math.sin(end_angle_rad)
             
             large_arc = 1 if angle > 180 else 0
             
@@ -610,8 +635,8 @@ class SVGChartRenderer:
 
             if data_labels.get('enabled', True):  # 饼图默认显示标签
                 mid_angle = (current_angle + angle / 2) * 3.14159 / 180
-                label_x = center_x + (radius + 20) * cos(mid_angle)
-                label_y = center_y + (radius + 20) * sin(mid_angle)
+                label_x = center_x + (radius + 20) * math.cos(mid_angle)
+                label_y = center_y + (radius + 20) * math.sin(mid_angle)
 
                 # 构建标签文本
                 label_text = ""
@@ -678,7 +703,7 @@ class SVGChartRenderer:
 
         return self._format_svg(svg)
 
-    def _render_area_chart(self, chart_data: Dict[str, Any]) -> str:
+    def _render_area_chart(self, chart_data: dict[str, Any]) -> str:
         """渲染面积图。"""
         svg = self._create_svg_root(chart_data.get('title', ''))
         series_list = chart_data.get('series', [])
@@ -767,8 +792,8 @@ class SVGChartRenderer:
         
         return self._format_svg(svg)
     
-    def _render_image_chart(self, chart_data: Dict[str, Any]) -> str:
-        """渲染图像 - 支持真实图片和占位符。"""
+    def _render_image_chart(self, chart_data: dict[str, Any]) -> str:
+        """渲染图像（支持图片和占位符）。"""
         # 检查是否有有效的图片数据 - 支持多种数据结构
         img_data = None
         
@@ -883,8 +908,8 @@ class SVGChartRenderer:
             info_text.text = "包含嵌入图像数据"
         
         return self._format_svg(svg)
-    
-    def _render_fallback_chart(self, chart_data: Dict[str, Any]) -> str:
+
+    def _render_fallback_chart(self, chart_data: dict[str, Any]) -> str:
         """渲染不支持类型的占位图表。"""
         svg = self._create_svg_root(chart_data.get('title', 'Unsupported Chart'))
         
@@ -908,9 +933,9 @@ class SVGChartRenderer:
         text.text = f"Chart type '{chart_data.get('type', 'unknown')}' not supported"
         
         return self._format_svg(svg)
-    
-    def _draw_x_axis_labels(self, svg: ET.Element, x_labels: List[str]):
-        """只绘制X轴标签，不绘制坐标轴线和网格线。"""
+
+    def _draw_x_axis_labels(self, svg: ET.Element, x_labels: list[str]):
+        """绘制X轴标签。"""
         # 使用传入的唯一标签，而不是重复的标签
         unique_labels = x_labels
 
@@ -936,8 +961,8 @@ class SVGChartRenderer:
             })
             text.text = str(label)
 
-    def _draw_axes(self, svg: ET.Element, x_labels: List[str], y_min: float, y_max: float):
-        """绘制完整坐标轴，包括轴线、网格线和标签。"""
+    def _draw_axes(self, svg: ET.Element, x_labels: list[str], y_min: float, y_max: float):
+        """绘制坐标轴、网格线和标签。"""
         # X轴
         x_axis = ET.SubElement(svg, 'line', {
             'x1': str(self.margin['left']),
@@ -984,16 +1009,11 @@ class SVGChartRenderer:
                 'class': 'axis-label'
             })
             text.text = f"{y_value:.1f}"
-    
-    def _draw_legend(self, svg: ET.Element, series_list: List[Dict], colors: List[str], legend_style: Optional[Dict[str, Any]] = None):
-        """
-        绘制图例，并应用指定的字体样式。
 
-        参数：
-            svg: SVG根元素
-            series_list: 系列数据列表
-            colors: 颜色列表
-            legend_style: 图例的字体样式字典
+    def _draw_legend(self, svg: ET.Element, series_list: list[dict], colors: list[str], legend_style: dict[str, Any] | None = None):
+        """
+        绘制图例。
+        参数：svg根元素，series_list系列列表，colors颜色列表，legend_style字体样式
         """
         # 图例位置计算：根据图表类型调整
         if hasattr(self, '_is_pie_chart') and self._is_pie_chart:
@@ -1046,16 +1066,9 @@ class SVGChartRenderer:
             text = ET.SubElement(svg, 'text', text_attrs)
             text.text = series_name
 
-    def _render_data_labels(self, svg: ET.Element, series_data: dict, x_positions: list, y_positions: list, colors: Optional[list] = None) -> None:
+    def _render_data_labels(self, svg: ET.Element, series_data: dict, x_positions: list, y_positions: list, colors: list | None = None) -> None:
         """
         渲染数据标签。
-
-        参数：
-            svg: SVG根元素
-            series_data: 系列数据，包含data_labels信息
-            x_positions: X坐标位置列表
-            y_positions: Y坐标位置列表
-            colors: 颜色列表（可选）
         """
         data_labels = series_data.get('data_labels', {})
         if not data_labels.get('enabled', False):
@@ -1134,11 +1147,7 @@ class SVGChartRenderer:
 
     def _render_annotations(self, svg: ET.Element, chart_data: dict) -> None:
         """
-        渲染图表注释（不包括标题，标题已在_create_svg_root中处理）。
-
-        参数：
-            svg: SVG根元素
-            chart_data: 图表数据，包含annotations信息
+        渲染图表注释（不含标题）。
         """
         annotations = chart_data.get('annotations', [])
         if not annotations:
@@ -1172,14 +1181,7 @@ class SVGChartRenderer:
 
     def _get_annotation_position(self, annotation_type: str, position: str) -> tuple[int, int]:
         """
-        根据注释类型和位置获取坐标。
-
-        参数：
-            annotation_type: 注释类型（title, axis_title等）
-            position: 位置（top, bottom, left, right等）
-
-        返回：
-            (x, y) 坐标元组
+        获取注释坐标。
         """
         if annotation_type == 'title' and position == 'top':
             return (self.width // 2, 15)
@@ -1202,16 +1204,7 @@ class SVGChartRenderer:
 
     def _should_deduplicate_x_labels(self, series_list: list) -> bool:
         """
-        判断是否应该去重X轴标签。
-
-        如果所有系列的X轴数据都相同，则应该去重（分组柱状图）。
-        如果系列的X轴数据不同，则不应该去重（连续柱状图）。
-
-        参数：
-            series_list: 系列数据列表
-
-        返回：
-            True表示应该去重，False表示不应该去重
+        判断是否去重X轴标签。
         """
         if not series_list or len(series_list) <= 1:
             return True  # 单系列或无系列，默认去重
@@ -1226,15 +1219,4 @@ class SVGChartRenderer:
                 return False  # 发现不同的X轴数据，不应该去重
 
         return True  # 所有系列的X轴数据都相同，应该去重
-
-
-def cos(angle_rad: float) -> float:
-    """计算余弦值。"""
-    import math
-    return math.cos(angle_rad)
-
-
-def sin(angle_rad: float) -> float:
-    """计算正弦值。"""
-    import math
-    return math.sin(angle_rad)
+    

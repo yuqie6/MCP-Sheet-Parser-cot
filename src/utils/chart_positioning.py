@@ -4,7 +4,6 @@
 将Excel图表的EMU定位数据转换为CSS定位信息，实现精确的图表覆盖定位。
 """
 
-from typing import Tuple, Optional
 from dataclasses import dataclass
 from src.models.table_model import Sheet, ChartPosition
 
@@ -74,8 +73,8 @@ class ChartPositionCalculator:
             width=width,
             height=height
         )
-    
-    def _calculate_cell_position(self, col: int, row: int) -> Tuple[float, float]:
+
+    def _calculate_cell_position(self, col: int, row: int) -> tuple[float, float]:
         """
         计算指定单元格的累计位置。
         
@@ -111,9 +110,6 @@ class ChartPositionCalculator:
         start_offset = position.from_col_offset * self.EMU_TO_PX
         end_offset = position.to_col_offset * self.EMU_TO_PX
         
-        # 结束列的宽度
-        end_col_width = self.sheet.column_widths.get(position.to_col, self.sheet.default_column_width) * self.EXCEL_TO_PX
-        
         width = (end_x - start_x) + end_offset - start_offset
         
         # 如果图表在单个单元格内
@@ -140,9 +136,6 @@ class ChartPositionCalculator:
         计算图表高度。
         """
         # 修复：精确计算图表高度
-        _, start_y = self._calculate_cell_position(0, position.from_row)
-        _, end_y = self._calculate_cell_position(0, position.to_row)
-
         start_offset = position.from_row_offset * self.EMU_TO_PT
         end_offset = position.to_row_offset * self.EMU_TO_PT
         
@@ -222,18 +215,16 @@ class ChartPositionCalculator:
             css_pos = self.calculate_chart_css_position(chart.position)
 
         # 添加内联样式进行精确定位
-        # 修复：统一使用px单位，避免pt和px混用导致的尺寸不匹配
         # 将pt转换为px (1pt = 1.333px)
         top_px = css_pos.top * 1.333
 
-        # 根据图表类型调整高度 - 修复容器与SVG高度不匹配问题
+        # 根据图表类型调整高度 
         if chart.type == 'image':
             height_px = css_pos.height * 1.333  # 图片不需要额外增加高度
         else:
             height_px = css_pos.height * 1.333  # 移除30%增加，保持与SVG高度一致
 
         # 使用绝对定位，但基于表格容器的相对位置
-        # 这样可以保持Excel的覆盖效果，同时相对于表格定位
         # 根据图表类型进行不同的位置调整
         if chart.type == 'image':
             # 图片位置通常是正确的，不需要调整

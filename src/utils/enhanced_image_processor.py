@@ -4,10 +4,15 @@
 在重构分析中发现的问题修复和改进。
 """
 
-from src.converters.svg_chart_renderer import SVGChartRenderer
 import logging
 
 logger = logging.getLogger(__name__)
+
+# 图片处理常量
+class ImageConstants:
+    """图片处理相关常量"""
+    DEFAULT_MAX_SIZE = 1024 * 1024  # 1MB
+    MIN_DATA_SIZE = 10  # 最小有效图片数据大小
 
 class EnhancedImageProcessor:
     """增强的图片处理器"""
@@ -37,7 +42,7 @@ class EnhancedImageProcessor:
     
     def validate_image_data(self, img_data: bytes) -> bool:
         """验证图片数据的有效性"""
-        if not img_data or len(img_data) < 10:
+        if not img_data or len(img_data) < ImageConstants.MIN_DATA_SIZE:
             return False
         
         # 检查是否是支持的格式
@@ -48,7 +53,7 @@ class EnhancedImageProcessor:
         
         return True
     
-    def optimize_image_size(self, img_data: bytes, max_size: int = 1024 * 1024) -> bytes:
+    def optimize_image_size(self, img_data: bytes, max_size: int = ImageConstants.DEFAULT_MAX_SIZE) -> bytes:
         """优化图片大小（如果需要）"""
         if len(img_data) <= max_size:
             return img_data

@@ -18,14 +18,10 @@ from .parsers.factory import ParserFactory
 from .models.table_model import Sheet
 from .converters.html_converter import HTMLConverter
 from .streaming import StreamingTableReader, ChunkFilter
-from .config import config
+from .unified_config import get_config
 from .cache import get_cache_manager
-from .exceptions import (
-    FileNotFoundError, ValidationError, HTMLConversionError,
-    MemoryLimitExceededError, TimeoutError
-)
-from .validators import validate_file_input, DataValidator
-from .constants import Limits, ErrorCodes
+from .exceptions import FileNotFoundError
+from .validators import validate_file_input
 
 logger = logging.getLogger(__name__)
 
@@ -38,25 +34,29 @@ class CoreService:
     
 
     def parse_sheet(self, file_path: str, sheet_name: str | None = None,
-                   range_string: str | None = None, 
-                   enable_streaming: bool = True, 
-                   streaming_threshold: int = config.STREAMING_THRESHOLD_CELLS) -> dict[str, Any]:
+                   range_string: str | None = None,
+                   enable_streaming: bool = True,
+                   streaming_threshold: int | None = None) -> dict[str, Any]:
         """
         解析表格文件为标准化的JSON格式。
-        
-        Args:
+
+        参数:
             file_path: 文件路径
             sheet_name: 工作表名称（可选）
             range_string: 单元格范围（可选）
             enable_streaming: 是否启用自动流式读取（默认True）
-            streaming_threshold: 流式读取的单元格数量阈值（默认10000）
-            
-        Returns:
+            streaming_threshold: 流式读取的单元格数量阈值，None时使用配置默认值
+
+        返回:
             标准化的TableModel JSON
         """
+        # 获取当前配置
+        current_config = get_config()
+        if streaming_threshold is None:
+            streaming_threshold = current_config.streaming_threshold_cells
         try:
-            # 使用新的验证器验证文件输入
-            validated_path, file_extension = validate_file_input(file_path)
+            # 验证文件输入
+            validated_path, _ = validate_file_input(file_path)
             
             # 尝试从缓存获取数据
             cache_manager = get_cache_manager()
@@ -85,6 +85,37 @@ class CoreService:
                     if not sheets:
                         raise ValueError("文件中没有找到任何工作表。")
                     target_sheet = sheets[0]
+
+                # 检查工作表是否为空
+                if not target_sheet:
+                    logger.warning("目标工作表为None")
+                    return {
+                        "sheet_name": "Empty",
+                        "headers": [],
+                        "rows": [],
+                        "total_rows": 0,
+                        "total_columns": 0,
+                        "size_info": {
+                            "total_cells": 0,
+                            "processing_mode": "empty",
+                            "recommendation": "工作表为空，无数据可显示"
+                        }
+                    }
+
+                if not target_sheet.rows:
+                    logger.warning(f"工作表 '{target_sheet.name}' 为空")
+                    return {
+                        "sheet_name": target_sheet.name,
+                        "headers": [],
+                        "rows": [],
+                        "total_rows": 0,
+                        "total_columns": 0,
+                        "size_info": {
+                            "total_cells": 0,
+                            "processing_mode": "empty",
+                            "recommendation": "工作表为空，无数据可显示"
+                        }
+                    }
                 
                 # 转换为标准化JSON格式
                 json_data = self._sheet_to_json(target_sheet, range_string)
@@ -104,9 +135,7 @@ class CoreService:
                              include_styles: bool = False, preview_rows: int = 5,
                              max_rows: int | None = None) -> dict[str, Any]:
         """
-        优化版本的表格解析，避免上下文爆炸。
-
-        Args:
+        参数：
             file_path: 文件路径
             sheet_name: 工作表名称（可选）
             range_string: 单元格范围（可选）
@@ -115,12 +144,12 @@ class CoreService:
             preview_rows: 预览行数（默认5行）
             max_rows: 最大返回行数（可选）
 
-        Returns:
+        返回：
             优化后的JSON数据
         """
         try:
             # 验证文件输入
-            validated_path, file_extension = validate_file_input(file_path)
+            validated_path, _ = validate_file_input(file_path)
 
             # 获取解析器
             parser = self.parser_factory.get_parser(str(validated_path))
@@ -167,14 +196,14 @@ class CoreService:
         """
         将表格文件转换为HTML文件。
 
-        Args:
+        参数：
             file_path: 源文件路径
             output_path: 输出HTML文件路径，如果为None则生成默认路径
             page_size: 分页大小（每页行数），如果为None则不分页
             page_number: 页码（从1开始），如果为None则显示第1页
             header_rows: 表头行数，默认第一行为表头
 
-        Returns:
+        返回：
             转换结果信息
         """
         try:
@@ -234,12 +263,12 @@ class CoreService:
         """
         将TableModel JSON的修改应用回原始文件。
 
-        Args:
+        参数：
             file_path: 目标文件路径
             table_model_json: 包含修改的JSON数据
             create_backup: 是否创建备份文件
 
-        Returns:
+        返回值：
             操作结果
         """
         try:
@@ -298,11 +327,11 @@ class CoreService:
         """
         将修改写回CSV文件。
 
-        Args:
+        参数：
             file_path: CSV文件路径
             table_model_json: 包含修改的JSON数据
 
-        Returns:
+        返回值：
             应用的修改数量
         """
         import csv
@@ -340,11 +369,11 @@ class CoreService:
         """
         将修改写回XLS文件。
 
-        Args:
+        参数：
             file_path: XLS文件路径
             table_model_json: 包含修改的JSON数据
 
-        Returns:
+        返回值：
             应用的修改数量
         """
         import xlwt
@@ -376,11 +405,11 @@ class CoreService:
         """
         将修改写回XLSX文件。
 
-        Args:
+        参数：
             file_path: XLSX文件路径
             table_model_json: 包含修改的JSON数据
 
-        Returns:
+        返回值：
             应用的修改数量
         """
         import openpyxl
@@ -409,11 +438,37 @@ class CoreService:
         for row in range(1, max_row + 1):
             for col in range(1, max_col + 1):
                 cell = worksheet.cell(row=row, column=col)
+                # 检查是否为合并单元格，跳过MergedCell类型
+                try:
+                    from openpyxl.cell.cell import MergedCell
+                    if isinstance(cell, MergedCell):
+                        # 跳过被合并的单元格，因为它们的value属性是只读的
+                        continue
+                except ImportError:
+                    # 如果导入失败，使用字符串检查作为备选方案
+                    if 'MergedCell' in str(type(cell)):
+                        continue
+
                 cell.value = None
 
         # 写入表头
         for col_idx, header in enumerate(headers, 1):
             cell = worksheet.cell(row=1, column=col_idx)
+
+            # 检查是否为合并单元格
+            try:
+                from openpyxl.cell.cell import MergedCell
+                if isinstance(cell, MergedCell):
+                    # 跳过被合并的单元格，因为它们的value属性是只读的
+                    # 只有合并区域的左上角单元格可以写入
+                    logger.debug(f"跳过合并单元格 {cell.coordinate}")
+                    continue
+            except ImportError:
+                # 如果导入失败，使用字符串检查作为备选方案
+                if 'MergedCell' in str(type(cell)):
+                    logger.debug(f"跳过合并单元格 {cell.coordinate}")
+                    continue
+
             cell.value = header
 
         # 写入数据行
@@ -430,24 +485,56 @@ class CoreService:
 
                 # 尝试转换数值类型
                 # 检查是否为合并单元格（MergedCell的value属性是只读的）
-                if 'MergedCell' in str(type(cell)):
-                    # 跳过合并单元格，因为它们的value属性是只读的
+                is_merged_cell = False
+                try:
+                    from openpyxl.cell.cell import MergedCell
+                    if isinstance(cell, MergedCell):
+                        is_merged_cell = True
+                except ImportError:
+                    # 如果导入失败，使用字符串检查作为备选方案
+                    if 'MergedCell' in str(type(cell)):
+                        is_merged_cell = True
+
+                if is_merged_cell:
+                    # 跳过被合并的单元格，因为它们的value属性是只读的
+                    # 只有合并区域的左上角单元格可以写入
+                    logger.debug(f"跳过合并单元格 {cell.coordinate}")
                     continue
 
-                if value is not None and value != "":
-                    try:
-                        # 尝试转换为数字
-                        if isinstance(value, str) and value.replace('.', '').replace('-', '').isdigit():
-                            if '.' in value:
-                                cell.value = float(value)
+                # 写入值到普通单元格（此时已确认不是MergedCell）
+                try:
+                    # 使用类型守卫确保不是 MergedCell
+                    from openpyxl.cell.cell import MergedCell
+                    if not isinstance(cell, MergedCell):
+                        if value is not None and value != "":
+                            # 改进的数值转换逻辑
+                            if isinstance(value, str):
+                                # 尝试转换为数字，使用更安全的方法
+                                try:
+                                    # 先尝试转换为整数
+                                    if '.' not in value and 'e' not in value.lower():
+                                        cell.value = int(value)
+                                    else:
+                                        # 尝试转换为浮点数
+                                        cell.value = float(value)
+                                except ValueError:
+                                    # 如果转换失败，保持为字符串
+                                    cell.value = str(value)
+                            elif isinstance(value, (int, float, bool)):
+                                # 保持原始数据类型
+                                cell.value = value
                             else:
-                                cell.value = int(value)
+                                # 对于其他类型，转换为字符串
+                                cell.value = str(value)
                         else:
-                            cell.value = str(value)
-                    except (ValueError, TypeError):
-                        cell.value = str(value)
-                else:
-                    cell.value = None
+                            cell.value = None
+                except AttributeError as e:
+                    # 如果仍然遇到MergedCell问题，记录并跳过
+                    if "read-only" in str(e):
+                        logger.warning(f"跳过只读单元格 {cell.coordinate}: {e}")
+                        continue
+                    else:
+                        raise
 
                 changes_count += 1
 
@@ -462,20 +549,21 @@ class CoreService:
         """
         将Sheet对象转换为标准化的JSON格式。
 
-        Args:
+        参数：
             sheet: Sheet对象
             range_string: 可选的范围字符串（如"A1:D10"）
 
-        Returns:
+        返回值：
             标准化的JSON数据
         """
         # 计算数据大小
         total_cells = self._calculate_data_size(sheet)
 
         # 智能大小检测 - 针对LLM上下文优化
-        SMALL_FILE_THRESHOLD = config.SMALL_FILE_THRESHOLD_CELLS
-        MEDIUM_FILE_THRESHOLD = config.MEDIUM_FILE_THRESHOLD_CELLS
-        LARGE_FILE_THRESHOLD = config.LARGE_FILE_THRESHOLD_CELLS
+        current_config = get_config()
+        SMALL_FILE_THRESHOLD = current_config.small_file_threshold_cells
+        MEDIUM_FILE_THRESHOLD = current_config.medium_file_threshold_cells
+        LARGE_FILE_THRESHOLD = current_config.large_file_threshold_cells
 
         # 处理范围选择
         if range_string:
@@ -711,8 +799,10 @@ class CoreService:
         return value
 
     def _calculate_data_size(self, sheet: Sheet) -> int:
-        """计算表格的总单元格数。"""
-        return sum(len(row.cells) for row in sheet.rows)
+        """计算表格的总单元格数，处理空表格的边界条件。"""
+        if not sheet or not sheet.rows:
+            return 0
+        return sum(len(row.cells) if row and row.cells else 0 for row in sheet.rows)
 
 
     def _extract_range_data(self, sheet: Sheet, start_row: int, start_col: int,
@@ -721,14 +811,32 @@ class CoreService:
         # 验证范围有效性
         if start_row < 0 or start_col < 0:
             raise ValueError("范围起始位置不能为负数")
-        if end_row >= len(sheet.rows) or start_row > end_row:
-            raise ValueError(f"行范围无效: {start_row}-{end_row}, 表格只有{len(sheet.rows)}行")
+        if start_row > end_row or start_col > end_col:
+            raise ValueError(f"范围无效: 起始位置({start_row},{start_col})不能大于结束位置({end_row},{end_col})")
+
+        # 调整范围以适应实际数据大小
+        actual_end_row = min(end_row, len(sheet.rows) - 1)
+        if start_row >= len(sheet.rows):
+            # 起始行超出数据范围，返回空结果
+            return {
+                "sheet_name": sheet.name,
+                "range": f"{chr(65 + start_col)}{start_row + 1}:{chr(65 + end_col)}{end_row + 1}",
+                "headers": [],
+                "rows": [],
+                "total_rows": 0,
+                "total_columns": 0,
+                "size_info": {
+                    "total_cells": 0,
+                    "processing_mode": "range_out_of_bounds",
+                    "recommendation": "指定范围超出数据范围"
+                }
+            }
 
         # 提取范围内的数据
         range_rows = []
         headers = []
 
-        for row_idx in range(start_row, min(end_row + 1, len(sheet.rows))):
+        for row_idx in range(start_row, actual_end_row + 1):
             row = sheet.rows[row_idx]
             row_data = []
 
@@ -886,16 +994,16 @@ class CoreService:
         """
         判断是否应该使用流式读取。
         
-        Args:
+        参数:
             file_path: 文件路径
             threshold: 单元格数量阈值
             
-        Returns:
+        返回:
             如果应该使用流式读取则返回True
         """
         try:
             # 检查解析器是否支持流式读取
-            if not self.parser_factory.supports_streaming(file_path):
+            if not ParserFactory.supports_streaming(file_path):
                 return False
             
             # 快速估算文件大小
@@ -903,8 +1011,9 @@ class CoreService:
             file_size = path.stat().st_size
             
             # 基于文件大小的简单启发式判断
-            # 大于10MB的文件通常值得流式读取
-            if file_size > config.STREAMING_FILE_SIZE_MB * 1024 * 1024:  # 10MB
+            # 大于配置阈值的文件通常值得流式读取
+            current_config = get_config()
+            if file_size > current_config.streaming_file_size_mb * 1024 * 1024:
                 return True
             
             # 对于较小的文件，可以先快速解析一小部分来估算总大小
@@ -926,12 +1035,12 @@ class CoreService:
         """
         使用流式读取器解析表格文件。
         
-        Args:
+        参数:
             file_path: 文件路径
             sheet_name: 工作表名称（可选）
             range_string: 单元格范围（可选）
-            
-        Returns:
+
+        返回:
             标准化的TableModel JSON
         """
         try:
@@ -946,7 +1055,8 @@ class CoreService:
                 
                 # 检查是否为大文件，如果是则返回摘要
                 total_cells = file_info['total_rows'] * file_info['total_columns']
-                LARGE_FILE_THRESHOLD = config.STREAMING_SUMMARY_THRESHOLD_CELLS  # 大文件阈值
+                current_config = get_config()
+                LARGE_FILE_THRESHOLD = current_config.streaming_summary_threshold_cells  # 大文件阈值
                 
                 if total_cells > LARGE_FILE_THRESHOLD and not range_string:
                     # 返回摘要信息
@@ -956,7 +1066,8 @@ class CoreService:
                 all_rows = []
                 headers = []
                 
-                for chunk in reader.iter_chunks(rows=config.STREAMING_CHUNK_SIZE_ROWS, filter_config=filter_config):
+                current_config = get_config()
+                for chunk in reader.iter_chunks(rows=current_config.streaming_chunk_size_rows, filter_config=filter_config):
                     if not headers:
                         headers = chunk.headers
                     
@@ -1012,11 +1123,11 @@ class CoreService:
         """
         为大文件生成流式摘要信息。
         
-        Args:
+        参数:
             reader: 流式读取器
             file_info: 文件信息
-            
-        Returns:
+
+        返回:
             摘要数据
         """
         # 读取前几行作为样本

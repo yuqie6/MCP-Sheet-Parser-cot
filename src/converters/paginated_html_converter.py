@@ -16,28 +16,29 @@ logger = logging.getLogger(__name__)
 class PaginatedHTMLConverter(HTMLConverter):
     """分页HTML转换器，继承自HTMLConverter，添加分页功能。"""
     
-    def __init__(self, compact_mode: bool = False, page_size: int = 100, page_number: int = 1, header_rows: int = 1):
+    def __init__(self, compact_mode: bool = False, page_size: int = 100, page_number: int = 1, header_rows: int = 1, auto_detect_headers: bool = True):
         """
         初始化分页HTML转换器。
 
-        Args:
+        参数：
             compact_mode: 是否使用紧凑模式
             page_size: 每页显示的行数
             page_number: 当前页码（从1开始）
             header_rows: 表头行数，默认第一行为表头
+            auto_detect_headers: 是否自动检测多行表头
         """
-        super().__init__(compact_mode, header_rows)
+        super().__init__(compact_mode, header_rows, auto_detect_headers)
         self.page_size = max(1, page_size)  # 确保页面大小至少为1
         self.page_number = max(1, page_number)  # 确保页码至少为1
         
     def _generate_html(self, sheet: Sheet) -> str:
         """
         生成分页HTML内容。
-        
-        Args:
+
+        参数：
             sheet: Sheet对象
-            
-        Returns:
+
+        返回：
             HTML字符串
         """
         # 计算分页信息
@@ -68,13 +69,13 @@ class PaginatedHTMLConverter(HTMLConverter):
     def _create_paginated_sheet(self, sheet: Sheet, start_row: int, end_row: int) -> Sheet:
         """
         创建分页后的Sheet对象。
-        
-        Args:
+
+        参数：
             sheet: 原始Sheet对象
             start_row: 起始行索引
             end_row: 结束行索引
-            
-        Returns:
+
+        返回：
             分页后的Sheet对象
         """
         # 获取当前页的行数据
@@ -98,11 +99,11 @@ class PaginatedHTMLConverter(HTMLConverter):
         """
         将单个Sheet对象转换为分页HTML文件。
 
-        Args:
+        参数：
             sheet: Sheet对象
             output_path: 输出文件路径
 
-        Returns:
+        返回：
             转换结果信息字典
         """
         from pathlib import Path
@@ -147,15 +148,15 @@ class PaginatedHTMLConverter(HTMLConverter):
                                     total_rows: int, start_row: int, end_row: int) -> str:
         """
         生成分页导航控件HTML。
-        
-        Args:
+
+        参数：
             current_page: 当前页码
             total_pages: 总页数
             total_rows: 总行数
             start_row: 当前页起始行
             end_row: 当前页结束行
-            
-        Returns:
+
+        返回：
             分页控件HTML字符串
         """
         pagination_parts = []
@@ -208,13 +209,13 @@ class PaginatedHTMLConverter(HTMLConverter):
     def _insert_pagination_controls(self, base_html: str, pagination_html: str, sheet_name: str) -> str:
         """
         将分页控件插入到HTML中。
-        
-        Args:
+
+        参数：
             base_html: 基础HTML内容
             pagination_html: 分页控件HTML
             sheet_name: 表格名称
-            
-        Returns:
+
+        返回：
             包含分页控件的完整HTML
         """
         # 添加分页样式

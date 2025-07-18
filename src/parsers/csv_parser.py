@@ -6,7 +6,7 @@ CSV解析器模块
 
 import csv
 from pathlib import Path
-from typing import Iterator
+from collections.abc import Iterator
 from src.models.table_model import Sheet, Row, Cell, LazySheet
 from src.parsers.base_parser import BaseParser
 
@@ -110,7 +110,7 @@ class CsvParser(BaseParser):
                     cells = [Cell(value=item) for item in row_data]
                     rows.append(Row(cells=cells))
         except UnicodeDecodeError:
-            # 尝试使用GBK编码（中文Windows常用）
+            # 尝试使用GBK编码
             with open(path, mode='r', encoding='gbk') as csvfile:
                 reader = csv.reader(csvfile)
                 for row_data in reader:

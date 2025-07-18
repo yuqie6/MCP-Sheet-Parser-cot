@@ -1,15 +1,14 @@
 """
 用于从 openpyxl 对象解析单元格样式的工具函数。
 """
-from typing import Any
+from typing import Any, TypeAlias
 from openpyxl.cell.cell import Cell as OpenpyxlCell, MergedCell as OpenpyxlMergedCell
-from openpyxl.styles.colors import Color
 from src.models.table_model import Style, RichTextFragment, RichTextFragmentStyle, CellValue
-from src.utils.color_utils import extract_color, get_color_brightness, has_sufficient_contrast, get_color_by_index
+from src.utils.color_utils import extract_color, get_color_brightness, has_sufficient_contrast, get_color_by_index, get_theme_color, apply_tint, apply_smart_color_matching
 from src.utils.border_utils import get_border_style
 
 # 定义一个类型提示，表示既可以是普通单元格也可以是合并单元格
-CellLike = OpenpyxlCell | OpenpyxlMergedCell
+CellLike: TypeAlias = OpenpyxlCell | OpenpyxlMergedCell
 
 def _extract_rich_text(cell: CellLike) -> list[RichTextFragment]:
     """从单元格中提取富文本片段。"""
@@ -167,112 +166,7 @@ def extract_fill_color(fill) -> str | None:
         pass
     return None
 
-def extract_color(color_obj) -> str | None:
-    """
-    增强的颜色提取，支持主题颜色、tint和RGB。
-    """
-    if not color_obj:
-        return None
 
-    try:
-        # 1. 处理RGB颜色
-        if hasattr(color_obj, 'rgb') and color_obj.rgb:
-            rgb_value = color_obj.rgb
-            if isinstance(rgb_value, str) and len(rgb_value) >= 6:
-                # 处理ARGB格式（如FFFF0000）- 移除前两位Alpha通道
-                if len(rgb_value) == 8 and rgb_value.startswith('FF'):
-                    return f"#{rgb_value[2:]}"
-                # 标准RGB格式
-                elif len(rgb_value) == 6:
-                    return f"#{rgb_value}"
-                # 其他情况取最后6位
-                else:
-                    return f"#{rgb_value[-6:]}"
-
-        # 2. 处理主题颜色
-        if hasattr(color_obj, 'theme') and color_obj.theme is not None:
-            theme_color = get_theme_color(color_obj.theme)
-            if theme_color:
-                # 应用tint调整
-                if hasattr(color_obj, 'tint') and color_obj.tint != 0:
-                    return apply_tint(theme_color, color_obj.tint)
-                return theme_color
-
-        # 3. 处理索引颜色
-        if hasattr(color_obj, 'indexed') and color_obj.indexed is not None:
-            return get_color_by_index(color_obj.indexed)
-
-        # 4. 处理value属性（向后兼容）
-        if hasattr(color_obj, 'value') and color_obj.value is not None:
-            value = color_obj.value
-            if isinstance(value, str) and len(value) >= 6:
-                return f"#{value[-6:]}"
-            elif isinstance(value, int):
-                return get_color_by_index(value)
-
-        # 5. 检查auto属性
-        if hasattr(color_obj, 'auto') and color_obj.auto:
-            return None  # 自动颜色，让系统决定
-
-    except Exception:
-        pass
-
-    return None
-
-def get_theme_color(theme_index: int) -> str | None:
-    """
-    Excel主题颜色映射。
-    基于实际Excel文件的主题颜色方案。
-    
-    注意：这个函数已迁移到 color_utils.py，这里保留是为了向后兼容
-    """
-    from src.utils.color_utils import get_theme_color as color_utils_get_theme_color
-    return color_utils_get_theme_color(theme_index)
-
-def apply_tint(base_color: str, tint: float) -> str:
-    """
-    对基础颜色应用tint调整。
-    
-    注意：这个函数已迁移到 color_utils.py，这里保留是为了向后兼容
-    """
-    from src.utils.color_utils import apply_tint as color_utils_apply_tint
-    return color_utils_apply_tint(base_color, tint)
-
-def apply_smart_color_matching(style: Style) -> Style:
-    """
-    智能匹配字体色与背景色，确保对比度和可读性。
-    
-    注意：这个函数已迁移到 color_utils.py，这里保留是为了向后兼容
-    """
-    from src.utils.color_utils import apply_smart_color_matching as color_utils_apply_smart_color_matching
-    return color_utils_apply_smart_color_matching(style)
-
-def get_color_brightness(color: str) -> int:
-    """
-    计算颜色的亮度。
-    
-    注意：这个函数已迁移到 color_utils.py，这里保留是为了向后兼容
-    """
-    from src.utils.color_utils import get_color_brightness as color_utils_get_color_brightness
-    return color_utils_get_color_brightness(color)
-
-def has_sufficient_contrast(color1: str, color2: str) -> bool:
-    """
-    检查两个颜色之间是否有足够的对比度。
-    
-    注意：这个函数已迁移到 color_utils.py，这里保留是为了向后兼容
-    """
-    from src.utils.color_utils import has_sufficient_contrast as color_utils_has_sufficient_contrast
-    return color_utils_has_sufficient_contrast(color1, color2)
-
-def get_color_by_index(index: int) -> str:
-    """
-    索引颜色映射。
-    
-    注意：这个函数已迁移到 color_utils.py，这里保留是为了向后兼容
-    """
-    from src.utils.color_utils import get_color_by_index as color_utils_get_color_by_index
-    return color_utils_get_color_by_index(index)
 
 def extract_number_format(cell) -> str:
     """
@@ -280,10 +174,7 @@ def extract_number_format(cell) -> str:
     """
     try:
         if cell.number_format and cell.number_format != 'General':
-            format_str = cell.number_format
-            format_mappings = {
-            }
-            return format_mappings.get(format_str, format_str) or ""
+            return cell.number_format
     except (AttributeError, ValueError):
         pass
     return ""

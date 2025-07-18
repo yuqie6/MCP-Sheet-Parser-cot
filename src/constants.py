@@ -25,38 +25,6 @@ class FileFormats:
         XLSM: "Excel 宏启用格式"
     }
 
-
-# 文件大小和性能相关常量
-class Limits:
-    """文件大小和性能限制常量。"""
-    
-    # 文件大小限制 (MB)
-    MAX_FILE_SIZE_MB = 500
-    LARGE_FILE_THRESHOLD_MB = 50
-    SMALL_FILE_THRESHOLD_MB = 5
-    
-    # 单元格数量限制
-    MAX_CELLS_COUNT = 1000000
-    LARGE_FILE_THRESHOLD_CELLS = 50000
-    SMALL_FILE_THRESHOLD_CELLS = 1000
-    STREAMING_THRESHOLD_CELLS = 10000
-    
-    # 内存限制 (MB)
-    MAX_MEMORY_USAGE_MB = 1024
-    
-    # 超时限制 (秒)
-    DEFAULT_TIMEOUT_SECONDS = 300
-    LARGE_FILE_TIMEOUT_SECONDS = 600
-    
-    # 分页限制
-    MAX_PAGE_SIZE = 10000
-    DEFAULT_PAGE_SIZE = 100
-    
-    # 缓存限制
-    MAX_CACHE_ENTRIES = 128
-    CACHE_TTL_SECONDS = 600
-
-
 # 样式相关常量
 class StyleConstants:
     """样式处理相关常量。"""
@@ -299,7 +267,26 @@ class MCPConstants:
     
     # 服务器信息
     SERVER_NAME = "mcp-sheet-parser"
-    SERVER_VERSION = "1.0.0"
+    SERVER_VERSION = "0.1.0"
     
     # 协议版本
-    PROTOCOL_VERSION = "2024-11-05"
+    PROTOCOL_VERSION = "2025-06-18"
+
+
+# 图表处理相关常量
+class ChartConstants:
+    """图表数据提取和处理相关常量。"""
+
+    # 字符串处理限制
+    MAX_STRING_REPRESENTATION_LENGTH = 100
+    MAX_TITLE_LENGTH = 200
+
+    # 图表元素默认值
+    DEFAULT_PIE_SLICE_COUNT = 3
+    MAX_DATA_LABEL_ITEMS = 50
+    DEFAULT_CHART_WIDTH = 600
+    DEFAULT_CHART_HEIGHT = 400
+
+    # 颜色相关
+    DEFAULT_COLOR_PALETTE_SIZE = 10
+    MAX_COLOR_VARIANTS = 20

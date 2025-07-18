@@ -1,18 +1,19 @@
+from typing import Any
 from src.models.table_model import Sheet
 from src.utils.range_parser import parse_range_string
 from src.utils.html_utils import escape_html, create_html_element, create_table_cell
 
 
 class TableStructureConverter:
-    """Handles the generation of the HTML table structure."""
+    """处理 HTML 表格结构的生成。"""
 
     def __init__(self, cell_converter, style_converter):
         self.cell_converter = cell_converter
         self.style_converter = style_converter
 
-    def generate_table(self, sheet: Sheet, styles: dict[str, any], header_rows: int) -> str:
+    def generate_table(self, sheet: Sheet, styles: dict[str, Any], header_rows: int) -> str:
         """
-        Generates the HTML for a table.
+        生成表格的 HTML。
         """
         occupied_cells: set[tuple[int, int]] = set()
         merged_cells_map: dict[tuple[int, int], dict[str, int]] = {}
@@ -68,9 +69,18 @@ class TableStructureConverter:
         for r_idx, row in enumerate(rows):
             actual_row_idx = r_idx + row_offset
             table_parts.append('<tr>')
+
+            # 找到行中最后一个有内容的单元格位置
+            last_content_col = self._find_last_content_column(row, actual_row_idx, occupied_cells, merged_cells_map)
+
             for c_idx, cell in enumerate(row.cells):
                 if (actual_row_idx, c_idx) in occupied_cells:
                     continue
+
+                # 如果超过了最后有内容的列，且当前单元格为空，则跳过
+                if c_idx > last_content_col and not self._has_meaningful_content(cell):
+                    continue
+
                 style_class = ""
                 css_classes = []
                 if cell.style:
@@ -151,20 +161,19 @@ class TableStructureConverter:
             is_header=is_header,
             rowspan=rowspan,
             colspan=colspan,
-            css_classes=css_classes if css_classes else None,
-            inline_styles=inline_styles if inline_styles else None,
-            title=cell_attrs.get('title')
+            css_classes=css_classes,
+            inline_styles=inline_styles,
+            title=cell_attrs.get('title', '')
         )
 
     def _should_overflow_text(self, cell, row, col_idx):
         """
-        检查单元格是否应该应用文字溢出显示（模拟Excel行为）。
-
+        检查单元格是否应应用文字溢出显示（模拟Excel行为）。
         条件：
-        1. 单元格有文字内容
-        2. 文字长度超过一定阈值（比如10个字符）
-        3. 右边的单元格为空
-        4. 单元格没有设置文字换行
+        1. 有文字内容
+        2. 文字长度超过阈值
+        3. 右侧单元格为空
+        4. 未设置文字换行
         """
         if not cell.value:
             return False
@@ -173,7 +182,8 @@ class TableStructureConverter:
         cell_text = str(cell.value).strip()
         # 计算显示宽度：中文字符按2倍计算，英文字符按1倍计算
         display_width = sum(2 if ord(c) > 127 else 1 for c in cell_text)
-        if display_width <= 8:  # 短文字不需要溢出 (降低阈值以适应中文)
+        TEXT_OVERFLOW_THRESHOLD = 8  # 短文字不需要溢出的阈值
+        if display_width <= TEXT_OVERFLOW_THRESHOLD:
             return False
 
         # 检查是否设置了文字换行
@@ -188,3 +198,61 @@ class TableStructureConverter:
                 return False
 
         return True  # 满足所有条件，应该溢出显示
+
+    def _find_last_content_column(self, row, actual_row_idx: int, occupied_cells: set, merged_cells_map: dict) -> int:
+        """
+        找到行中最后一个有内容的列索引。
+        参数：
+            row 行对象，actual_row_idx 实际行索引，occupied_cells 被占用位置集合，merged_cells_map 合并单元格映射
+        返回：
+            最后一个有内容的列索引，无内容则返回-1
+        """
+        last_content_col = -1
+
+        for c_idx, cell in enumerate(row.cells):
+            # 跳过被占用的单元格
+            if (actual_row_idx, c_idx) in occupied_cells:
+                continue
+
+            # 检查是否有意义的内容
+            if self._has_meaningful_content(cell):
+                last_content_col = c_idx
+
+            # 如果是合并单元格的起始位置，也算作有内容
+            elif (actual_row_idx, c_idx) in merged_cells_map:
+                last_content_col = c_idx
+
+        return last_content_col
+
+    def _has_meaningful_content(self, cell) -> bool:
+        """
+        检查单元格是否有有意义内容。
+        参数：
+            cell 单元格对象
+        返回：
+            有内容返回True，否则False
+        """
+        # 检查值
+        if cell.value is not None and str(cell.value).strip():
+            return True
+
+        # 检查是否有公式
+        if cell.formula:
+            return True
+
+        # 检查是否有特殊样式（背景色、边框等）
+        if cell.style:
+            # 如果有背景色（非默认）
+            if (hasattr(cell.style, 'background_color') and
+                cell.style.background_color and
+                cell.style.background_color.lower() not in ['ffffff', 'white', 'none', 'auto']):
+                return True
+
+            # 如果有边框
+            if (hasattr(cell.style, 'border_top') and cell.style.border_top) or \
+               (hasattr(cell.style, 'border_bottom') and cell.style.border_bottom) or \
+               (hasattr(cell.style, 'border_left') and cell.style.border_left) or \
+               (hasattr(cell.style, 'border_right') and cell.style.border_right):
+                return True
+
+        return False

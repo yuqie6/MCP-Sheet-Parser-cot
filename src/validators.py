@@ -22,8 +22,11 @@ class FileValidator:
     # 支持的文件扩展名
     SUPPORTED_EXTENSIONS = {'.csv', '.xlsx', '.xls', '.xlsb', '.xlsm'}
     
-    # 最大文件大小 (MB)
-    MAX_FILE_SIZE_MB = 500
+    # 最大文件大小 (MB) - 从 unified_config 获取
+    @classmethod
+    def get_max_file_size_mb(cls):
+        from .unified_config import get_config
+        return get_config().max_file_size_mb
     
     # 危险的文件路径模式
     DANGEROUS_PATH_PATTERNS = [
@@ -41,13 +44,13 @@ class FileValidator:
         """
         验证文件路径的安全性和有效性。
         
-        Args:
+        参数:
             file_path: 文件路径字符串
-            
-        Returns:
+
+        返回:
             验证后的Path对象
             
-        Raises:
+        异常:
             ValidationError: 路径验证失败
             FileNotFoundError: 文件不存在
             FileAccessError: 文件访问权限不足
@@ -85,13 +88,13 @@ class FileValidator:
         """
         验证文件扩展名是否支持。
         
-        Args:
+        参数:
             file_path: 文件路径
-            
-        Returns:
+
+        返回:
             小写的文件扩展名（不含点）
-            
-        Raises:
+
+        异常:
             UnsupportedFileTypeError: 不支持的文件类型
         """
         path = Path(file_path)
@@ -108,26 +111,25 @@ class FileValidator:
         """
         验证文件大小是否在允许范围内。
         
-        Args:
+        参数:
             file_path: 文件路径
-            
-        Returns:
+
+        返回:
             文件大小（字节）
-            
-        Raises:
+
+        异常:
             ValidationError: 文件大小超出限制
         """
         path = Path(file_path)
         file_size_bytes = path.stat().st_size
         file_size_mb = file_size_bytes / (1024 * 1024)
-        
-        if file_size_mb > cls.MAX_FILE_SIZE_MB:
+        max_mb = cls.get_max_file_size_mb()
+        if file_size_mb > max_mb:
             raise ValidationError(
                 "file_size", 
                 f"{file_size_mb:.2f}MB", 
-                f"文件大小超出限制 (最大: {cls.MAX_FILE_SIZE_MB}MB)"
+                f"文件大小超出限制 (最大: {max_mb}MB)"
             )
-        
         return file_size_bytes
 
 
@@ -150,14 +152,14 @@ class RangeValidator:
     def validate_range_string(cls, range_string: str) -> tuple[str, str] | None:
         """
         验证单元格范围字符串的格式。
-        
-        Args:
+
+        参数:
             range_string: 范围字符串，如 "A1:B10" 或 "A1"
-            
-        Returns:
+
+        返回:
             (start_cell, end_cell) 元组，如果是单个单元格则end_cell为None
-            
-        Raises:
+
+        异常:
             ValidationError: 范围格式无效
         """
         if not range_string:
@@ -192,14 +194,14 @@ class DataValidator:
     def validate_sheet_name(sheet_name: str) -> str:
         """
         验证工作表名称。
-        
-        Args:
+
+        参数:
             sheet_name: 工作表名称
-            
-        Returns:
+
+        返回:
             验证后的工作表名称
-            
-        Raises:
+
+        异常:
             ValidationError: 工作表名称无效
         """
         if not sheet_name:
@@ -228,14 +230,14 @@ class DataValidator:
     def validate_page_size(page_size: int) -> int:
         """
         验证分页大小。
-        
-        Args:
+
+        参数:
             page_size: 分页大小
-            
-        Returns:
+
+        返回:
             验证后的分页大小
-            
-        Raises:
+
+        异常:
             ValidationError: 分页大小无效
         """
         if not isinstance(page_size, int):
@@ -253,14 +255,14 @@ class DataValidator:
     def validate_page_number(page_number: int) -> int:
         """
         验证页码。
-        
-        Args:
+
+        参数:
             page_number: 页码
-            
-        Returns:
+
+        返回:
             验证后的页码
-            
-        Raises:
+
+        异常:
             ValidationError: 页码无效
         """
         if not isinstance(page_number, int):
@@ -275,15 +277,15 @@ class DataValidator:
     def validate_output_path(output_path: str, create_dirs: bool = True) -> Path:
         """
         验证输出路径。
-        
-        Args:
+
+        参数:
             output_path: 输出路径
             create_dirs: 是否创建不存在的目录
-            
-        Returns:
+
+        返回:
             验证后的Path对象
-            
-        Raises:
+
+        异常:
             ValidationError: 输出路径无效
         """
         if not output_path or not isinstance(output_path, str):
@@ -315,14 +317,14 @@ class DataValidator:
 def validate_file_input(file_path: str) -> tuple[Path, str]:
     """
     综合验证文件输入。
-    
-    Args:
+
+    参数:
         file_path: 文件路径
-        
-    Returns:
+
+    返回:
         (validated_path, file_extension) 元组
-        
-    Raises:
+
+    异常:
         各种验证异常
     """
     # 验证路径安全性和存在性

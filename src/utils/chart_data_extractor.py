@@ -4,14 +4,15 @@
 提供统一的图表数据提取功能，避免代码重复。
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from src.utils.color_utils import convert_scheme_color_to_hex, generate_pie_color_variants
+from src.constants import ChartConstants
 
 
 class ChartDataExtractor:
     """图表数据提取器，统一处理各种图表数据提取逻辑。"""
     
-    def extract_series_y_data(self, series) -> List[float]:
+    def extract_series_y_data(self, series) -> list[float]:
         """
         提取系列的Y轴数据。
         
@@ -32,8 +33,8 @@ class ChartDataExtractor:
             y_data = self._extract_from_val(series.yVal)
         
         return y_data
-    
-    def extract_series_x_data(self, series) -> List[str]:
+
+    def extract_series_x_data(self, series) -> list[str]:
         """
         提取系列的X轴数据。
         
@@ -54,8 +55,8 @@ class ChartDataExtractor:
             x_data = self._extract_from_xval(series.xVal)
         
         return x_data
-    
-    def extract_series_color(self, series) -> Optional[str]:
+
+    def extract_series_color(self, series) -> str | None:
         """
         提取系列的颜色信息。
         
@@ -80,8 +81,8 @@ class ChartDataExtractor:
             pass
         
         return None
-    
-    def extract_pie_chart_colors(self, series) -> List[str]:
+
+    def extract_pie_chart_colors(self, series) -> list[str]:
         """
         提取饼图各片段的颜色。
         
@@ -112,84 +113,84 @@ class ChartDataExtractor:
             pass
         
         return colors
-    
-    def extract_axis_title(self, title_obj: Any) -> Optional[str]:
+
+    def extract_axis_title(self, title_obj: Any) -> str | None:
         """
         安全提取openpyxl图表轴的标题。
-        
+
         参数：
             title_obj: 图表轴的标题对象（可能是Title对象或Text对象）
-            
+
         返回：
             标题字符串，提取失败时返回None
         """
         if not title_obj:
             return None
-        
-        # 记录对象类型以供调试
-        obj_type = type(title_obj).__name__
-        
-        try:
-            # 方式1：处理Title对象 - 从 title.tx.rich.p[0].r[0].t 提取
-            if hasattr(title_obj, 'tx') and title_obj.tx:
-                tx = title_obj.tx
-                result = self._extract_text_from_tx(tx)
-                if result:
-                    return result
-            
-            # 方式2：处理Text对象 - 直接从 rich.p[0].r[0].t 提取
-            if hasattr(title_obj, 'rich') and title_obj.rich:
-                result = self._extract_text_from_rich(title_obj.rich)
-                if result:
-                    return result
-            
-            # 方式3：处理含有strRef的对象
-            if hasattr(title_obj, 'strRef') and title_obj.strRef:
-                result = self._extract_text_from_strref(title_obj.strRef)
-                if result:
-                    return result
-            
-            # 方式4：检查是否有直接的文本属性
-            if hasattr(title_obj, 'text') and title_obj.text:
-                text_str = str(title_obj.text).strip()
-                if text_str and not text_str.startswith('<'):  # 避免对象字符串
-                    return text_str
-                
-            # 方式5：检查是否有value属性
-            if hasattr(title_obj, 'value') and title_obj.value:
-                value_str = str(title_obj.value).strip()
-                if value_str and not value_str.startswith('<'):  # 避免对象字符串
-                    return value_str
-            
-            # 方式6：检查是否有v属性（某些对象直接存储文本）
-            if hasattr(title_obj, 'v') and title_obj.v:
-                v_str = str(title_obj.v).strip()
-                if v_str and not v_str.startswith('<'):  # 避免对象字符串
-                    return v_str
-            
-            # 方式7：如果对象有__str__方法但不是默认的对象表示，尝试使用
+
+        # 尝试多种提取方法
+        extraction_methods = [
+            self._extract_from_title_tx,
+            self._extract_from_rich_text,
+            self._extract_from_string_reference,
+            self._extract_from_direct_attributes,
+            self._extract_from_string_representation
+        ]
+
+        for method in extraction_methods:
             try:
-                str_repr = str(title_obj)
-                if (str_repr and 
-                    not str_repr.startswith('<') and 
-                    not 'object at' in str_repr and 
-                    not 'Parameters:' in str_repr and
-                    len(str_repr) < 100):  # 避免长对象描述
-                    return str_repr.strip()
-            except:
-                pass
-            
-            # 如果以上都失败，返回None
-            return None
-            
-        except Exception as e:
-            # 在调试模式下记录错误
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.debug(f"Failed to extract title from {obj_type}: {e}")
-            return None
+                result = method(title_obj)
+                if result:
+                    return result
+            except Exception:
+                continue
+
+        return None
+
+    def _extract_from_title_tx(self, title_obj: Any) -> str | None:
+        """从Title对象的tx属性提取文本"""
+        if hasattr(title_obj, 'tx') and title_obj.tx:
+            return self._extract_text_from_tx(title_obj.tx)
+        return None
+
+    def _extract_from_rich_text(self, title_obj: Any) -> str | None:
+        """从rich文本对象提取文本"""
+        if hasattr(title_obj, 'rich') and title_obj.rich:
+            return self._extract_text_from_rich(title_obj.rich)
+        return None
+
+    def _extract_from_string_reference(self, title_obj: Any) -> str | None:
+        """从字符串引用对象提取文本"""
+        if hasattr(title_obj, 'strRef') and title_obj.strRef:
+            return self._extract_text_from_strref(title_obj.strRef)
+        return None
+
+    def _extract_from_direct_attributes(self, title_obj: Any) -> str | None:
+        """从直接属性提取文本"""
+        # 检查常见的文本属性
+        for attr in ['text', 'value', 'v']:
+            if hasattr(title_obj, attr):
+                attr_value = getattr(title_obj, attr)
+                if attr_value:
+                    text_str = str(attr_value).strip()
+                    if text_str and not text_str.startswith('<'):
+                        return text_str
+        return None
+
+    def _extract_from_string_representation(self, title_obj: Any) -> str | None:
+        """从字符串表示提取文本"""
+        try:
+            str_repr = str(title_obj)
+            if (str_repr and
+                not str_repr.startswith('<') and
+                not 'object at' in str_repr and
+                not 'Parameters:' in str_repr and
+                len(str_repr) < ChartConstants.MAX_STRING_REPRESENTATION_LENGTH):
+                return str_repr.strip()
+        except (AttributeError, TypeError, ValueError):
+            pass
+        return None
     
-    def _extract_text_from_tx(self, tx) -> Optional[str]:
+    def _extract_text_from_tx(self, tx) -> str | None:
         """从tx对象提取文本内容"""
         if not tx:
             return None
@@ -211,8 +212,8 @@ class ChartDataExtractor:
                 return v_str
         
         return None
-    
-    def _extract_text_from_rich(self, rich) -> Optional[str]:
+
+    def _extract_text_from_rich(self, rich) -> str | None:
         """从rich对象提取文本内容"""
         if not rich or not hasattr(rich, 'p'):
             return None
@@ -232,8 +233,8 @@ class ChartDataExtractor:
                     return ''.join(texts)
         
         return None
-    
-    def _extract_text_from_strref(self, strref) -> Optional[str]:
+
+    def _extract_text_from_strref(self, strref) -> str | None:
         """从strRef对象提取文本内容"""
         if not strref:
             return None
@@ -255,7 +256,7 @@ class ChartDataExtractor:
         
         return None
 
-    def extract_color(self, solid_fill) -> Optional[str]:
+    def extract_color(self, solid_fill) -> str | None:
         """
         从solidFill对象中提取颜色。
         
@@ -271,7 +272,7 @@ class ChartDataExtractor:
             return convert_scheme_color_to_hex(solid_fill.schemeClr.val)
         return None
     
-    def _extract_from_val(self, val_obj) -> List[float]:
+    def _extract_from_val(self, val_obj) -> list[float]:
         """从val对象提取数值数据。"""
         data = []
         
@@ -288,7 +289,7 @@ class ChartDataExtractor:
         
         return data
     
-    def _extract_from_cat(self, cat_obj) -> List[str]:
+    def _extract_from_cat(self, cat_obj) -> list[str]:
         """从cat对象提取分类数据。"""
         data = []
         
@@ -312,8 +313,8 @@ class ChartDataExtractor:
                 pass
         
         return data
-    
-    def _extract_from_xval(self, xval_obj) -> List[str]:
+
+    def _extract_from_xval(self, xval_obj) -> list[str]:
         """从xVal对象提取数据。"""
         data = []
         
@@ -329,8 +330,8 @@ class ChartDataExtractor:
                 pass
         
         return data
-    
-    def _extract_from_graphics_properties(self, series) -> Optional[str]:
+
+    def _extract_from_graphics_properties(self, series) -> str | None:
         """从图形属性中提取颜色。"""
         if not (hasattr(series, 'graphicalProperties') and series.graphicalProperties):
             return None
@@ -363,8 +364,8 @@ class ChartDataExtractor:
                         return f"#{rgb.upper()}"
         
         return None
-    
-    def _extract_from_sp_pr(self, series) -> Optional[str]:
+
+    def _extract_from_sp_pr(self, series) -> str | None:
         """从spPr属性中提取颜色。"""
         if not (hasattr(series, 'spPr') and series.spPr):
             return None
@@ -381,8 +382,8 @@ class ChartDataExtractor:
                 return convert_scheme_color_to_hex(scheme_color)
         
         return None
-    
-    def _extract_data_point_color(self, data_point) -> Optional[str]:
+
+    def _extract_data_point_color(self, data_point) -> str | None:
         """提取数据点的颜色。"""
         try:
             if hasattr(data_point, 'spPr') and data_point.spPr:
@@ -411,9 +412,9 @@ class ChartDataExtractor:
         except Exception:
             pass
 
-        return 3  # 默认数量
+        return ChartConstants.DEFAULT_PIE_SLICE_COUNT  # 默认数量
 
-    def extract_data_labels(self, series) -> Dict[str, Any]:
+    def extract_data_labels(self, series) -> dict[str, Any]:
         """
         提取系列的数据标签信息。
 
@@ -488,10 +489,10 @@ class ChartDataExtractor:
 
         return data_labels_info
 
-    def _extract_individual_data_label(self, dLbl) -> Optional[Dict[str, Any]]:
+    def _extract_individual_data_label(self, dLbl) -> dict[str, Any] | None:
         """提取单个数据标签的信息。"""
         try:
-            label_info: Dict[str, Any] = {
+            label_info: dict[str, Any] = {
                 'index': None,
                 'text': None,
                 'position': None,
@@ -668,8 +669,17 @@ class ChartDataExtractor:
                         'axis': 'y'
                     })
 
-            # TODO: 添加对其他类型注释的支持（如文本框、形状等）
-            # 这需要访问图表的绘图区域和形状集合
+            # 提取文本框和形状注释
+            textbox_annotations = self._extract_textbox_annotations(chart)
+            annotations.extend(textbox_annotations)
+
+            # 提取形状注释
+            shape_annotations = self._extract_shape_annotations(chart)
+            annotations.extend(shape_annotations)
+
+            # 提取绘图区域中的其他注释元素
+            plotarea_annotations = self._extract_plotarea_annotations(chart)
+            annotations.extend(plotarea_annotations)
 
         except Exception as e:
             import logging
@@ -677,3 +687,418 @@ class ChartDataExtractor:
             logger.debug(f"Failed to extract chart annotations: {e}")
 
         return annotations
+
+    def _extract_textbox_annotations(self, chart) -> list[dict[str, Any]]:
+        """
+        提取图表中的文本框注释。
+
+        注意：由于openpyxl对文本框的支持有限，此方法尝试多种方式来提取文本框信息。
+
+        参数：
+            chart: openpyxl图表对象
+
+        返回：
+            文本框注释列表
+        """
+        textbox_annotations = []
+
+        try:
+            # 方法1：尝试从plotArea访问文本框
+            if hasattr(chart, 'plotArea') and chart.plotArea:
+                plotarea = chart.plotArea
+
+                # 检查plotArea中的文本属性
+                if hasattr(plotarea, 'txPr') and plotarea.txPr:
+                    text_content = self._extract_text_from_rich(plotarea.txPr)
+                    if text_content:
+                        textbox_annotations.append({
+                            'type': 'textbox',
+                            'text': text_content,
+                            'position': 'plotarea',
+                            'source': 'plotArea.txPr'
+                        })
+
+                # 检查plotArea中可能的文本元素
+                for attr_name in ['tx', 'text', 'textBox', 'txBox']:
+                    if hasattr(plotarea, attr_name):
+                        attr_value = getattr(plotarea, attr_name)
+                        if attr_value:
+                            text_content = self.extract_axis_title(attr_value)
+                            if text_content:
+                                textbox_annotations.append({
+                                    'type': 'textbox',
+                                    'text': text_content,
+                                    'position': 'plotarea',
+                                    'source': f'plotArea.{attr_name}'
+                                })
+
+            # 方法2：尝试从图表的其他属性访问文本框
+            # 检查图表级别的文本属性
+            for attr_name in ['textBox', 'txBox', 'freeText', 'annotation']:
+                if hasattr(chart, attr_name):
+                    attr_value = getattr(chart, attr_name)
+                    if attr_value:
+                        # 如果是列表，遍历每个元素
+                        if isinstance(attr_value, (list, tuple)):
+                            for i, item in enumerate(attr_value):
+                                text_content = self.extract_axis_title(item)
+                                if text_content:
+                                    textbox_annotations.append({
+                                        'type': 'textbox',
+                                        'text': text_content,
+                                        'position': 'chart',
+                                        'source': f'chart.{attr_name}[{i}]'
+                                    })
+                        else:
+                            text_content = self.extract_axis_title(attr_value)
+                            if text_content:
+                                textbox_annotations.append({
+                                    'type': 'textbox',
+                                    'text': text_content,
+                                    'position': 'chart',
+                                    'source': f'chart.{attr_name}'
+                                })
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Failed to extract textbox annotations: {e}")
+
+        return textbox_annotations
+
+    def _extract_shape_annotations(self, chart) -> list[dict[str, Any]]:
+        """
+        提取图表中的形状注释。
+
+        注意：openpyxl对形状的支持非常有限。此方法尝试从可能的属性中提取形状信息。
+
+        参数：
+            chart: openpyxl图表对象
+
+        返回：
+            形状注释列表
+        """
+        shape_annotations = []
+
+        try:
+            # 方法1：尝试从plotArea访问形状
+            if hasattr(chart, 'plotArea') and chart.plotArea:
+                plotarea = chart.plotArea
+
+                # 检查plotArea中的形状属性
+                for attr_name in ['sp', 'shape', 'shapes', 'spPr']:
+                    if hasattr(plotarea, attr_name):
+                        attr_value = getattr(plotarea, attr_name)
+                        if attr_value:
+                            shapes_found = self._extract_shapes_from_attribute(attr_value, f'plotArea.{attr_name}')
+                            shape_annotations.extend(shapes_found)
+
+            # 方法2：尝试从图表级别访问形状
+            for attr_name in ['shapes', 'sp', 'drawing', 'drawingElements']:
+                if hasattr(chart, attr_name):
+                    attr_value = getattr(chart, attr_name)
+                    if attr_value:
+                        shapes_found = self._extract_shapes_from_attribute(attr_value, f'chart.{attr_name}')
+                        shape_annotations.extend(shapes_found)
+
+            # 方法3：尝试从图表的图形属性中提取形状信息
+            if hasattr(chart, 'graphicalProperties') and chart.graphicalProperties:
+                gp = chart.graphicalProperties
+                shape_info = self._extract_shape_from_graphical_properties(gp)
+                if shape_info:
+                    shape_annotations.append(shape_info)
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Failed to extract shape annotations: {e}")
+
+        return shape_annotations
+
+    def _extract_shapes_from_attribute(self, attr_value, source: str) -> list[dict[str, Any]]:
+        """从属性值中提取形状信息。"""
+        shapes = []
+
+        try:
+            # 如果是列表或元组，遍历每个元素
+            if isinstance(attr_value, (list, tuple)):
+                for i, item in enumerate(attr_value):
+                    shape_info = self._extract_single_shape(item, f'{source}[{i}]')
+                    if shape_info:
+                        shapes.append(shape_info)
+            else:
+                # 单个形状对象
+                shape_info = self._extract_single_shape(attr_value, source)
+                if shape_info:
+                    shapes.append(shape_info)
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Failed to extract shapes from {source}: {e}")
+
+        return shapes
+
+    def _extract_single_shape(self, shape_obj, source: str) -> dict[str, Any] | None:
+        """提取单个形状的信息。"""
+        try:
+            shape_info = {
+                'type': 'shape',
+                'position': 'unknown',
+                'source': source,
+                'text': None,
+                'shape_type': None,
+                'properties': {}
+            }
+
+            # 尝试提取形状类型
+            if hasattr(shape_obj, 'type'):
+                shape_info['shape_type'] = str(shape_obj.type)
+            elif hasattr(shape_obj, '__class__'):
+                shape_info['shape_type'] = shape_obj.__class__.__name__
+
+            # 尝试提取文本内容
+            for text_attr in ['text', 'tx', 'txPr', 'textBody']:
+                if hasattr(shape_obj, text_attr):
+                    text_value = getattr(shape_obj, text_attr)
+                    if text_value:
+                        text_content = self.extract_axis_title(text_value)
+                        if text_content:
+                            shape_info['text'] = text_content
+                            break
+
+            # 尝试提取形状属性
+            if hasattr(shape_obj, 'spPr') and shape_obj.spPr:
+                shape_info['properties']['spPr'] = 'present'
+
+            # 只有在找到有用信息时才返回
+            if shape_info['text'] or shape_info['shape_type'] or shape_info['properties']:
+                return shape_info
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Failed to extract single shape from {source}: {e}")
+
+        return None
+
+    def _extract_shape_from_graphical_properties(self, gp) -> dict[str, Any] | None:
+        """从图形属性中提取形状信息。"""
+        try:
+            shape_info = {
+                'type': 'shape',
+                'position': 'chart',
+                'source': 'chart.graphicalProperties',
+                'text': None,
+                'shape_type': 'graphical_properties',
+                'properties': {}
+            }
+
+            # 检查是否有填充属性
+            if hasattr(gp, 'solidFill') and gp.solidFill:
+                shape_info['properties']['fill'] = 'solid'
+            elif hasattr(gp, 'noFill') and gp.noFill:
+                shape_info['properties']['fill'] = 'none'
+
+            # 检查是否有线条属性
+            if hasattr(gp, 'ln') and gp.ln:
+                shape_info['properties']['line'] = 'present'
+
+            # 只有在找到属性时才返回
+            if shape_info['properties']:
+                return shape_info
+
+        except Exception:
+            pass
+
+        return None
+
+    def _extract_plotarea_annotations(self, chart) -> list[dict[str, Any]]:
+        """
+        提取绘图区域中的其他注释元素。
+
+        这个方法尝试从图表的绘图区域中提取各种可能的注释元素，
+        包括但不限于：数据标签、趋势线标签、误差线等。
+
+        参数：
+            chart: openpyxl图表对象
+
+        返回：
+            绘图区域注释列表
+        """
+        plotarea_annotations = []
+
+        try:
+            if not (hasattr(chart, 'plotArea') and chart.plotArea):
+                return plotarea_annotations
+
+            plotarea = chart.plotArea
+
+            # 方法1：检查绘图区域的布局信息
+            if hasattr(plotarea, 'layout') and plotarea.layout:
+                layout_info = self._extract_layout_annotations(plotarea.layout)
+                if layout_info:
+                    plotarea_annotations.append(layout_info)
+
+            # 方法2：检查绘图区域中的数据表
+            if hasattr(plotarea, 'dTable') and plotarea.dTable:
+                table_info = {
+                    'type': 'data_table',
+                    'position': 'plotarea',
+                    'source': 'plotArea.dTable',
+                    'enabled': True
+                }
+                plotarea_annotations.append(table_info)
+
+            # 方法3：检查绘图区域中的其他可能的注释元素
+            annotation_attrs = [
+                'annotation', 'annotations', 'textAnnotation',
+                'callout', 'callouts', 'note', 'notes',
+                'label', 'labels', 'marker', 'markers'
+            ]
+
+            for attr_name in annotation_attrs:
+                if hasattr(plotarea, attr_name):
+                    attr_value = getattr(plotarea, attr_name)
+                    if attr_value:
+                        annotations_found = self._extract_annotations_from_attribute(
+                            attr_value, f'plotArea.{attr_name}'
+                        )
+                        plotarea_annotations.extend(annotations_found)
+
+            # 方法4：尝试从XML属性中提取未知的注释元素
+            # 这是一个实验性的方法，尝试发现openpyxl可能没有完全支持的元素
+            if hasattr(plotarea, '__dict__'):
+                for attr_name, attr_value in plotarea.__dict__.items():
+                    if (attr_name.startswith('_') or
+                        attr_name in ['tagname', 'namespace'] or
+                        attr_value is None):
+                        continue
+
+                    # 检查是否是可能包含文本的属性
+                    if any(keyword in attr_name.lower() for keyword in
+                           ['text', 'annotation', 'label', 'note', 'comment']):
+                        text_content = self._try_extract_text_from_unknown_element(attr_value)
+                        if text_content:
+                            plotarea_annotations.append({
+                                'type': 'unknown_annotation',
+                                'text': text_content,
+                                'position': 'plotarea',
+                                'source': f'plotArea.{attr_name}',
+                                'experimental': True
+                            })
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Failed to extract plotarea annotations: {e}")
+
+        return plotarea_annotations
+
+    def _extract_layout_annotations(self, layout) -> dict[str, Any] | None:
+        """从布局对象中提取注释信息。"""
+        try:
+            if not layout:
+                return None
+
+            layout_info = {
+                'type': 'layout',
+                'position': 'plotarea',
+                'source': 'plotArea.layout',
+                'properties': {}
+            }
+
+            # 提取布局属性
+            layout_attrs = ['x', 'y', 'w', 'h', 'xMode', 'yMode', 'wMode', 'hMode']
+            for attr in layout_attrs:
+                if hasattr(layout, attr):
+                    value = getattr(layout, attr)
+                    if value is not None:
+                        layout_info['properties'][attr] = str(value)
+
+            # 只有在找到属性时才返回
+            if layout_info['properties']:
+                return layout_info
+
+        except Exception:
+            pass
+
+        return None
+
+    def _extract_annotations_from_attribute(self, attr_value, source: str) -> list[dict[str, Any]]:
+        """从属性值中提取注释信息。"""
+        annotations = []
+
+        try:
+            # 如果是列表或元组，遍历每个元素
+            if isinstance(attr_value, (list, tuple)):
+                for i, item in enumerate(attr_value):
+                    annotation_info = self._extract_single_annotation(item, f'{source}[{i}]')
+                    if annotation_info:
+                        annotations.append(annotation_info)
+            else:
+                # 单个注释对象
+                annotation_info = self._extract_single_annotation(attr_value, source)
+                if annotation_info:
+                    annotations.append(annotation_info)
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Failed to extract annotations from {source}: {e}")
+
+        return annotations
+
+    def _extract_single_annotation(self, annotation_obj, source: str) -> dict[str, Any] | None:
+        """提取单个注释的信息。"""
+        try:
+            annotation_info = {
+                'type': 'annotation',
+                'position': 'plotarea',
+                'source': source,
+                'text': None,
+                'properties': {}
+            }
+
+            # 尝试提取文本内容
+            text_content = self.extract_axis_title(annotation_obj)
+            if text_content:
+                annotation_info['text'] = text_content
+
+            # 尝试提取其他属性
+            if hasattr(annotation_obj, '__class__'):
+                annotation_info['properties']['class'] = annotation_obj.__class__.__name__
+
+            # 只有在找到文本或属性时才返回
+            if annotation_info['text'] or annotation_info['properties']:
+                return annotation_info
+
+        except Exception:
+            pass
+
+        return None
+
+    def _try_extract_text_from_unknown_element(self, element) -> str | None:
+        """尝试从未知元素中提取文本内容。"""
+        try:
+            # 尝试多种方法提取文本
+            if isinstance(element, str):
+                return element.strip() if element.strip() else None
+
+            # 尝试使用现有的文本提取方法
+            text_content = self.extract_axis_title(element)
+            if text_content:
+                return text_content
+
+            # 如果是对象，尝试查找文本属性
+            if hasattr(element, '__dict__'):
+                for attr_name, attr_value in element.__dict__.items():
+                    if 'text' in attr_name.lower() and isinstance(attr_value, str):
+                        text = attr_value.strip()
+                        if text:
+                            return text
+
+        except Exception:
+            pass
+
+        return None

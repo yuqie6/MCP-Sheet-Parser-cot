@@ -1,27 +1,23 @@
 import logging
-import re
 
 from src.constants import StyleConstants
 from src.font_manager import get_font_manager
 from src.models.table_model import Sheet, Style
 from src.utils.color_utils import format_color
-from src.utils.border_utils import parse_border_style_complete
 
 logger = logging.getLogger(__name__)
 
 
 class StyleConverter:
-    """Handles all CSS generation logic."""
+    """处理所有 CSS 生成逻辑。"""
 
     def collect_styles(self, sheet: Sheet) -> dict[str, Style]:
         """
-        Collects all unique styles from a sheet.
-
-        Args:
-            sheet: The Sheet object.
-
-        Returns:
-            A dictionary of styles, with style IDs as keys and Style objects as values.
+        收集表格中的所有唯一样式。
+        参数：
+            sheet: Sheet对象。
+        返回：
+            以样式ID为键、Style对象为值的字典。
         """
         styles = {}
         style_counter = 0
@@ -37,13 +33,11 @@ class StyleConverter:
 
     def get_style_key(self, style: Style) -> str:
         """
-        Generates a unique identifier for a style.
-
-        Args:
-            style: The Style object.
-
-        Returns:
-            A unique string identifier for the style.
+        生成样式的唯一标识符。
+        参数：
+            style: Style对象。
+        返回：
+            唯一字符串标识。
         """
         key_parts = []
         if style.font_name:
@@ -87,19 +81,26 @@ class StyleConverter:
 
         return "|".join(key_parts) if key_parts else "default"
 
-    def generate_css(self, styles: dict[str, Style], sheet: Sheet | None = None, position_calculator=None) -> str:
+    def generate_css(self, styles: dict[str, Style], sheet: Sheet | None = None) -> str:
         """
-        Generates CSS styles.
-
-        Args:
-            styles: A dictionary of styles.
-            sheet: The Sheet object, for dimension information.
-
-        Returns:
-            A CSS string.
+        生成 CSS 样式。
+        参数：
+            styles: 样式字典。
+            sheet: Sheet对象，用于维度信息。
+        返回：CSS字符串。
         """
         css_rules = [
             """
+        body {
+            margin: 20px;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+            text-align: center;
+        }
         table {
             border-collapse: separate;
             border-spacing: 0;
@@ -270,7 +271,7 @@ class StyleConverter:
 
     def _generate_dimension_css(self, sheet: Sheet) -> str:
         """
-        Generates CSS for column widths and row heights.
+        生成列宽和行高的CSS。
         """
         css_rules = []
         excel_to_px = 8.43
@@ -287,7 +288,7 @@ class StyleConverter:
         return "\n".join(css_rules)
 
     def _generate_chart_css(self) -> str:
-        """Generates CSS for charts."""
+        """生成图表相关CSS。"""
         return """
         .chart-overlay {
             position: absolute;
@@ -363,7 +364,7 @@ class StyleConverter:
 
     def _generate_border_css(self, style: Style) -> str:
         """
-        Generates CSS for borders.
+        生成边框相关CSS。
         """
         border_css = ""
         has_any_border = False
@@ -383,24 +384,18 @@ class StyleConverter:
             border_css = " border: none !important;"
         return border_css
 
-    def _parse_border_style_complete(self, border_style: str, border_color: str) -> str:
-        """
-        解析完整的边框样式字符串。
-        
-        注意：这个方法已迁移到 border_utils.py，这里保留是为了向后兼容
-        """
-        return parse_border_style_complete(border_style, border_color)
+
 
     def _format_font_family(self, font_name: str) -> str:
         """
-        Formats a font family name.
+        格式化字体族名称。
         """
         font_manager = get_font_manager()
         return font_manager.generate_font_family(font_name)
 
     def _format_font_size(self, font_size: float) -> str:
         """
-        Formats a font size.
+        格式化字体大小。
         """
         if not font_size or font_size <= 0:
             return f"{StyleConstants.DEFAULT_FONT_SIZE_PT}pt"

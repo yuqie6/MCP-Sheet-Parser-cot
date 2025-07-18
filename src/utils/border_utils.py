@@ -5,7 +5,6 @@
 """
 
 import re
-from typing import Optional
 from src.utils.color_utils import extract_color
 
 # 统一的边框样式映射

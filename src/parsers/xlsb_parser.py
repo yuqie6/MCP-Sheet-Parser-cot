@@ -22,13 +22,13 @@ class XlsbParser(BaseParser):
         """
         解析XLSB文件并返回Sheet对象列表。
 
-        Args:
+        参数:
             file_path: XLSB文件路径
 
-        Returns:
+        返回:
             包含数据和基础样式的Sheet对象列表
 
-        Raises:
+        异常:
             RuntimeError: 当解析失败时
         """
         try:
@@ -100,10 +100,10 @@ class XlsbParser(BaseParser):
         """
         处理单元格值，包括数据类型转换和日期处理。
         
-        Args:
+        参数:
             value: 原始单元格值
             
-        Returns:
+        返回:
             处理后的单元格值
         """
         if value is None:
@@ -115,13 +115,17 @@ class XlsbParser(BaseParser):
         elif isinstance(value, (int, float)):
             # 检查是否为日期（更严格的日期范围检测）
             # Excel日期通常在1900-01-01到2099-12-31之间，对应数值范围约为1-73050
-            if isinstance(value, float) and 25569 <= value <= 73050:  # 更合理的日期范围
+            # 但要避免将普通数字误判为日期，增加更严格的条件
+            if (isinstance(value, float) and
+                1 <= value <= 73050 and  # 基本范围检查
+                value != int(value)):    # 日期通常有小数部分（时间），纯整数不太可能是日期
                 try:
                     # 尝试转换为日期
                     date_value = convert_date(value)
                     if isinstance(date_value, datetime):
-                        # 额外验证：检查年份是否合理
-                        if 1900 <= date_value.year <= 2099:
+                        # 额外验证：检查年份是否合理，且不是明显的数字
+                        if (1900 <= date_value.year <= 2099 and
+                            value > 365):  # 排除小于一年的数值，避免误判
                             return date_value
                 except (ValueError, TypeError, OverflowError):
                     # 如果转换失败，当作普通数字处理
@@ -195,10 +199,10 @@ class XlsbParser(BaseParser):
         """
         获取工作簿中所有工作表的名称。
         
-        Args:
+        参数:
             workbook: pyxlsb工作簿对象
-            
-        Returns:
+
+        返回:
             工作表名称列表
         """
         try:
@@ -211,11 +215,11 @@ class XlsbParser(BaseParser):
         """
         标准化行数据，确保所有行都有相同的列数。
         
-        Args:
+        参数:
             row_data: 原始行数据
             max_columns: 最大列数
-            
-        Returns:
+
+        返回:
             标准化后的行数据
         """
         normalized_row = [None] * max_columns

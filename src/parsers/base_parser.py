@@ -5,7 +5,6 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
 from src.models.table_model import Sheet, LazySheet
 
 
@@ -57,13 +56,5 @@ class BaseParser(ABC):
         返回：
             如果支持流式处理，返回 LazySheet 对象，否则返回 None。
         """
-    def _style_to_dict(self, style: Any) -> dict[str, Any]:
-        """
-        将特定库的 Style 对象转换为标准化字典格式。
-        这是一个辅助方法，可在子类中实现，供 CoreService 使用。
-        """
-        if not style:
-            return {}
-        # 默认实现返回空字典，子类应重写此方法
-        return {}
+        return None
 

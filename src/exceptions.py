@@ -18,7 +18,7 @@ class SheetParserError(Exception):
         """
         初始化异常。
         
-        Args:
+        参数:
             message: 错误消息
             error_code: 错误代码，用于程序化处理
             details: 额外的错误详情

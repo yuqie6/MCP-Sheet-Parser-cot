@@ -4,7 +4,6 @@ HTML工具模块
 提供统一的HTML处理功能，避免代码重复。
 """
 
-from typing import Optional
 
 
 def escape_html(text: str) -> str:
@@ -56,8 +55,8 @@ def generate_class_attribute(css_classes: list[str]) -> str:
     return f'class="{" ".join(css_classes)}"'
 
 
-def create_html_element(tag: str, content: str = "", attributes: dict[str, str] = None, 
-                       css_classes: list[str] = None, inline_styles: dict[str, str] = None) -> str:
+def create_html_element(tag: str, content: str = "", attributes: dict[str, str] | None = None, 
+                       css_classes: list[str] | None = None, inline_styles: dict[str, str] | None = None) -> str:
     """
     创建HTML元素。
     
@@ -96,8 +95,8 @@ def create_html_element(tag: str, content: str = "", attributes: dict[str, str] 
 
 
 def create_table_cell(content: str, is_header: bool = False, rowspan: int = 1, 
-                     colspan: int = 1, css_classes: list[str] = None, 
-                     inline_styles: dict[str, str] = None, title: str = None) -> str:
+                     colspan: int = 1, css_classes: list[str] | None = None, 
+                     inline_styles: dict[str, str] | None = None, title: str | None = None) -> str:
     """
     创建表格单元格。
     
@@ -127,7 +126,7 @@ def create_table_cell(content: str, is_header: bool = False, rowspan: int = 1,
 
 
 def create_svg_element(width: int, height: int, content: str = "", 
-                      css_classes: list[str] = None) -> str:
+                      css_classes: list[str] | None = None) -> str:
     """
     创建SVG元素。
     

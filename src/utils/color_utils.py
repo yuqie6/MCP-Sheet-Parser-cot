@@ -5,7 +5,7 @@
 """
 
 import re
-from typing import Optional, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from functools import lru_cache
 
 if TYPE_CHECKING:
@@ -70,13 +70,12 @@ COLOR_NAMES = {
 @lru_cache(maxsize=256)
 def normalize_color(color: str) -> str:
     """
-    标准化颜色格式为#RRGGBB格式。
+    将颜色标准化为#RRGGBB格式。
     
     参数：
-        color: 颜色值（可能包含#前缀或不包含）
-        
+        color: 颜色值（可带#前缀或不带）
     返回：
-        标准化的#RRGGBB格式颜色
+        标准化后的#RRGGBB格式颜色字符串
     """
     if not color:
         return '#000000'
@@ -95,7 +94,7 @@ def normalize_color(color: str) -> str:
         return '#000000'  # 默认黑色
 
 
-def format_color(color: str, is_font_color: bool = False, is_border_color: bool = False) -> Optional[str]:
+def format_color(color: str, is_font_color: bool = False, is_border_color: bool = False) -> str | None:
     """
     格式化颜色字符串。
     
@@ -103,7 +102,6 @@ def format_color(color: str, is_font_color: bool = False, is_border_color: bool 
         color: 原始颜色字符串
         is_font_color: 是否为字体颜色
         is_border_color: 是否为边框颜色
-        
     返回：
         格式化后的颜色字符串，失败时返回None
     """
@@ -139,11 +137,10 @@ def format_color(color: str, is_font_color: bool = False, is_border_color: bool 
 @lru_cache(maxsize=128)
 def convert_scheme_color_to_hex(scheme_color: str) -> str:
     """
-    将Excel主题颜色转换为十六进制颜色。
+    将Excel主题颜色名称转换为十六进制颜色。
     
     参数：
         scheme_color: Excel主题颜色名称
-        
     返回：
         十六进制颜色字符串
     """
@@ -157,7 +154,6 @@ def generate_pie_color_variants(base_color: str, count: int) -> list[str]:
     参数：
         base_color: 基础颜色（十六进制）
         count: 需要的颜色数量
-        
     返回：
         颜色列表
     """
@@ -190,14 +186,13 @@ def generate_pie_color_variants(base_color: str, count: int) -> list[str]:
         return (DEFAULT_CHART_COLORS * ((count // len(DEFAULT_CHART_COLORS)) + 1))[:count]
 
 
-def generate_distinct_colors(count: int, existing_colors: Optional[list] = None) -> list[str]:
+def generate_distinct_colors(count: int, existing_colors: list | None = None) -> list[str]:
     """
     生成与现有颜色不同的新颜色。统一的颜色生成工具。
     
     参数：
         count: 需要生成的颜色数量
         existing_colors: 已存在的颜色列表
-        
     返回：
         新颜色列表
     """
@@ -243,7 +238,6 @@ def ensure_distinct_colors(colors: list[str], required_count: int) -> list[str]:
     参数：
         colors: 原始颜色列表
         required_count: 需要的颜色数量
-        
     返回：
         包含足够不重复颜色的列表
     """
@@ -269,7 +263,7 @@ def ensure_distinct_colors(colors: list[str], required_count: int) -> list[str]:
 
 def extract_color(color_obj) -> str | None:
     """
-    增强的颜色提取，支持主题颜色、tint和RGB。
+    增强的颜色提取，支持主题色、tint和RGB。
     """
     if not color_obj:
         return None
@@ -421,11 +415,10 @@ def get_color_by_index(index: int) -> str:
 def apply_smart_color_matching(style: "Style") -> "Style":
     """
     智能匹配字体色与背景色，确保对比度和可读性。
-    只在真正需要的时候才应用智能匹配。
+    仅在确实需要时才应用智能匹配。
     
     参数：
-        style: Style对象，需要有background_color和font_color属性
-        
+        style: Style对象，需包含background_color和font_color属性
     返回：
         调整后的Style对象
     """
