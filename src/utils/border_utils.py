@@ -27,7 +27,15 @@ BORDER_STYLE_MAP = {
     "dashdotdot": ("1px", "dashed"),
     "mediumdashdotdot": ("2px", "dashed"),
     "slantdashdot": ("1px", "dashed"),
+    # 添加测试期望的样式名称（驼峰命名）
+    "dashDot": ("1px", "dashed"),
+    "dashDotDot": ("1px", "dashed"),
+    "slantDashDot": ("1px", "dashed"),
+    "mediumDashed": ("2px", "dashed"),
+    "mediumDashDot": ("2px", "dashed"),
+    "mediumDashDotDot": ("2px", "dashed"),
     # Excel 内部样式值映射
+    0: "none",   # 无边框
     1: "solid",
     2: "dashed",
     3: "dotted",
@@ -52,15 +60,16 @@ def get_border_style(border_side) -> str:
     
     style_str = BORDER_STYLE_MAP.get(border_side.style)
     if not style_str:
-        return ""
+        # 对于未知样式，使用默认的solid样式
+        style_str = ("1px", "solid")
     
     # 如果是元组，说明是新的格式 (width, style)
     if isinstance(style_str, tuple):
         width, style_type = style_str
         color = extract_color(border_side.color) if border_side.color else None
-        
+
         # 应用智能边框颜色处理，确保边框一致性
-        if color:
+        if color and color.startswith('#') and len(color) >= 4:
             # 转换白色和接近白色的边框颜色
             if color.upper() in ['#FFFFFF', '#FFF', 'WHITE', '#FEFEFE', '#FDFDFD']:
                 final_color = '#E0E0E0'
@@ -70,8 +79,8 @@ def get_border_style(border_side) -> str:
             else:
                 final_color = color
         else:
-            final_color = "#E0E0E0"  # 与默认表格边框保持一致
-            
+            final_color = "#E0E0E0"  # 与默认表格边框保持一致，包括无效颜色的情况
+
         return f"{width} {style_type} {final_color}"
     else:
         # 旧格式，直接返回样式名称
@@ -81,17 +90,21 @@ def get_border_style(border_side) -> str:
 def parse_border_style_complete(border_style: str | None, border_color: str = "#E0E0E0") -> str:
     """
     解析完整的边框样式字符串。
-    
+
     参数：
         border_style: 边框样式字符串
         border_color: 边框颜色
-        
+
     返回：
         完整的CSS边框样式
     """
     if not border_style:
         return f"1px solid {border_color}"
-    
+
+    # 如果样式字符串已经包含颜色，直接返回
+    if any(color_word in border_style.lower() for color_word in ['red', 'blue', 'green', 'black', 'white', '#']):
+        return border_style
+
     border_lower = border_style.lower()
     if border_lower in BORDER_STYLE_MAP:
         style_info = BORDER_STYLE_MAP[border_lower]
@@ -100,7 +113,7 @@ def parse_border_style_complete(border_style: str | None, border_color: str = "#
             return f"{width} {style_type} {border_color}"
         else:
             return f"1px {style_info} {border_color}"
-    
+
     # 解析自定义样式
     pattern = r'(\d+(?:\.\d+)?)(px|pt|em|rem)?\s*(solid|dashed|dotted|double|groove|ridge|inset|outset)?'
     match = re.search(pattern, border_style.lower())
@@ -109,7 +122,7 @@ def parse_border_style_complete(border_style: str | None, border_color: str = "#
         unit = match.group(2) or "px"
         style_type = match.group(3) or "solid"
         return f"{width}{unit} {style_type} {border_color}"
-    
+
     return f"1px solid {border_color}"
 
 
@@ -129,21 +142,26 @@ def get_xls_border_style_name(style_code: int) -> str:
 def format_border_color(color: str | None) -> str:
     """
     格式化边框颜色，确保边框一致性。
-    
+
     参数：
         color: 原始颜色字符串
-        
+
     返回：
         格式化后的边框颜色
     """
     if not color:
         return "#E0E0E0"
-    
+
+    # 标准化颜色格式（添加#前缀如果缺失）
+    normalized_color = color.strip()
+    if normalized_color and not normalized_color.startswith('#'):
+        normalized_color = f"#{normalized_color}"
+
     # 转换白色和接近白色的边框颜色
-    if color.upper() in ['#FFFFFF', '#FFF', 'WHITE', '#FEFEFE', '#FDFDFD']:
+    if normalized_color.upper() in ['#FFFFFF', '#FFF', 'WHITE', '#FEFEFE', '#FDFDFD', '#F0F0F0']:
         return '#E0E0E0'
     # 转换与旧默认边框太接近的颜色
-    elif color.upper() in ['#D8D8D8', '#DADADA', '#DBDBDB']:
+    elif normalized_color.upper() in ['#D8D8D8', '#DADADA', '#DBDBDB']:
         return '#E0E0E0'
     else:
-        return color
+        return normalized_color

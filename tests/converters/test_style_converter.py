@@ -229,26 +229,29 @@ def test_get_style_key_with_none_style():
     """
     TDD测试：get_style_key应该处理None样式
 
-    这个测试确保方法在样式为None时返回空字符串
+    这个测试确保方法在样式为None时返回默认值
     """
     # 🔴 红阶段：编写测试描述期望的行为
     converter = StyleConverter()
 
     key = converter.get_style_key(None)
 
-    # 应该返回空字符串
-    assert key == ""
+    # 应该返回默认值
+    assert key == "default"
 
 def test_generate_css_with_empty_styles():
     """
     TDD测试：generate_css应该处理空的样式字典
 
-    这个测试确保方法在没有样式时返回空字符串
+    这个测试确保方法在没有样式时仍返回基础CSS
     """
     # 🔴 红阶段：编写测试描述期望的行为
     converter = StyleConverter()
 
     css = converter.generate_css({})
 
-    # 应该返回空字符串
-    assert css == ""
+    # 应该包含基础CSS，但不包含自定义样式类
+    assert "body {" in css
+    assert "table {" in css
+    # 不应该包含任何.style_开头的类
+    assert ".style_" not in css

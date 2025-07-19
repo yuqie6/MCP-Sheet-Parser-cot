@@ -5,7 +5,7 @@
 统一接口分块读取大文件，支持可选数据过滤。
 """
 
-from typing import Any
+from typing import Any, Callable
 from pathlib import Path
 from dataclasses import dataclass
 import re
@@ -27,6 +27,7 @@ class ChunkFilter:
     start_row: int = 0  # 起始行索引（从0开始）
     max_rows: int | None = None  # 最大读取行数
     range_string: str | None = None  # Excel格式范围字符串，如"A1:D10"
+    row_filter: Callable | None = None  # 行过滤函数
 
 
 @dataclass
@@ -75,26 +76,34 @@ class StreamingTableReader:
             self._regular_sheet = sheets[0] if sheets else None
             logger.info(f"为 {self.file_path} 初始化了常规工作表")
     
-    def iter_chunks(self, rows: int = 1000, filter_config: ChunkFilter | None = None) -> Iterator[StreamingChunk]:
+    def iter_chunks(self, rows: int = 1000, filter_config: ChunkFilter | None = None, range_filter: str | None = None) -> Iterator[StreamingChunk]:
         """
         分块迭代数据。
-        
+
         参数：
             rows: 每块的行数
             filter_config: 可选，数据过滤配置
-        
+            range_filter: 可选，Excel格式的范围字符串，如"A1:D10"
+
         逐步返回：
             每次返回一个包含过滤数据的 StreamingChunk 对象
         """
         if rows <= 0:
             raise ValueError("块大小必须为正数")
-        
+
         # 如果指定了范围过滤器，应用它
-        if filter_config and filter_config.range_string:
-            range_filter = self._parse_range_filter(filter_config.range_string)
-            start_row = range_filter['start_row']
-            max_rows = range_filter['max_rows']
-            column_indices = range_filter['column_indices']
+        range_filter_string = range_filter or (filter_config.range_string if filter_config else None)
+        if range_filter_string:
+            parsed_range = self._parse_range_filter(range_filter_string)
+            if parsed_range:
+                start_row = parsed_range['start_row']
+                max_rows = parsed_range['max_rows']
+                column_indices = parsed_range['column_indices']
+            else:
+                # 无效的范围格式，使用默认值
+                start_row = filter_config.start_row if filter_config else 0
+                max_rows = filter_config.max_rows if filter_config else None
+                column_indices = None
         else:
             start_row = filter_config.start_row if filter_config else 0
             max_rows = filter_config.max_rows if filter_config else None
@@ -206,14 +215,18 @@ class StreamingTableReader:
 
         return rows
     
-    def _apply_column_filter(self, headers: list[str], filter_config: ChunkFilter, 
+    def _apply_column_filter(self, headers: list[str], filter_config: ChunkFilter | None,
                            existing_indices: list[int] | None = None) -> tuple[list[str], list[int]]:
         """对表头应用列过滤，返回过滤后的表头和索引。"""
         if existing_indices:
             # 使用来自范围过滤器的现有索引
             filtered_headers = [headers[i] for i in existing_indices if i < len(headers)]
             return filtered_headers, existing_indices
-        
+
+        if filter_config is None:
+            # 没有过滤配置，返回所有列
+            return headers, list(range(len(headers)))
+
         if filter_config.column_indices:
             # 按列索引过滤
             indices = [i for i in filter_config.column_indices if 0 <= i < len(headers)]
@@ -236,33 +249,86 @@ class StreamingTableReader:
         
         # 不过滤
         return headers, list(range(len(headers)))
-    
-    def _parse_range_filter(self, range_string: str) -> dict[str, Any]:
-        """解析 Excel 格式的范围字符串，如 'A1:D10'。"""
+
+    def _apply_chunk_filter(self, headers: list[str], rows: list[Row], filter_config: ChunkFilter | None) -> tuple[list[str], list[Row]]:
+        """对数据块应用过滤，返回过滤后的表头和行。"""
+        # 应用列过滤
+        filtered_headers, column_indices = self._apply_column_filter(headers, filter_config)
+
+        # 过滤行数据
+        filtered_rows = []
+        for row in rows:
+            # 应用行过滤器（如果存在）
+            if filter_config and filter_config.row_filter:
+                row_data = [cell.value for cell in row.cells]
+                if not filter_config.row_filter(row_data):
+                    continue  # 跳过不符合条件的行
+
+            # 应用列过滤
+            filtered_cells = [row.cells[i] for i in column_indices if i < len(row.cells)]
+            filtered_rows.append(Row(cells=filtered_cells))
+
+        return filtered_headers, filtered_rows
+
+    def _get_column_indices(self, headers: list[str], column_names: list[str]) -> list[int]:
+        """获取指定列名对应的索引。"""
+        indices = []
+        for name in column_names:
+            try:
+                index = headers.index(name)
+                indices.append(index)
+            except ValueError:
+                # 列名不存在，跳过
+                pass
+        return indices
+
+    def _filter_row_by_indices(self, row: Row, indices: list[int]) -> Row:
+        """根据索引过滤行数据。"""
+        filtered_cells = [row.cells[i] for i in indices if i < len(row.cells)]
+        return Row(cells=filtered_cells)
+
+    def _parse_range_filter(self, range_string: str) -> dict[str, Any] | None:
+        """解析 Excel 格式的范围字符串，如 'A1:D10' 或单个单元格 'B5'。"""
         range_string = range_string.strip().upper()
-        
-        # A1:D10类型的范围模式
+
+        # 首先尝试单个单元格模式，如 'B5'
+        single_cell_pattern = r'^([A-Z]+)(\d+)$'
+        single_match = re.match(single_cell_pattern, range_string)
+
+        if single_match:
+            col_str, row_str = single_match.groups()
+            col_index = self._col_to_index(col_str)
+            row_index = int(row_str) - 1  # 转换为基于0的索引
+
+            return {
+                'start_row': row_index,
+                'max_rows': 1,
+                'column_indices': [col_index]
+            }
+
+        # 然后尝试范围模式，如 'A1:D10'
         range_pattern = r'^([A-Z]+)(\d+):([A-Z]+)(\d+)$'
-        match = re.match(range_pattern, range_string)
-        
-        if not match:
-            raise ValueError(f"无效的范围格式: {range_string}。期望格式: A1:D10")
-        
-        start_col_str, start_row_str, end_col_str, end_row_str = match.groups()
-        
-        # 将列字母转换为索引
-        start_col = self._col_to_index(start_col_str)
-        end_col = self._col_to_index(end_col_str)
-        
-        # 将行号转换为基于0的索引
-        start_row = int(start_row_str) - 1
-        end_row = int(end_row_str) - 1
-        
-        return {
-            'start_row': start_row,
-            'max_rows': end_row - start_row + 1,
-            'column_indices': list(range(start_col, end_col + 1))
-        }
+        range_match = re.match(range_pattern, range_string)
+
+        if range_match:
+            start_col_str, start_row_str, end_col_str, end_row_str = range_match.groups()
+
+            # 将列字母转换为索引
+            start_col = self._col_to_index(start_col_str)
+            end_col = self._col_to_index(end_col_str)
+
+            # 将行号转换为基于0的索引
+            start_row = int(start_row_str) - 1
+            end_row = int(end_row_str) - 1
+
+            return {
+                'start_row': start_row,
+                'max_rows': end_row - start_row + 1,
+                'column_indices': list(range(start_col, end_col + 1))
+            }
+
+        # 如果都不匹配，返回None
+        return None
     
     def _col_to_index(self, col_str: str) -> int:
         """将列字母转换为基于0的索引（A=0, B=1, ..., Z=25, AA=26, ...）。"""

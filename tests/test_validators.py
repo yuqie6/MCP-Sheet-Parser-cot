@@ -265,7 +265,7 @@ def test_data_validator_validate_output_path_create_dirs(tmp_path):
 
 def test_data_validator_validate_output_path_no_create_dirs():
     """Test output path validation without directory creation."""
-    with patch('pathlib.Path') as mock_path_class:
+    with patch('src.validators.Path') as mock_path_class:
         mock_path = MagicMock()
         mock_parent = MagicMock()
         mock_parent.exists.return_value = False
@@ -277,7 +277,7 @@ def test_data_validator_validate_output_path_no_create_dirs():
 
 def test_data_validator_validate_output_path_mkdir_error():
     """Test output path validation with mkdir error."""
-    with patch('pathlib.Path') as mock_path_class:
+    with patch('src.validators.Path') as mock_path_class:
         mock_path = MagicMock()
         mock_parent = MagicMock()
         mock_parent.exists.return_value = False

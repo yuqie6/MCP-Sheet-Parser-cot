@@ -85,6 +85,9 @@ def test_get_border_style_with_invalid_color(mock_border_side):
     border = mock_border_side("thin")
     border.color = MagicMock()
     border.color.rgb = "INVALID_COLOR"  # 无效颜色
+    border.color.indexed = None  # 确保不会通过indexed分支
+    border.color.theme = None   # 确保不会通过theme分支
+    border.color.value = None   # 确保不会通过value分支
 
     # 应该使用默认颜色而不是崩溃
     result = get_border_style(border)
@@ -101,6 +104,9 @@ def test_get_border_style_with_color_attribute_error(mock_border_side):
     border.color = MagicMock()
     # 模拟访问rgb属性时抛出AttributeError
     type(border.color).rgb = PropertyMock(side_effect=AttributeError("No rgb attribute"))
+    border.color.indexed = None  # 确保不会通过indexed分支
+    border.color.theme = None   # 确保不会通过theme分支
+    border.color.value = None   # 确保不会通过value分支
 
     # 应该使用默认颜色
     result = get_border_style(border)
@@ -207,5 +213,191 @@ def test_border_style_map_completeness():
 
     for style in expected_styles:
         assert style in BORDER_STYLE_MAP
-        assert isinstance(BORDER_STYLE_MAP[style], str)
-        assert len(BORDER_STYLE_MAP[style]) > 0
+        # 映射值可以是字符串或元组
+        style_value = BORDER_STYLE_MAP[style]
+        assert isinstance(style_value, (str, tuple))
+        if isinstance(style_value, tuple):
+            assert len(style_value) == 2  # (width, style_type)
+        else:
+            assert len(style_value) > 0
+
+# === TDD测试：提升border_utils覆盖率到95%+ ===
+
+class TestFormatBorderColorEdgeCases:
+    """测试format_border_color的边界情况。"""
+
+    def test_format_border_color_with_specific_gray_colors(self):
+        """
+        TDD测试：format_border_color应该转换特定的灰色
+
+        这个测试覆盖第78行的特定颜色转换代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 测试需要转换的特定灰色
+        assert format_border_color("#D8D8D8") == "#E0E0E0"
+        assert format_border_color("#DADADA") == "#E0E0E0"
+        assert format_border_color("#DBDBDB") == "#E0E0E0"
+
+        # 测试大小写不敏感
+        assert format_border_color("#d8d8d8") == "#E0E0E0"
+        assert format_border_color("#dadada") == "#E0E0E0"
+        assert format_border_color("#dbdbdb") == "#E0E0E0"
+
+class TestGetBorderStyleEdgeCases:
+    """测试get_border_style的边界情况。"""
+
+    def test_get_border_style_old_format_return(self):
+        """
+        TDD测试：get_border_style应该处理旧格式的直接返回
+
+        这个测试覆盖第87行的旧格式返回代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 创建一个没有颜色的边框对象
+        mock_border = MagicMock()
+        mock_border.style = "custom_style"
+        mock_border.color = None
+
+        # 模拟get_border_style的内部逻辑，当没有颜色时应该返回样式字符串
+        result = get_border_style(mock_border)
+
+        # 验证返回了处理后的样式（实际会通过BORDER_STYLE_MAP处理）
+        assert isinstance(result, str)
+
+class TestParseBorderStyleCompleteEdgeCases:
+    """测试parse_border_style_complete的边界情况。"""
+
+    def test_parse_border_style_complete_single_style_info(self):
+        """
+        TDD测试：parse_border_style_complete应该处理单个样式信息
+
+        这个测试覆盖第115行的单个样式信息处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 查找一个映射为字符串而不是元组的样式
+        # 从BORDER_STYLE_MAP中找到一个字符串值的样式
+        string_style = None
+        for style, value in BORDER_STYLE_MAP.items():
+            if isinstance(value, str):
+                string_style = style
+                break
+
+        if string_style:
+            result = parse_border_style_complete(string_style, "#FF0000")
+            # 验证返回了正确的格式：1px + 样式 + 颜色
+            assert result == f"1px {BORDER_STYLE_MAP[string_style]} #FF0000"
+        else:
+            # 如果没有找到字符串样式，创建一个测试用例
+            # 临时修改映射来测试这个分支
+            original_value = BORDER_STYLE_MAP.get('test_style')
+            BORDER_STYLE_MAP['test_style'] = 'dotted'
+            try:
+                result = parse_border_style_complete('test_style', '#FF0000')
+                assert result == "1px dotted #FF0000"
+            finally:
+                # 恢复原始映射
+                if original_value is None:
+                    del BORDER_STYLE_MAP['test_style']
+                else:
+                    BORDER_STYLE_MAP['test_style'] = original_value
+
+    def test_parse_border_style_complete_fallback_default(self):
+        """
+        TDD测试：parse_border_style_complete应该使用默认样式作为后备
+
+        这个测试覆盖第126行的默认返回代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 使用一个无法解析的样式字符串
+        result = parse_border_style_complete("invalid_unparseable_style", "#FF0000")
+
+        # 验证返回了默认样式
+        assert result == "1px solid #FF0000"
+
+        # 测试空字符串
+        result = parse_border_style_complete("", "#00FF00")
+        assert result == "1px solid #00FF00"
+
+        # 测试只有空格的字符串
+        result = parse_border_style_complete("   ", "#0000FF")
+        assert result == "1px solid #0000FF"
+
+class TestGetBorderStyleStringFormat:
+    """测试get_border_style的字符串格式处理。"""
+
+    def test_get_border_style_string_format_return(self):
+        """
+        TDD测试：get_border_style应该处理字符串格式的样式映射
+
+        这个测试覆盖第87行的字符串格式返回代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 临时修改BORDER_STYLE_MAP来包含一个字符串值
+        original_value = BORDER_STYLE_MAP.get('test_string_style')
+        BORDER_STYLE_MAP['test_string_style'] = 'solid'  # 字符串而不是元组
+
+        try:
+            # 创建一个使用字符串样式的边框对象
+            mock_border = MagicMock()
+            mock_border.style = 'test_string_style'
+            mock_border.color = None
+
+            result = get_border_style(mock_border)
+
+            # 验证返回了字符串样式
+            assert result == 'solid'
+
+        finally:
+            # 恢复原始映射
+            if original_value is None:
+                del BORDER_STYLE_MAP['test_string_style']
+            else:
+                BORDER_STYLE_MAP['test_string_style'] = original_value
+
+    def test_get_border_style_with_normal_color(self, mock_border_side):
+        """
+        TDD测试：get_border_style应该保持正常颜色不变
+
+        这个测试覆盖第78行else分支的正常颜色处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 使用一个正常的颜色（不在转换列表中）
+        border = mock_border_side("thin", "00FF00")  # 绿色
+        result = get_border_style(border)
+
+        # 验证颜色保持不变
+        assert result == "1px solid #00FF00"
+
+        # 测试另一个正常颜色
+        border = mock_border_side("medium", "FF00FF")  # 紫色
+        result = get_border_style(border)
+
+        # 验证颜色保持不变
+        assert result == "2px solid #FF00FF"
+
+    def test_get_border_style_with_specific_gray_conversion(self, mock_border_side):
+        """
+        TDD测试：get_border_style应该转换特定的灰色
+
+        这个测试覆盖第78行的特定灰色转换代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 测试需要转换的特定灰色
+        border = mock_border_side("thin", "D8D8D8")
+        result = get_border_style(border)
+        assert result == "1px solid #E0E0E0"
+
+        border = mock_border_side("medium", "DADADA")
+        result = get_border_style(border)
+        assert result == "2px solid #E0E0E0"
+
+        border = mock_border_side("thick", "DBDBDB")
+        result = get_border_style(border)
+        assert result == "3px solid #E0E0E0"

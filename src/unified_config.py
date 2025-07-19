@@ -197,6 +197,31 @@ def get_cache_config():
     return get_config_manager().get_cache_config()
 
 
+def get_streaming_config():
+    """获取流式处理配置"""
+    return get_config()
+
+
+def get_conversion_config():
+    """获取转换配置"""
+    return get_config()
+
+
+def get_parsing_config():
+    """获取解析配置"""
+    return get_config()
+
+
+def get_validation_config():
+    """获取验证配置"""
+    return get_config()
+
+
+def get_font_config():
+    """获取字体配置"""
+    return get_config()
+
+
 # 创建一个兼容旧config模块的对象
 class LegacyConfigCompat:
     """为了向后兼容而创建的配置对象"""

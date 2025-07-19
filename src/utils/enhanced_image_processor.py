@@ -18,39 +18,72 @@ class EnhancedImageProcessor:
     """增强的图片处理器"""
     
     def __init__(self):
+        # 图像格式签名和最小长度要求
         self.supported_formats = {
-            b'\x89PNG': 'png',
-            b'\xff\xd8\xff': 'jpeg', 
+            # PNG: 需要完整的8字节签名
+            b'\x89PNG\r\n\x1a\n': 'png',
+            # JPEG: 需要完整的SOI标记
+            b'\xff\xd8\xff': 'jpeg',
+            # GIF: 需要完整的6字节签名
             b'GIF87a': 'gif',
             b'GIF89a': 'gif',
+            # BMP: 需要完整的2字节签名
             b'BM': 'bmp',
+            # TIFF: 需要完整的4字节签名
             b'II*\x00': 'tiff',
             b'MM\x00*': 'tiff',
-            b'\x00\x00\x01\x00': 'ico'
+            # ICO: 需要完整的4字节签名
+            b'\x00\x00\x01\x00': 'ico',
+            # WebP: 需要RIFF...WEBP签名（至少12字节）
+            b'RIFF': 'webp'  # 特殊处理
         }
     
     def detect_image_format(self, img_data: bytes) -> str:
-        """增强的图片格式检测"""
+        """增强的图片格式检测，严格验证格式签名"""
         if not img_data:
             return 'unknown'
-        
+
+        # 特殊处理WebP格式
+        if img_data.startswith(b'RIFF') and len(img_data) >= 12:
+            if img_data[8:12] == b'WEBP':
+                return 'webp'
+
+        # 检查其他格式，要求完整的签名匹配
         for signature, format_name in self.supported_formats.items():
-            if img_data.startswith(signature):
+            if signature == b'RIFF':  # 跳过WebP，已经处理过了
+                continue
+            if len(img_data) >= len(signature) and img_data.startswith(signature):
                 return format_name
-        
+
         return 'unknown'
     
     def validate_image_data(self, img_data: bytes) -> bool:
         """验证图片数据的有效性"""
-        if not img_data or len(img_data) < ImageConstants.MIN_DATA_SIZE:
+        if not img_data:
             return False
-        
+
         # 检查是否是支持的格式
         format_name = self.detect_image_format(img_data)
         if format_name == 'unknown':
             logger.warning(f"Unsupported image format detected")
             return False
-        
+
+        # 根据格式检查最小长度要求
+        min_lengths = {
+            'png': 8,    # PNG签名长度
+            'jpeg': 3,   # JPEG SOI标记长度
+            'gif': 6,    # GIF签名长度
+            'bmp': 2,    # BMP签名长度
+            'tiff': 4,   # TIFF签名长度
+            'ico': 4,    # ICO签名长度
+            'webp': 12   # WebP需要RIFF...WEBP
+        }
+
+        min_length = min_lengths.get(format_name, ImageConstants.MIN_DATA_SIZE)
+        if len(img_data) < min_length:
+            logger.warning(f"Image data too short for {format_name} format: {len(img_data)} < {min_length}")
+            return False
+
         return True
     
     def optimize_image_size(self, img_data: bytes, max_size: int = ImageConstants.DEFAULT_MAX_SIZE) -> bytes:

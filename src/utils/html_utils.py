@@ -16,6 +16,8 @@ def escape_html(text: str) -> str:
     返回：
         转义后的文本
     """
+    if text is None:
+        return ""
     if not isinstance(text, str):
         text = str(text)
     return (text.replace('&', '&amp;')
@@ -37,7 +39,11 @@ def generate_style_attribute(css_parts: list[str]) -> str:
     """
     if not css_parts:
         return ""
-    return f'style="{" ".join(css_parts)}"'
+    # 过滤掉None值
+    valid_parts = [part for part in css_parts if part is not None]
+    if not valid_parts:
+        return ""
+    return f'style="{" ".join(valid_parts)}"'
 
 
 def generate_class_attribute(css_classes: list[str]) -> str:
@@ -52,11 +58,16 @@ def generate_class_attribute(css_classes: list[str]) -> str:
     """
     if not css_classes:
         return ""
-    return f'class="{" ".join(css_classes)}"'
+    # 过滤掉None值
+    valid_classes = [cls for cls in css_classes if cls is not None]
+    if not valid_classes:
+        return ""
+    return f'class="{" ".join(valid_classes)}"'
 
 
-def create_html_element(tag: str, content: str = "", attributes: dict[str, str] | None = None, 
-                       css_classes: list[str] | None = None, inline_styles: dict[str, str] | None = None) -> str:
+def create_html_element(tag: str, content: str = "", attributes: dict[str, str] | None = None,
+                       css_classes: list[str] | None = None, inline_styles: dict[str, str] | None = None,
+                       self_closing: bool = False) -> str:
     """
     创建HTML元素。
     
@@ -88,15 +99,16 @@ def create_html_element(tag: str, content: str = "", attributes: dict[str, str] 
     
     attr_str = " " + " ".join(attr_parts) if attr_parts else ""
     
-    if content:
-        return f'<{tag}{attr_str}>{content}</{tag}>'
+    if self_closing:
+        return f'<{tag}{attr_str} />'
     else:
-        return f'<{tag}{attr_str}>'
+        return f'<{tag}{attr_str}>{content}</{tag}>'
 
 
-def create_table_cell(content: str, is_header: bool = False, rowspan: int = 1, 
-                     colspan: int = 1, css_classes: list[str] | None = None, 
-                     inline_styles: dict[str, str] | None = None, title: str | None = None) -> str:
+def create_table_cell(content: str, is_header: bool = False, rowspan: int = 1,
+                     colspan: int = 1, css_classes: list[str] | None = None,
+                     inline_styles: dict[str, str] | None = None, title: str | None = None,
+                     attributes: dict[str, str] | None = None) -> str:
     """
     创建表格单元格。
     
@@ -113,20 +125,21 @@ def create_table_cell(content: str, is_header: bool = False, rowspan: int = 1,
         完整的表格单元格HTML
     """
     tag = 'th' if is_header else 'td'
-    attributes = {}
-    
+    cell_attributes = attributes.copy() if attributes else {}
+
     if rowspan > 1:
-        attributes['rowspan'] = str(rowspan)
+        cell_attributes['rowspan'] = str(rowspan)
     if colspan > 1:
-        attributes['colspan'] = str(colspan)
+        cell_attributes['colspan'] = str(colspan)
     if title:
-        attributes['title'] = title
-    
-    return create_html_element(tag, content, attributes, css_classes, inline_styles)
+        cell_attributes['title'] = title
+
+    return create_html_element(tag, content, cell_attributes, css_classes, inline_styles)
 
 
-def create_svg_element(width: int, height: int, content: str = "", 
-                      css_classes: list[str] | None = None) -> str:
+def create_svg_element(width: int, height: int, content: str = "",
+                      css_classes: list[str] | None = None,
+                      attributes: dict[str, str] | None = None) -> str:
     """
     创建SVG元素。
     
@@ -139,14 +152,18 @@ def create_svg_element(width: int, height: int, content: str = "",
     返回：
         完整的SVG元素HTML
     """
-    attributes = {
+    svg_attributes = {
         'width': f'{width}px',
         'height': f'{height}px',
         'viewBox': f'0 0 {width} {height}',
         'xmlns': 'http://www.w3.org/2000/svg'
     }
-    
-    return create_html_element('svg', content, attributes, css_classes)
+
+    # 合并传入的attributes
+    if attributes:
+        svg_attributes.update(attributes)
+
+    return create_html_element('svg', content, svg_attributes, css_classes)
 
 
 def compact_html(html: str) -> str:

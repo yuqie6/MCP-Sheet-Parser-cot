@@ -1,6 +1,6 @@
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from src.converters.table_structure_converter import TableStructureConverter
 from src.models.table_model import Sheet, Row, Cell, Style
 
@@ -24,7 +24,7 @@ def test_generate_table(table_structure_converter, sample_sheet):
     """Test generating a simple table."""
     html = table_structure_converter.generate_table(sample_sheet, styles={}, header_rows=0)
     assert '<table role="table"' in html
-    assert "<tbody>" not in html
+    assert "<tbody>" in html
     assert "<tr>" in html
     assert "<td>cell_content</td>" in html
 
@@ -250,3 +250,120 @@ def test_generate_cell_html_with_formula_only():
     # 应该包含公式信息在title中
     assert 'title="Formula: =SUM(A1:A10)"' in html
     assert 'formula_result' in html
+
+# === TDD测试：提升TableStructureConverter更多覆盖率 ===
+
+def test_generate_cell_html_with_overflow_style_parsing():
+    """
+    TDD测试：_generate_cell_html应该正确解析overflow样式
+
+    这个测试覆盖第151-156行的样式解析代码路径
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    cell_converter = MagicMock()
+    cell_converter.convert.return_value = "overflow_content"
+    style_converter = MagicMock()
+    converter = TableStructureConverter(cell_converter, style_converter)
+
+    cell = Cell(value="Long text that overflows")
+
+    # 直接传递overflow_style参数
+    overflow_style = 'style="color: red; font-weight: bold;"'
+    html = converter._generate_cell_html(cell, "", "", False, overflow_style)
+
+    # 应该包含解析后的内联样式
+    assert 'style=' in html
+    assert 'color: red' in html
+    assert 'font-weight: bold' in html
+
+def test_generate_cell_html_with_malformed_overflow_style():
+    """
+    TDD测试：_generate_cell_html应该处理格式错误的overflow样式
+
+    这个测试确保方法在样式格式错误时不会崩溃
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    cell_converter = MagicMock()
+    cell_converter.convert.return_value = "content"
+    style_converter = MagicMock()
+    converter = TableStructureConverter(cell_converter, style_converter)
+
+    cell = Cell(value="Text")
+
+    # 模拟返回格式错误的样式
+    malformed_styles = [
+        'style="color red"',  # 缺少冒号
+        'style="color:"',     # 缺少值
+        'style="color"',      # 不完整
+        'invalid_style',      # 不包含style=
+    ]
+
+    for malformed_style in malformed_styles:
+        with patch.object(converter, '_should_overflow_text', return_value=malformed_style):
+            # 应该不会抛出异常
+            html = converter._generate_cell_html(cell, "", "", False)
+            assert isinstance(html, str)
+
+def test_should_overflow_text_with_empty_next_cells():
+    """
+    TDD测试：_should_overflow_text应该处理后续单元格为空的情况
+
+    这个测试覆盖第175-185行的文本溢出检查代码路径
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    cell_converter = MagicMock()
+    style_converter = MagicMock()
+    converter = TableStructureConverter(cell_converter, style_converter)
+
+    # 创建一个长文本单元格
+    long_text_cell = Cell(value="This is a very long text that should overflow into next cells")
+
+    # 创建包含空单元格的行
+    empty_cells = [Cell(value=None), Cell(value=""), Cell(value="   ")]
+    row = Row(cells=[long_text_cell] + empty_cells)
+
+    result = converter._should_overflow_text(long_text_cell, row, 0)
+
+    # 应该返回溢出样式（因为后续单元格为空）
+    assert result is not False
+    if isinstance(result, str):
+        assert 'style=' in result
+
+def test_should_overflow_text_with_non_empty_next_cell():
+    """
+    TDD测试：_should_overflow_text应该在下一个单元格非空时不溢出
+
+    这个测试确保文本不会溢出到有内容的单元格
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    cell_converter = MagicMock()
+    style_converter = MagicMock()
+    converter = TableStructureConverter(cell_converter, style_converter)
+
+    long_text_cell = Cell(value="This is a very long text")
+    non_empty_cell = Cell(value="Not empty")
+    row = Row(cells=[long_text_cell, non_empty_cell])
+
+    result = converter._should_overflow_text(long_text_cell, row, 0)
+
+    # 应该返回False（不溢出）
+    assert result is False
+
+def test_should_overflow_text_with_short_text():
+    """
+    TDD测试：_should_overflow_text应该在文本较短时不溢出
+
+    这个测试确保短文本不会触发溢出
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    cell_converter = MagicMock()
+    style_converter = MagicMock()
+    converter = TableStructureConverter(cell_converter, style_converter)
+
+    short_text_cell = Cell(value="Short")
+    row = Row(cells=[short_text_cell, Cell(value=None)])
+
+    result = converter._should_overflow_text(short_text_cell, row, 0)
+
+    # 应该返回False（不溢出）
+    assert result is False

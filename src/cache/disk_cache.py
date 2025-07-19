@@ -64,17 +64,29 @@ class DiskCache:
 
     def _cleanup_cache(self) -> None:
         """当缓存目录超出最大容量时进行清理。"""
-        total_size = sum(f.stat().st_size for f in self.cache_dir.glob('*.cache') if f.is_file())
-        max_size_bytes = self.max_cache_size_mb * 1024 * 1024
-        if total_size > max_size_bytes:
-            # 超出容量时移除旧缓存文件
-            for cache_file in sorted(self.cache_dir.glob('*.cache'), key=lambda f: f.stat().st_mtime):
-                total_size -= cache_file.stat().st_size
-                cache_file.unlink()
-                if total_size <= max_size_bytes:
-                    break
+        try:
+            total_size = sum(f.stat().st_size for f in self.cache_dir.glob('*.cache') if f.is_file())
+            max_size_bytes = self.max_cache_size_mb * 1024 * 1024
+            if total_size > max_size_bytes:
+                # 超出容量时移除旧缓存文件
+                for cache_file in sorted(self.cache_dir.glob('*.cache'), key=lambda f: f.stat().st_mtime):
+                    try:
+                        total_size -= cache_file.stat().st_size
+                        cache_file.unlink()
+                        if total_size <= max_size_bytes:
+                            break
+                    except (OSError, PermissionError):
+                        # 忽略单个文件的错误，继续处理其他文件
+                        continue
+        except (OSError, PermissionError):
+            # 忽略整体的stat错误
+            pass
 
     def clear(self) -> None:
         """清除所有缓存文件。"""
         for cache_file in self.cache_dir.glob('*.cache'):
-            cache_file.unlink()
+            try:
+                cache_file.unlink()
+            except (OSError, PermissionError):
+                # 忽略删除错误，继续删除其他文件
+                pass

@@ -147,11 +147,25 @@ class XlsParser(BaseParser):
                 # 如果是整数，返回int，否则返回float
                 return int(cell_value) if cell_value.is_integer() else cell_value
             elif cell_type == xlrd.XL_CELL_DATE:
-                return xlrd.xldate.xldate_as_datetime(cell_value, worksheet.book.datemode)
+                try:
+                    return xlrd.xldate.xldate_as_datetime(cell_value, worksheet.book.datemode)
+                except xlrd.xldate.XLDateError:
+                    # 日期转换失败，返回原始数值
+                    return cell_value
             elif cell_type == xlrd.XL_CELL_BOOLEAN:
                 return bool(cell_value)
             elif cell_type == xlrd.XL_CELL_ERROR:
-                return f"#ERROR:{cell_value}"
+                # Excel错误代码映射
+                error_codes = {
+                    0: "#NULL!",
+                    7: "#DIV/0!",
+                    15: "#VALUE!",
+                    23: "#REF!",
+                    29: "#NAME?",
+                    36: "#NUM!",
+                    42: "#N/A"
+                }
+                return error_codes.get(cell_value, f"#ERROR:{cell_value}")
             else:
                 return cell_value
                 

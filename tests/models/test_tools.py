@@ -166,3 +166,339 @@ def test_generate_next_steps_guidance():
     result_meta = {"metadata": {"total_rows": 10, "preview_rows": 10, "has_styles": False, "total_cells": 50}}
     guidance = _generate_next_steps_guidance(result_meta, True, True)
     assert "数据已完整加载" in guidance[0]
+
+# === TDD测试：提升models/tools.py覆盖率到90%+ ===
+
+class TestConvertToHtmlExceptionHandling:
+    """测试convert_to_html的异常处理。"""
+
+    @pytest.mark.asyncio
+    async def test_handle_convert_to_html_permission_error(self, mock_core_service):
+        """
+        TDD测试：_handle_convert_to_html应该处理PermissionError
+
+        这个测试覆盖第205-214行的PermissionError处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_core_service.convert_to_html.side_effect = PermissionError("Permission denied")
+
+        arguments = {
+            "file_path": "test.xlsx",
+            "output_path": "output.html"
+        }
+
+        result = await _handle_convert_to_html(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "permission_error"
+        assert "权限不足" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_convert_to_html_value_error(self, mock_core_service):
+        """
+        TDD测试：_handle_convert_to_html应该处理ValueError
+
+        这个测试覆盖第215-224行的ValueError处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_core_service.convert_to_html.side_effect = ValueError("Invalid parameter")
+
+        arguments = {
+            "file_path": "test.xlsx",
+            "output_path": "output.html"
+        }
+
+        result = await _handle_convert_to_html(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "invalid_parameter"
+        assert "参数错误" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_convert_to_html_general_exception(self, mock_core_service):
+        """
+        TDD测试：_handle_convert_to_html应该处理一般异常
+
+        这个测试覆盖第225行之后的一般异常处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_core_service.convert_to_html.side_effect = RuntimeError("Unexpected error")
+
+        arguments = {
+            "file_path": "test.xlsx",
+            "output_path": "output.html"
+        }
+
+        result = await _handle_convert_to_html(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "conversion_error"
+
+class TestParseSheetParameterValidation:
+    """测试parse_sheet的参数验证。"""
+
+    @pytest.mark.asyncio
+    async def test_handle_parse_sheet_invalid_file_path(self, mock_core_service):
+        """
+        TDD测试：_handle_parse_sheet应该验证file_path参数
+
+        这个测试覆盖第244行的file_path验证代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        arguments = {
+            "file_path": ""  # 空字符串
+        }
+
+        result = await _handle_parse_sheet(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "invalid_parameter"
+        assert "file_path必须是非空字符串" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_parse_sheet_invalid_sheet_name(self, mock_core_service):
+        """
+        TDD测试：_handle_parse_sheet应该验证sheet_name参数
+
+        这个测试覆盖第248行的sheet_name验证代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        arguments = {
+            "file_path": "test.xlsx",
+            "sheet_name": 123  # 非字符串
+        }
+
+        result = await _handle_parse_sheet(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "invalid_parameter"
+        assert "sheet_name必须是字符串" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_parse_sheet_invalid_range_string(self, mock_core_service):
+        """
+        TDD测试：_handle_parse_sheet应该验证range_string参数
+
+        这个测试覆盖第252行的range_string验证代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        arguments = {
+            "file_path": "test.xlsx",
+            "range_string": 123  # 非字符串
+        }
+
+        result = await _handle_parse_sheet(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "invalid_parameter"
+        assert "range_string必须是字符串" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_parse_sheet_invalid_include_full_data(self, mock_core_service):
+        """
+        TDD测试：_handle_parse_sheet应该验证include_full_data参数
+
+        这个测试覆盖第256行的include_full_data验证代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        arguments = {
+            "file_path": "test.xlsx",
+            "include_full_data": "true"  # 非布尔值
+        }
+
+        result = await _handle_parse_sheet(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "invalid_parameter"
+        assert "include_full_data必须是布尔值" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_parse_sheet_invalid_include_styles(self, mock_core_service):
+        """
+        TDD测试：_handle_parse_sheet应该验证include_styles参数
+
+        这个测试覆盖第260行的include_styles验证代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        arguments = {
+            "file_path": "test.xlsx",
+            "include_styles": "false"  # 非布尔值
+        }
+
+        result = await _handle_parse_sheet(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "invalid_parameter"
+        assert "include_styles必须是布尔值" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_parse_sheet_invalid_max_rows(self, mock_core_service):
+        """
+        TDD测试：_handle_parse_sheet应该验证max_rows参数
+
+        这个测试覆盖第268行的max_rows验证代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        arguments = {
+            "file_path": "test.xlsx",
+            "max_rows": -1  # 负数
+        }
+
+        result = await _handle_parse_sheet(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "invalid_parameter"
+        assert "max_rows必须是正整数或None" in response["error_message"]
+
+class TestParseSheetExceptionHandling:
+    """测试parse_sheet的异常处理。"""
+
+    @pytest.mark.asyncio
+    async def test_handle_parse_sheet_file_not_found_error(self, mock_core_service):
+        """
+        TDD测试：_handle_parse_sheet应该处理FileNotFoundError
+
+        这个测试覆盖第304行的FileNotFoundError处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_core_service.parse_sheet_optimized.side_effect = FileNotFoundError("File not found")
+
+        arguments = {
+            "file_path": "nonexistent.xlsx"
+        }
+
+        result = await _handle_parse_sheet(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "file_not_found"
+        assert "文件未找到" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_parse_sheet_general_exception(self, mock_core_service):
+        """
+        TDD测试：_handle_parse_sheet应该处理一般异常
+
+        这个测试覆盖第323-324行的一般异常处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_core_service.parse_sheet_optimized.side_effect = RuntimeError("Parsing failed")
+
+        arguments = {
+            "file_path": "test.xlsx"
+        }
+
+        result = await _handle_parse_sheet(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "parsing_error"
+        assert "解析失败" in response["error_message"]
+
+class TestApplyChangesExceptionHandling:
+    """测试apply_changes的异常处理。"""
+
+    @pytest.mark.asyncio
+    async def test_handle_apply_changes_file_not_found_error(self, mock_core_service):
+        """
+        TDD测试：_handle_apply_changes应该处理FileNotFoundError
+
+        这个测试覆盖第380行的FileNotFoundError处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_core_service.apply_changes.side_effect = FileNotFoundError("File not found")
+
+        arguments = {
+            "file_path": "nonexistent.xlsx",
+            "table_model_json": '{"sheet_name": "Sheet1", "headers": [], "rows": []}'
+        }
+
+        result = await _handle_apply_changes(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "file_not_found"
+        assert "文件未找到" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_apply_changes_value_error(self, mock_core_service):
+        """
+        TDD测试：_handle_apply_changes应该处理ValueError
+
+        这个测试覆盖第399-408行的ValueError处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_core_service.apply_changes.side_effect = ValueError("Invalid data format")
+
+        arguments = {
+            "file_path": "test.xlsx",
+            "table_model_json": '{"invalid": "data"}'
+        }
+
+        result = await _handle_apply_changes(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "invalid_data"
+        assert "数据格式错误" in response["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_handle_apply_changes_general_exception(self, mock_core_service):
+        """
+        TDD测试：_handle_apply_changes应该处理一般异常
+
+        这个测试覆盖第409-410行之后的一般异常处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_core_service.apply_changes.side_effect = RuntimeError("Apply failed")
+
+        arguments = {
+            "file_path": "test.xlsx",
+            "table_model_json": '{"sheet_name": "Sheet1", "headers": [], "rows": []}'
+        }
+
+        result = await _handle_apply_changes(arguments, mock_core_service)
+
+        # 验证返回的错误响应
+        assert len(result) == 1
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert response["error_type"] == "write_error"

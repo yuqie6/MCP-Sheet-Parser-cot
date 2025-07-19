@@ -164,9 +164,9 @@ class FontManager:
             return False
         
         # 包含空格、中文字符或特殊字符时需要引号
-        return (" " in font_name or 
+        return (" " in font_name or
                 any(ord(c) > 127 for c in font_name) or
-                any(c in font_name for c in [',', ';', '(', ')', '[', ']', '"', "'"]))
+                any(c in font_name for c in [',', ';', '(', ')', '[', ']', '"', "'", '-', '_']))
     
     def format_font_name(self, font_name: str) -> str:
         """
@@ -333,9 +333,10 @@ class FontManager:
             字体信息字典
         """
         font_type = self.detect_font_type(font_name)
-        formatted_name = self.format_font_name(font_name)
+        # formatted_name应该是格式化后的原始名称，不应用映射
+        formatted_name = f'"{font_name}"' if self.needs_quotes(font_name) else font_name
         font_family = self.generate_font_family(font_name)
-        
+
         return {
             'original_name': font_name,
             'formatted_name': formatted_name,

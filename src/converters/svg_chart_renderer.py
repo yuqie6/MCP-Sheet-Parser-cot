@@ -802,9 +802,12 @@ class SVGChartRenderer:
         if isinstance(chart_data, dict):
             # 方式1：直接从chart_data中获取
             img_data = chart_data.get('image_data')
-            
+
             # 方式2：从嵌套字典中获取（这是xlsx_parser存储的方式）
-            if not img_data and 'image_data' in chart_data:
+            if img_data and isinstance(img_data, dict):
+                # 如果img_data是字典，尝试从中获取真正的图片数据
+                img_data = img_data.get('image_data')
+            elif not img_data and 'image_data' in chart_data:
                 nested_data = chart_data['image_data']
                 if isinstance(nested_data, dict):
                     img_data = nested_data.get('image_data')
@@ -828,10 +831,14 @@ class SVGChartRenderer:
             img_base64 = base64.b64encode(img_data).decode('utf-8')
             data_url = f"data:image/{img_format};base64,{img_base64}"
 
+            # 获取标题
+            title = chart_data.get('title', 'Excel Image')
+
             # 返回HTML img标签 - 正常显示，无背景
             return f'''
             <div class="chart-svg-wrapper" style="background: none; padding: 0; min-height: auto;">
-                <img src="{data_url}" alt="Excel Image" style="max-width: 100%; height: auto; border-radius: 4px; background: transparent;" />
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">{title}</h3>
+                <img src="{data_url}" alt="{title}" style="max-width: 100%; height: auto; border-radius: 4px; background: transparent;" />
             </div>
             '''
 

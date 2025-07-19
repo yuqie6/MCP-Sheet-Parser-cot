@@ -239,7 +239,7 @@ class TestCsvRowProvider:
 
         assert lazy_sheet is not None
         assert isinstance(lazy_sheet, LazySheet)
-        assert lazy_sheet.file_path == str(file_path)
+        assert lazy_sheet.name == "lazy_test"
 
     def test_create_lazy_sheet_with_sheet_name(self, create_csv_file):
         """
@@ -255,7 +255,7 @@ class TestCsvRowProvider:
         lazy_sheet = parser.create_lazy_sheet(str(file_path), "CustomName")
 
         assert lazy_sheet is not None
-        assert lazy_sheet.sheet_name == "CustomName"
+        assert lazy_sheet.name == "CustomName"
 
 class TestCsvRowProviderAdditional:
     """额外的CsvRowProvider测试，提升覆盖率。"""
@@ -298,9 +298,9 @@ class TestCsvRowProviderAdditional:
         file_path = create_csv_file("short_file.csv", content)
         provider = CsvRowProvider(str(file_path))
 
-        # 尝试获取不存在的行
-        row = provider.get_row(10)
-        assert row is None
+        # 尝试获取不存在的行，应该抛出IndexError
+        with pytest.raises(IndexError, match="行索引 10 超出范围"):
+            provider.get_row(10)
 
     def test_iter_rows_with_max_rows_exceeding_file(self, create_csv_file):
         """
@@ -331,3 +331,61 @@ class TestCsvRowProviderAdditional:
         # 从文件末尾开始迭代
         rows = list(provider.iter_rows(start_row=10))
         assert len(rows) == 0
+
+# === TDD测试：提升csv_parser覆盖率到100% ===
+
+class TestCsvRowProviderEncodingDetection:
+    """测试CsvRowProvider的编码检测功能。"""
+
+    def test_detect_encoding_with_unicode_decode_error(self, create_csv_file):
+        """
+        TDD测试：_detect_encoding应该处理UnicodeDecodeError并回退到GBK
+
+        这个测试覆盖第28-29行的异常处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 创建一个包含GBK特有字符的文件，这些字符在UTF-8下会导致解码错误
+        content = "测试,数据\n中文,内容"
+        file_path = create_csv_file("test_gbk_encoding.csv", content, "gbk")
+
+        # 创建CsvRowProvider实例，这会触发编码检测
+        provider = CsvRowProvider(str(file_path))
+
+        # 验证编码被正确检测为gbk
+        assert provider._encoding == "gbk"
+
+        # 验证能够正确读取内容
+        rows = list(provider.iter_rows())
+        assert len(rows) == 2
+        assert rows[0].cells[0].value == "测试"
+        assert rows[1].cells[1].value == "内容"
+
+class TestCsvParserStyleExtraction:
+    """测试CsvParser的样式提取功能。"""
+
+    def test_extract_style_returns_none(self, create_csv_file):
+        """
+        TDD测试：_extract_style应该始终返回None（CSV不支持样式）
+
+        这个测试覆盖第84行的返回None代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        content = "header1,header2\nvalue1,value2"
+        file_path = create_csv_file("test_style.csv", content, "utf-8")
+
+        parser = CsvParser()
+
+        # 测试_extract_style方法直接调用
+        result = parser._extract_style("any_cell_value")
+        assert result is None
+
+        # 测试通过解析验证样式确实为None
+        sheets = parser.parse(str(file_path))
+        sheet = sheets[0]
+
+        # 验证所有单元格的样式都是None
+        for row in sheet.rows:
+            for cell in row.cells:
+                assert cell.style is None

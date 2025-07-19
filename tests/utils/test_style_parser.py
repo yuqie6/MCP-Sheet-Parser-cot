@@ -216,3 +216,214 @@ class TestExtractMisc:
         cell = mock_cell_factory(has_style=True, comment=mock_comment)
         style = extract_style(cell)
         assert style.comment == "This is a comment."
+
+# === TDD测试：提升style_parser覆盖率到90%+ ===
+
+class TestExtractCellValueEdgeCases:
+    """测试extract_cell_value函数的边界情况。"""
+
+    def test_cell_without_value_attribute(self):
+        """
+        TDD测试：extract_cell_value应该处理没有value属性的单元格
+
+        这个测试覆盖第57行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_cell = MagicMock()
+        # 删除value属性
+        del mock_cell.value
+
+        result = extract_cell_value(mock_cell)
+        assert result is None
+
+    def test_cell_with_none_value(self, mock_cell_factory):
+        """
+        TDD测试：extract_cell_value应该处理value为None的单元格
+
+        这个测试覆盖基本的None值处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        cell = mock_cell_factory(value=None)
+        result = extract_cell_value(cell)
+        assert result is None
+
+class TestRichTextEdgeCases:
+    """测试富文本处理的边界情况。"""
+
+    def test_rich_text_cell_without_value_attribute(self):
+        """
+        TDD测试：_extract_rich_text应该处理没有value属性的单元格
+
+        这个测试覆盖第19行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        from src.utils.style_parser import _extract_rich_text
+
+        mock_cell = MagicMock()
+        # 删除value属性
+        del mock_cell.value
+
+        result = _extract_rich_text(mock_cell)
+        assert result == []
+
+    def test_rich_text_cell_with_none_value(self):
+        """
+        TDD测试：_extract_rich_text应该处理value为None的单元格
+
+        这个测试覆盖第19行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        from src.utils.style_parser import _extract_rich_text
+
+        mock_cell = MagicMock()
+        mock_cell.value = None
+
+        result = _extract_rich_text(mock_cell)
+        assert result == []
+
+    def test_rich_text_fragment_without_font(self):
+        """
+        TDD测试：_extract_rich_text应该处理没有字体的富文本片段
+
+        这个测试覆盖第35行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        from src.utils.style_parser import _extract_rich_text
+
+        mock_cell = MagicMock()
+        mock_fragment = MagicMock()
+        mock_fragment.text = "test text"
+        # 没有font属性
+        del mock_fragment.font
+        mock_cell.value = [mock_fragment]
+
+        result = _extract_rich_text(mock_cell)
+        assert len(result) == 1
+        assert result[0].text == "test text"
+        # 应该使用默认样式
+        assert result[0].style.bold is False
+
+    def test_plain_text_cell_without_font(self, mock_cell_factory):
+        """
+        TDD测试：_extract_rich_text应该处理没有字体的纯文本单元格
+
+        这个测试覆盖第50行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        from src.utils.style_parser import _extract_rich_text
+
+        mock_cell = MagicMock()
+        mock_cell.value = "plain text"
+        # 没有font属性
+        del mock_cell.font
+
+        result = _extract_rich_text(mock_cell)
+        assert len(result) == 1
+        assert result[0].text == "plain text"
+        # 应该使用默认样式
+        assert result[0].style.bold is False
+
+class TestExtractStyleEdgeCases:
+    """测试extract_style函数的边界情况。"""
+
+    def test_cell_without_has_style_attribute(self):
+        """
+        TDD测试：extract_style应该处理没有has_style属性的单元格
+
+        这个测试覆盖第68行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_cell = MagicMock()
+        # 删除has_style属性
+        del mock_cell.has_style
+
+        result = extract_style(mock_cell)
+        # 应该返回默认样式
+        assert result.bold is False
+        assert result.italic is False
+
+    def test_cell_with_has_style_false(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该处理has_style为False的单元格
+
+        这个测试覆盖第68行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        cell = mock_cell_factory(has_style=False)
+
+        result = extract_style(cell)
+        # 应该返回默认样式
+        assert result.bold is False
+        assert result.italic is False
+
+    def test_cell_with_none_font(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该处理font为None的情况
+
+        这个测试覆盖字体为空的处理逻辑
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        cell = mock_cell_factory(has_style=True, font=None)
+
+        result = extract_style(cell)
+        # 字体相关属性应该使用默认值
+        assert result.bold is False
+        assert result.italic is False
+        assert result.font_name is None
+
+    def test_font_with_none_values(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该处理字体属性为None的情况
+
+        这个测试覆盖字体属性的None值处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_font = MagicMock()
+        mock_font.bold = None
+        mock_font.italic = None
+        mock_font.underline = None
+        mock_font.name = None
+        mock_font.size = None
+        mock_font.color = None
+
+        cell = mock_cell_factory(has_style=True, font=mock_font)
+
+        result = extract_style(cell)
+        # None值应该转换为默认值
+        assert result.bold is False
+        assert result.italic is False
+        assert result.underline is False
+        assert result.font_name is None
+        assert result.font_size is None
+        assert result.font_color is None
+
+class TestExtractFillColorEdgeCases:
+    """测试extract_fill_color函数的边界情况。"""
+
+    def test_fill_with_none_pattern_type(self):
+        """
+        TDD测试：extract_fill_color应该处理patternType为None的填充
+
+        这个测试覆盖填充类型检查的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_fill = MagicMock()
+        mock_fill.patternType = None
+
+        result = extract_fill_color(mock_fill)
+        assert result is None
+
+    def test_fill_with_none_start_color(self):
+        """
+        TDD测试：extract_fill_color应该处理start_color为None的填充
+
+        这个测试覆盖颜色提取的边界情况
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        mock_fill = MagicMock()
+        mock_fill.patternType = 'solid'
+        mock_fill.start_color = None
+
+        result = extract_fill_color(mock_fill)
+        # 实际实现返回默认颜色而不是None
+        assert result == '#000000'

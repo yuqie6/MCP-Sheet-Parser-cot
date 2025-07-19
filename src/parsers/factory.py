@@ -157,7 +157,7 @@ class ParserFactory:
         try:
             parser = ParserFactory.get_parser(file_path)
             return parser.supports_streaming()
-        except UnsupportedFileTypeError:
+        except (UnsupportedFileTypeError, Exception):
             return False
     
     @staticmethod

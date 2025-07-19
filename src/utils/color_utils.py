@@ -157,7 +157,9 @@ def generate_pie_color_variants(base_color: str, count: int) -> list[str]:
     返回：
         颜色列表
     """
-    if count <= 1:
+    if count <= 0:
+        return []
+    if count == 1:
         return [base_color]
     
     try:
@@ -203,7 +205,7 @@ def generate_distinct_colors(count: int, existing_colors: list | None = None) ->
     color_pool = [
         '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
         '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-        '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2',
+        '#F8C471', '#82E0AA', '#F1948A', '#76D7C4', '#D7BDE2',  # 修复重复的#85C1E9
         '#A3E4D7', '#F9E79F', '#D5A6BD', '#AED6F1', '#A9DFBF',
         '#FAD7A0', '#E8DAEF', '#D1F2EB', '#FCF3CF', '#FADBD8'
     ]
@@ -273,15 +275,28 @@ def extract_color(color_obj) -> str | None:
         if hasattr(color_obj, 'rgb') and color_obj.rgb:
             rgb_value = color_obj.rgb
             if isinstance(rgb_value, str) and len(rgb_value) >= 6:
+                # 验证是否为有效的十六进制颜色
+                def is_valid_hex_color(hex_str):
+                    try:
+                        int(hex_str, 16)
+                        return True
+                    except ValueError:
+                        return False
+
                 # 处理ARGB格式（如FFFF0000）- 移除前两位Alpha通道
                 if len(rgb_value) == 8 and rgb_value.startswith('FF'):
-                    return f"#{rgb_value[2:]}"
+                    color_part = rgb_value[2:]
+                    if is_valid_hex_color(color_part):
+                        return f"#{color_part}"
                 # 标准RGB格式
                 elif len(rgb_value) == 6:
-                    return f"#{rgb_value}"
+                    if is_valid_hex_color(rgb_value):
+                        return f"#{rgb_value}"
                 # 其他情况取最后6位
                 else:
-                    return f"#{rgb_value[-6:]}"
+                    color_part = rgb_value[-6:]
+                    if is_valid_hex_color(color_part):
+                        return f"#{color_part}"
 
         # 2. 处理主题颜色
         if hasattr(color_obj, 'theme') and color_obj.theme is not None:
@@ -380,7 +395,7 @@ def get_color_brightness(color: str) -> int:
     使用感知亮度公式：0.299*R + 0.587*G + 0.114*B
     """
     if not color or not color.startswith('#'):
-        return 128  # 默认中等亮度
+        return 0  # 无效颜色返回0
 
     try:
         r = int(color[1:3], 16)
@@ -388,7 +403,7 @@ def get_color_brightness(color: str) -> int:
         b = int(color[5:7], 16)
         return int(0.299 * r + 0.587 * g + 0.114 * b)
     except (ValueError, IndexError):
-        return 128
+        return 0  # 解析失败时返回0
 
 
 def has_sufficient_contrast(color1: str, color2: str) -> bool:

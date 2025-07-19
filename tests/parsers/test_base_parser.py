@@ -31,11 +31,13 @@ class StreamingParser(BaseParser):
     def create_lazy_sheet(self, file_path: str, sheet_name: str | None = None) -> LazySheet | None:
         """
         TDD测试：create_lazy_sheet应该能被子类重写
-        
+
         这个测试覆盖第45-59行的代码路径
         """
         # 🔴 红阶段：编写测试描述期望的行为
-        return LazySheet(file_path=file_path, sheet_name=sheet_name or "default")
+        from unittest.mock import MagicMock
+        mock_provider = MagicMock()
+        return LazySheet(name=sheet_name or "default", provider=mock_provider)
 
 def test_base_parser_is_abstract():
     """
@@ -111,12 +113,11 @@ def test_streaming_parser_overrides():
     lazy_sheet = parser.create_lazy_sheet("test.xlsx")
     assert lazy_sheet is not None
     assert isinstance(lazy_sheet, LazySheet)
-    assert lazy_sheet.file_path == "test.xlsx"
-    assert lazy_sheet.sheet_name == "default"
+    assert lazy_sheet.name == "default"
     
     # 测试带sheet_name参数的情况
     lazy_sheet = parser.create_lazy_sheet("test.xlsx", "CustomSheet")
-    assert lazy_sheet.sheet_name == "CustomSheet"
+    assert lazy_sheet.name == "CustomSheet"
 
 def test_parse_method_is_abstract():
     """
@@ -152,7 +153,7 @@ def test_base_parser_interface_completeness():
     assert not getattr(BaseParser.supports_streaming, '__isabstractmethod__', False)
     assert not getattr(BaseParser.create_lazy_sheet, '__isabstractmethod__', False)
 
-class TestParserWithCustomBehavior(BaseParser):
+class CustomBehaviorParser(BaseParser):
     """测试自定义行为的解析器"""
     
     def __init__(self, should_support_streaming=False, lazy_sheet_result=None):
@@ -177,11 +178,11 @@ def test_parser_with_custom_streaming_behavior():
     # 🔴 红阶段：编写测试描述期望的行为
     
     # 测试不支持流式处理的解析器
-    parser1 = TestParserWithCustomBehavior(should_support_streaming=False)
+    parser1 = CustomBehaviorParser(should_support_streaming=False)
     assert parser1.supports_streaming() is False
-    
+
     # 测试支持流式处理的解析器
-    parser2 = TestParserWithCustomBehavior(should_support_streaming=True)
+    parser2 = CustomBehaviorParser(should_support_streaming=True)
     assert parser2.supports_streaming() is True
 
 def test_parser_with_custom_lazy_sheet_behavior():
@@ -193,13 +194,14 @@ def test_parser_with_custom_lazy_sheet_behavior():
     # 🔴 红阶段：编写测试描述期望的行为
     
     # 测试返回None的解析器
-    parser1 = TestParserWithCustomBehavior(lazy_sheet_result=None)
+    parser1 = CustomBehaviorParser(lazy_sheet_result=None)
     assert parser1.create_lazy_sheet("test.xlsx") is None
-    
+
     # 测试返回LazySheet的解析器
-    lazy_sheet = LazySheet(file_path="test.xlsx", sheet_name="TestSheet")
-    parser2 = TestParserWithCustomBehavior(lazy_sheet_result=lazy_sheet)
+    from unittest.mock import MagicMock
+    mock_provider = MagicMock()
+    lazy_sheet = LazySheet(name="TestSheet", provider=mock_provider)
+    parser2 = CustomBehaviorParser(lazy_sheet_result=lazy_sheet)
     result = parser2.create_lazy_sheet("test.xlsx")
     assert result is lazy_sheet
-    assert result.file_path == "test.xlsx"
-    assert result.sheet_name == "TestSheet"
+    assert result.name == "TestSheet"

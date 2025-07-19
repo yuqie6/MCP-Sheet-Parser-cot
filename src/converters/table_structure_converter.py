@@ -1,5 +1,5 @@
 from typing import Any
-from src.models.table_model import Sheet
+from src.models.table_model import Sheet, Row
 from src.utils.range_parser import parse_range_string
 from src.utils.html_utils import escape_html, create_html_element, create_table_cell
 
@@ -57,12 +57,56 @@ class TableStructureConverter:
                 self._generate_rows_html(table_parts, sheet.rows[header_rows:], occupied_cells, merged_cells_map,
                                          style_key_to_id_map, is_header=False, row_offset=header_rows)
                 table_parts.append('</tbody>')
+            else:
+                # 即使没有数据行，也要添加空的tbody
+                table_parts.append('<tbody>')
+                table_parts.append('</tbody>')
         else:
-            self._generate_rows_html(table_parts, sheet.rows, occupied_cells, merged_cells_map, style_key_to_id_map,
-                                     is_header=False)
+            if sheet.rows:  # 只有当有行时才添加tbody
+                table_parts.append('<tbody>')
+                self._generate_rows_html(table_parts, sheet.rows, occupied_cells, merged_cells_map, style_key_to_id_map,
+                                         is_header=False)
+                table_parts.append('</tbody>')
+            else:
+                # 空表格也需要tbody
+                table_parts.append('<tbody>')
+                table_parts.append('</tbody>')
 
         table_parts.append('</table>')
         return "\n".join(table_parts)
+
+    def _generate_row_html(self, row: Row, styles: dict[str, Any], is_header: bool = False,
+                          occupied_cells: set | None = None, merged_cells_map: dict | None = None,
+                          row_idx: int = 0) -> str:
+        """
+        生成单行的HTML。
+        """
+        if occupied_cells is None:
+            occupied_cells = set()
+        if merged_cells_map is None:
+            merged_cells_map = {}
+
+        row_parts = ['<tr>']
+
+        for c_idx, cell in enumerate(row.cells):
+            if (row_idx, c_idx) in occupied_cells:
+                continue
+
+            # 构建样式类和跨度属性
+            style_class = ""
+            span_attrs = ""
+            if (row_idx, c_idx) in merged_cells_map:
+                spans = merged_cells_map[(row_idx, c_idx)]
+                if spans["rowspan"] > 1:
+                    span_attrs += f' rowspan="{spans["rowspan"]}"'
+                if spans["colspan"] > 1:
+                    span_attrs += f' colspan="{spans["colspan"]}"'
+
+            cell_html = self._generate_cell_html(cell, style_class, span_attrs, is_header)
+            row_parts.append(cell_html)
+
+        row_parts.append('</tr>')
+        return ''.join(row_parts)
 
     def _generate_rows_html(self, table_parts: list, rows: list, occupied_cells: set, merged_cells_map: dict,
                             style_key_to_id_map: dict, is_header: bool = False, row_offset: int = 0):
@@ -111,7 +155,8 @@ class TableStructureConverter:
                 table_parts.append(cell_html)
             table_parts.append('</tr>')
 
-    def _generate_cell_html(self, cell, style_class, span_attrs, is_header, overflow_style=""):
+    def _generate_cell_html(self, cell, style_class, span_attrs, is_header, overflow_style="",
+                           colspan=None, rowspan=None):
         cell_content = self.cell_converter.convert(cell)
 
         # 处理超链接
@@ -134,12 +179,14 @@ class TableStructureConverter:
             cell_attrs['data-number-format'] = escape_html(cell.style.number_format)
         
         # 解析跨度属性
-        rowspan = 1
-        colspan = 1
+        final_rowspan = rowspan if rowspan is not None else 1
+        final_colspan = colspan if colspan is not None else 1
+
+        # 如果span_attrs中有跨度信息，优先使用
         if ' rowspan="' in span_attrs:
-            rowspan = int(span_attrs.split('rowspan="')[1].split('"')[0])
+            final_rowspan = int(span_attrs.split('rowspan="')[1].split('"')[0])
         if ' colspan="' in span_attrs:
-            colspan = int(span_attrs.split('colspan="')[1].split('"')[0])
+            final_colspan = int(span_attrs.split('colspan="')[1].split('"')[0])
         
         # 解析CSS类
         css_classes = []
@@ -159,8 +206,8 @@ class TableStructureConverter:
         return create_table_cell(
             content=cell_content,
             is_header=is_header,
-            rowspan=rowspan,
-            colspan=colspan,
+            rowspan=final_rowspan,
+            colspan=final_colspan,
             css_classes=css_classes,
             inline_styles=inline_styles,
             title=cell_attrs.get('title', '')

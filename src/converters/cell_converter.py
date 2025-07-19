@@ -94,6 +94,8 @@ class CellConverter:
         """
         对值应用数字格式。
         """
+        if not number_format:
+            return str(value)
         if number_format in NUMBER_FORMAT_MAP:
             return NUMBER_FORMAT_MAP[number_format](value)
         if isinstance(value, (int, float)) and ("月" in number_format and "日" in number_format):

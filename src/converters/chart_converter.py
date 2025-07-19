@@ -23,7 +23,7 @@ class ChartConverter:
         safe_height = int(height) if height is not None else 500
         renderer = SVGChartRenderer(width=safe_width, height=safe_height)
 
-        if chart.chart_data:
+        if chart.chart_data is not None:
             try:
                 return renderer.render_chart_to_svg(chart.chart_data)
             except Exception as e:
@@ -63,7 +63,7 @@ class ChartConverter:
         """
         standalone_charts = [chart for chart in charts if chart.position is None]
         if not standalone_charts:
-            return ""
+            return create_html_element('h2', 'Charts')
 
         charts_html_parts = [create_html_element('h2', 'Charts')]
         for chart in standalone_charts:

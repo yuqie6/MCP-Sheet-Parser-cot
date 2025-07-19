@@ -42,6 +42,9 @@ class StyleConverter:
         返回：
             唯一字符串标识。
         """
+        if style is None:
+            return "default"
+
         key_parts = []
         if style.font_name:
             key_parts.append(f"fn:{style.font_name}")
@@ -83,6 +86,57 @@ class StyleConverter:
             key_parts.append(f"comment:{style.comment}")
 
         return "|".join(key_parts) if key_parts else "default"
+
+    def _style_to_css(self, style: Style) -> str:
+        """
+        将单个样式对象转换为CSS字符串。
+        参数：
+            style: Style对象。
+        返回：
+            CSS字符串。
+        """
+        css_parts = []
+
+        if style.font_name:
+            font_family = self._format_font_family(style.font_name)
+            css_parts.append(f"font-family: {font_family};")
+        if style.font_size:
+            font_size = self._format_font_size(style.font_size)
+            css_parts.append(f"font-size: {font_size};")
+        if style.font_color:
+            formatted_color = format_color(style.font_color, is_font_color=True)
+            css_parts.append(f"color: {formatted_color};")
+        if style.bold:
+            css_parts.append("font-weight: bold;")
+        if style.italic:
+            css_parts.append("font-style: italic;")
+        if style.underline:
+            css_parts.append("text-decoration: underline;")
+        if style.background_color:
+            formatted_bg_color = format_color(style.background_color, is_font_color=False,
+                                             is_border_color=False)
+            if formatted_bg_color:
+                css_parts.append(f"background-color: {formatted_bg_color};")
+        if style.text_align:
+            css_parts.append(f"text-align: {style.text_align};")
+        if style.vertical_align:
+            css_parts.append(f"vertical-align: {style.vertical_align};")
+
+        # 生成边框CSS（不带!important，用于_style_to_css方法）
+        if style.border_top:
+            css_parts.append(f"border-top: {style.border_top};")
+        if style.border_bottom:
+            css_parts.append(f"border-bottom: {style.border_bottom};")
+        if style.border_left:
+            css_parts.append(f"border-left: {style.border_left};")
+        if style.border_right:
+            css_parts.append(f"border-right: {style.border_right};")
+        if style.wrap_text:
+            css_parts.append("white-space: pre-wrap; word-wrap: break-word;")
+        if style.number_format:
+            css_parts.append(f"/* number-format: {style.number_format} */")
+
+        return " ".join(css_parts)
 
     def generate_css(self, styles: dict[str, Style], sheet: Sheet | None = None) -> str:
         """

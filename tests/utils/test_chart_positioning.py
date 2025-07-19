@@ -213,3 +213,148 @@ def test_calculate_cell_position_with_defaults(calculator):
     expected_y = 20 + 25 + 18 + 15 # row 0, 1, 2, 3 (default)
     assert abs(x - expected_x) < 1e-9
     assert abs(y - expected_y) < 1e-9
+
+# === TDD测试：提升chart_positioning覆盖率到90%+ ===
+
+class TestGenerateChartHtmlEdgeCases:
+    """测试generate_chart_html_with_positioning的边界情况。"""
+
+    def test_generate_chart_html_without_position(self, calculator):
+        """
+        TDD测试：generate_chart_html_with_positioning应该处理没有定位信息的图表
+
+        这个测试覆盖第207行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 创建没有position的模拟图表
+        mock_chart = MagicMock()
+        mock_chart.position = None
+        mock_chart.type = 'bar'
+
+        chart_html = "<div>Test Chart</div>"
+
+        result = calculator.generate_chart_html_with_positioning(mock_chart, chart_html)
+
+        # 验证返回原始HTML
+        assert result == chart_html
+
+    def test_generate_chart_html_with_non_image_chart(self, calculator):
+        """
+        TDD测试：generate_chart_html_with_positioning应该正确处理非图片类型的图表
+
+        这个测试覆盖第215、225、235-236行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 创建非图片类型的模拟图表
+        mock_chart = MagicMock()
+        mock_chart.type = 'bar'  # 非图片类型
+        mock_chart.position = MagicMock()
+        mock_chart.position.from_row = 1
+        mock_chart.position.from_col = 1
+        mock_chart.position.from_row_offset = 100000
+        mock_chart.position.from_col_offset = 50000
+        mock_chart.position.to_row = 3
+        mock_chart.position.to_col = 3
+        mock_chart.position.to_row_offset = 200000
+        mock_chart.position.to_col_offset = 150000
+
+        chart_html = "<div>Bar Chart</div>"
+
+        result = calculator.generate_chart_html_with_positioning(mock_chart, chart_html)
+
+        # 验证返回了包含定位信息的HTML
+        assert "position: absolute" in result
+        assert "chart-overlay" in result
+        assert chart_html in result
+
+class TestImagePositionCalculation:
+    """测试图片位置计算的相关方法。"""
+
+    def test_calculate_image_position(self, calculator):
+        """
+        TDD测试：_calculate_image_position应该正确计算图片位置
+
+        这个测试覆盖第265-278行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 创建模拟的图片位置
+        mock_position = MagicMock()
+        mock_position.from_row = 1
+        mock_position.from_col = 1
+        mock_position.from_row_offset = 100000
+        mock_position.from_col_offset = 50000
+        mock_position.to_row_offset = 200000
+        mock_position.to_col_offset = 150000
+
+        result = calculator._calculate_image_position(mock_position)
+
+        # 验证返回了ChartCSSPosition对象
+        assert isinstance(result, ChartCSSPosition)
+        assert result.left >= 0
+        assert result.top >= 0
+        assert result.width > 0
+        assert result.height > 0
+
+    def test_calculate_image_width_with_default(self, calculator):
+        """
+        TDD测试：_calculate_image_width应该使用默认宽度
+
+        这个测试覆盖第294行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 创建没有to_col_offset的模拟位置
+        mock_position = MagicMock()
+        mock_position.from_col_offset = 50000
+        mock_position.to_col_offset = 0  # 没有结束偏移
+
+        result = calculator._calculate_image_width(mock_position)
+
+        # 验证使用了默认宽度
+        assert result >= 20  # 最小宽度
+        # 默认宽度应该是914400 EMU转换后的像素值
+        expected_default = 914400 * calculator.EMU_TO_PX
+        assert abs(result - expected_default) < 1
+
+    def test_calculate_image_height_with_default(self, calculator):
+        """
+        TDD测试：_calculate_image_height应该使用默认高度
+
+        这个测试覆盖第308行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 创建没有to_row_offset的模拟位置
+        mock_position = MagicMock()
+        mock_position.from_row_offset = 100000
+        mock_position.to_row_offset = 0  # 没有结束偏移
+
+        result = calculator._calculate_image_height(mock_position)
+
+        # 验证使用了默认高度
+        assert result >= 10  # 最小高度
+        # 默认高度应该是285750 EMU转换后的点值
+        expected_default = 285750 * calculator.EMU_TO_PT
+        assert abs(result - expected_default) < 1
+
+class TestFactoryFunction:
+    """测试工厂函数。"""
+
+    def test_create_position_calculator(self, mock_sheet):
+        """
+        TDD测试：create_position_calculator应该创建计算器实例
+
+        这个测试覆盖第324行的代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        from src.utils.chart_positioning import create_position_calculator
+
+        result = create_position_calculator(mock_sheet)
+
+        # 验证返回了正确的实例
+        assert isinstance(result, ChartPositionCalculator)
+        assert result.sheet == mock_sheet

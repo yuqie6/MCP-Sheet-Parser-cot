@@ -427,7 +427,9 @@ class ChartDataExtractor:
         data_labels_info = {
             'enabled': False,
             'show_value': False,
+            'show_category': False,  
             'show_category_name': False,
+            'show_series': False,
             'show_series_name': False,
             'show_percent': False,
             'show_legend_key': False,
@@ -449,10 +451,14 @@ class ChartDataExtractor:
                     data_labels_info['show_value'] = bool(dLbls.showVal)
 
                 if hasattr(dLbls, 'showCatName') and dLbls.showCatName is not None:
-                    data_labels_info['show_category_name'] = bool(dLbls.showCatName)
+                    show_cat = bool(dLbls.showCatName)
+                    data_labels_info['show_category_name'] = show_cat
+                    data_labels_info['show_category'] = show_cat
 
                 if hasattr(dLbls, 'showSerName') and dLbls.showSerName is not None:
-                    data_labels_info['show_series_name'] = bool(dLbls.showSerName)
+                    show_ser = bool(dLbls.showSerName)
+                    data_labels_info['show_series_name'] = show_ser
+                    data_labels_info['show_series'] = show_ser
 
                 if hasattr(dLbls, 'showPercent') and dLbls.showPercent is not None:
                     data_labels_info['show_percent'] = bool(dLbls.showPercent)
@@ -1098,6 +1104,10 @@ class ChartDataExtractor:
 
     def _extract_single_annotation(self, annotation_obj, source: str) -> dict[str, Any] | None:
         """提取单个注释的信息。"""
+        # 如果输入为None，直接返回None
+        if annotation_obj is None:
+            return None
+
         try:
             annotation_info = {
                 'type': 'annotation',

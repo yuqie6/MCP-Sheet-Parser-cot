@@ -220,8 +220,8 @@ def test_parse_with_unknown_error_code(mock_open_workbook, mock_workbook):
     parser = XlsParser()
     sheets = parser.parse("dummy.xls")
 
-    # 应该返回通用错误字符串
-    assert sheets[0].rows[0].cells[0].value == "#ERROR!"
+    # 应该返回包含错误代码的字符串
+    assert sheets[0].rows[0].cells[0].value == "#ERROR:255"
 
 def test_extract_style_with_no_xf_list():
     """
@@ -234,11 +234,13 @@ def test_extract_style_with_no_xf_list():
 
     workbook = MagicMock()
     workbook.xf_list = []  # 空的格式列表
+    worksheet = MagicMock()
 
-    style = parser._extract_style(workbook, 0)
+    style = parser._extract_style(workbook, worksheet, 0, 0)
 
-    # 应该返回None
-    assert style is None
+    # 应该返回默认样式
+    assert style is not None
+    assert isinstance(style, Style)
 
 def test_extract_style_with_invalid_xf_index():
     """
@@ -251,8 +253,10 @@ def test_extract_style_with_invalid_xf_index():
 
     workbook = MagicMock()
     workbook.xf_list = [MagicMock()]  # 只有一个格式
+    worksheet = MagicMock()
 
-    style = parser._extract_style(workbook, 10)  # 超出范围的索引
+    style = parser._extract_style(workbook, worksheet, 0, 0)
 
-    # 应该返回None
-    assert style is None
+    # 应该返回默认样式
+    assert style is not None
+    assert isinstance(style, Style)

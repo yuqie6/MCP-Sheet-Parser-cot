@@ -189,8 +189,52 @@ def test_chart_converter_initialization():
     这个测试验证构造函数的正确性
     """
     # 🔴 红阶段：编写测试描述期望的行为
-    mock_style_converter = MagicMock()
-    converter = ChartConverter(mock_style_converter)
+    mock_cell_converter = MagicMock()
+    converter = ChartConverter(mock_cell_converter)
 
-    # 验证style_converter被正确设置
-    assert converter.style_converter is mock_style_converter
+    # 验证cell_converter被正确设置
+    assert converter.cell_converter is mock_cell_converter
+
+# === TDD测试：提升chart_converter覆盖率到100% ===
+
+@patch('src.converters.chart_converter.create_position_calculator')
+def test_generate_overlay_charts_html_with_image_chart(mock_pos_calc, chart_converter):
+    """
+    TDD测试：generate_overlay_charts_html应该正确处理图片类型的图表
+
+    这个测试覆盖第50行的图片类型高度计算代码
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+
+    # 创建一个图片类型的图表
+    image_chart = Chart(name="ImageChart", type="image", anchor="A1")
+    image_chart.chart_data = {"type": "image", "data": "image_data"}
+    image_chart.position = ChartPosition(
+        from_col=0, from_row=0, to_col=5, to_row=10,
+        from_col_offset=0, from_row_offset=0, to_col_offset=0, to_row_offset=0
+    )
+
+    sheet = Sheet(name="Sheet1", rows=[], charts=[image_chart])
+
+    # 模拟位置计算器
+    mock_calculator = MagicMock()
+    css_pos = MagicMock()
+    css_pos.width = 300
+    css_pos.height = 200  # 这将触发图片高度计算：max(150, int(200 * 1.333)) = 266
+    mock_calculator.calculate_chart_css_position.return_value = css_pos
+    mock_calculator.generate_chart_html_with_positioning.return_value = "<div>positioned image chart</div>"
+    mock_pos_calc.return_value = mock_calculator
+
+    # 模拟_render_chart_content方法
+    with patch.object(chart_converter, '_render_chart_content', return_value="<img>chart content</img>") as mock_render:
+        html = chart_converter.generate_overlay_charts_html(sheet)
+
+        # 验证返回了定位的HTML
+        assert "<div>positioned image chart</div>" in html
+
+        # 验证_render_chart_content被调用时使用了正确的参数
+        mock_render.assert_called_once()
+        call_args = mock_render.call_args[0]
+        assert call_args[0] == image_chart  # 图表对象
+        assert call_args[1] == 300  # 宽度
+        assert call_args[2] == 266  # 高度（200 * 1.333 = 266.6，取整为266）

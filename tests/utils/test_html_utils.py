@@ -231,3 +231,108 @@ def test_compact_html_with_no_whitespace():
     result = compact_html(compact_html_input)
     assert result == compact_html_input
 
+# === TDD测试：提升html_utils覆盖率到100% ===
+
+class TestEscapeHtmlEdgeCases:
+    """测试escape_html的边界情况。"""
+
+    def test_escape_html_with_non_string_input(self):
+        """
+        TDD测试：escape_html应该将非字符串类型转换为字符串
+
+        这个测试覆盖第22行的类型转换代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 测试数字
+        assert escape_html(123) == "123"
+        assert escape_html(45.67) == "45.67"
+
+        # 测试布尔值
+        assert escape_html(True) == "True"
+        assert escape_html(False) == "False"
+
+        # 测试列表
+        assert escape_html([1, 2, 3]) == "[1, 2, 3]"
+
+        # 测试包含特殊字符的对象
+        class TestObj:
+            def __str__(self):
+                return "<test&object>"
+
+        result = escape_html(TestObj())
+        assert result == "&lt;test&amp;object&gt;"
+
+class TestGenerateStyleAttributeEdgeCases:
+    """测试generate_style_attribute的边界情况。"""
+
+    def test_generate_style_attribute_with_all_none_values(self):
+        """
+        TDD测试：generate_style_attribute应该处理全为None的列表
+
+        这个测试覆盖第45行的空valid_parts处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 测试全为None的列表
+        result = generate_style_attribute([None, None, None])
+        assert result == ""
+
+        # 测试混合None和空字符串
+        result = generate_style_attribute([None, "", None])
+        assert result == 'style=""'
+
+        # 测试只有一个None
+        result = generate_style_attribute([None])
+        assert result == ""
+
+class TestGenerateClassAttributeEdgeCases:
+    """测试generate_class_attribute的边界情况。"""
+
+    def test_generate_class_attribute_with_all_none_values(self):
+        """
+        TDD测试：generate_class_attribute应该处理全为None的列表
+
+        这个测试覆盖第64行的空valid_classes处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 测试全为None的列表
+        result = generate_class_attribute([None, None, None])
+        assert result == ""
+
+        # 测试混合None和空字符串
+        result = generate_class_attribute([None, "", None])
+        assert result == 'class=""'
+
+        # 测试只有一个None
+        result = generate_class_attribute([None])
+        assert result == ""
+
+class TestCreateTableCellWithTitle:
+    """测试create_table_cell的title属性。"""
+
+    def test_create_table_cell_with_title_attribute(self):
+        """
+        TDD测试：create_table_cell应该正确设置title属性
+
+        这个测试覆盖第135行的title属性设置代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 测试带title的表格单元格
+        result = create_table_cell("Content", title="Tooltip text")
+        assert 'title="Tooltip text"' in result
+        assert ">Content</td>" in result
+
+        # 测试带title的表头单元格
+        result = create_table_cell("Header", is_header=True, title="Header tooltip")
+        assert 'title="Header tooltip"' in result
+        assert ">Header</th>" in result
+
+        # 测试title与其他属性的组合
+        result = create_table_cell("Data", colspan=2, rowspan=3, title="Complex cell")
+        assert 'title="Complex cell"' in result
+        assert 'colspan="2"' in result
+        assert 'rowspan="3"' in result
+
