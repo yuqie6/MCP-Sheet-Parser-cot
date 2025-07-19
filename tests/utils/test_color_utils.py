@@ -192,3 +192,217 @@ class TestSmartColorMatching:
         style = Style(background_color="#000000", font_color="#FFFFFF")
         new_style = apply_smart_color_matching(style)
         assert new_style.font_color == "#FFFFFF"
+
+# === TDD测试：提升ColorUtils覆盖率 ===
+
+class TestConvertSchemeColorToHex:
+    """测试 convert_scheme_color_to_hex 函数的边界情况。"""
+
+    def test_convert_scheme_color_with_invalid_scheme(self):
+        """
+        TDD测试：convert_scheme_color_to_hex应该处理无效的配色方案
+
+        这个测试覆盖第217-229行的异常处理代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = convert_scheme_color_to_hex("invalid_scheme", 0)
+
+        # 应该返回默认颜色
+        assert result == "#000000"
+
+    def test_convert_scheme_color_with_out_of_range_index(self):
+        """
+        TDD测试：convert_scheme_color_to_hex应该处理超出范围的索引
+
+        这个测试覆盖索引超出范围的情况
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = convert_scheme_color_to_hex("accent1", 999)
+
+        # 应该返回默认颜色
+        assert result == "#000000"
+
+class TestGeneratePieColorVariants:
+    """测试 generate_pie_color_variants 函数的边界情况。"""
+
+    def test_generate_pie_color_variants_with_empty_base_colors(self):
+        """
+        TDD测试：generate_pie_color_variants应该处理空的基础颜色列表
+
+        这个测试覆盖第245行的边界情况
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = generate_pie_color_variants([], 5)
+
+        # 应该返回空列表
+        assert result == []
+
+    def test_generate_pie_color_variants_with_zero_count(self):
+        """
+        TDD测试：generate_pie_color_variants应该处理count=0的情况
+
+        这个测试确保方法在不需要颜色时返回空列表
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        base_colors = ["#FF0000", "#00FF00", "#0000FF"]
+        result = generate_pie_color_variants(base_colors, 0)
+
+        # 应该返回空列表
+        assert result == []
+
+    def test_generate_pie_color_variants_with_negative_count(self):
+        """
+        TDD测试：generate_pie_color_variants应该处理负数count
+
+        这个测试确保方法在count为负数时返回空列表
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        base_colors = ["#FF0000", "#00FF00", "#0000FF"]
+        result = generate_pie_color_variants(base_colors, -5)
+
+        # 应该返回空列表
+        assert result == []
+
+class TestGenerateDistinctColors:
+    """测试 generate_distinct_colors 函数的边界情况。"""
+
+    def test_generate_distinct_colors_with_zero_count(self):
+        """
+        TDD测试：generate_distinct_colors应该处理count=0的情况
+
+        这个测试覆盖第284行的边界情况
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = generate_distinct_colors(0)
+
+        # 应该返回空列表
+        assert result == []
+
+    def test_generate_distinct_colors_with_large_count(self):
+        """
+        TDD测试：generate_distinct_colors应该处理大数量请求
+
+        这个测试覆盖第300-314行的循环生成代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = generate_distinct_colors(50)
+
+        # 应该生成50个不同的颜色
+        assert len(result) == 50
+        assert len(set(result)) == 50  # 所有颜色都应该是唯一的
+
+class TestEnsureDistinctColors:
+    """测试 ensure_distinct_colors 函数的边界情况。"""
+
+    def test_ensure_distinct_colors_with_empty_list(self):
+        """
+        TDD测试：ensure_distinct_colors应该处理空颜色列表
+
+        这个测试覆盖第346行的边界情况
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = ensure_distinct_colors([])
+
+        # 应该返回空列表
+        assert result == []
+
+    def test_ensure_distinct_colors_with_single_color(self):
+        """
+        TDD测试：ensure_distinct_colors应该处理单个颜色
+
+        这个测试确保方法在只有一个颜色时正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = ensure_distinct_colors(["#FF0000"])
+
+        # 应该返回原始颜色
+        assert result == ["#FF0000"]
+
+class TestApplyTint:
+    """测试 apply_tint 函数的边界情况。"""
+
+    def test_apply_tint_with_invalid_color(self):
+        """
+        TDD测试：apply_tint应该处理无效颜色
+
+        这个测试覆盖第373-374行的异常处理代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = apply_tint("invalid_color", 0.5)
+
+        # 应该返回原始颜色
+        assert result == "invalid_color"
+
+    def test_apply_tint_with_extreme_tint_values(self):
+        """
+        TDD测试：apply_tint应该处理极端的tint值
+
+        这个测试确保方法在极端值时正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+
+        # 测试tint=1.0（完全变白）
+        result = apply_tint("#000000", 1.0)
+        assert result == "#FFFFFF"
+
+        # 测试tint=0.0（不变）
+        result = apply_tint("#FF0000", 0.0)
+        assert result == "#FF0000"
+
+        # 测试负值tint
+        result = apply_tint("#FF0000", -0.5)
+        assert result == "#FF0000"  # 应该被限制为0
+
+class TestGetColorBrightness:
+    """测试 get_color_brightness 函数的边界情况。"""
+
+    def test_get_color_brightness_with_invalid_color(self):
+        """
+        TDD测试：get_color_brightness应该处理无效颜色
+
+        这个测试覆盖第383行的异常处理代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = get_color_brightness("invalid_color")
+
+        # 应该返回0
+        assert result == 0
+
+    def test_get_color_brightness_with_short_color(self):
+        """
+        TDD测试：get_color_brightness应该处理短颜色代码
+
+        这个测试确保方法在颜色代码太短时正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = get_color_brightness("#FF")
+
+        # 应该返回0
+        assert result == 0
+
+class TestHasSufficientContrast:
+    """测试 has_sufficient_contrast 函数的边界情况。"""
+
+    def test_has_sufficient_contrast_with_invalid_colors(self):
+        """
+        TDD测试：has_sufficient_contrast应该处理无效颜色
+
+        这个测试覆盖第390-391行的异常处理代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = has_sufficient_contrast("invalid1", "invalid2")
+
+        # 应该返回False
+        assert result is False
+
+    def test_has_sufficient_contrast_with_same_colors(self):
+        """
+        TDD测试：has_sufficient_contrast应该处理相同颜色
+
+        这个测试确保方法在颜色相同时返回False
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        result = has_sufficient_contrast("#FF0000", "#FF0000")
+
+        # 相同颜色应该没有对比度
+        assert result is False

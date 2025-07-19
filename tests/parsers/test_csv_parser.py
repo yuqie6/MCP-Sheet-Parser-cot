@@ -159,6 +159,175 @@ class TestCsvRowProvider:
         """测试迭代一个空文件。"""
         file_path = create_csv_file("empty.csv", "")
         provider = CsvRowProvider(str(file_path))
-        
+
         rows = list(provider.iter_rows())
+        assert len(rows) == 0
+
+    # === TDD测试：提升CSV解析器覆盖率到100% ===
+
+    def test_parse_with_encoding_detection_failure(self, create_csv_file):
+        """
+        TDD测试：parse应该处理编码检测失败的情况
+
+        这个测试覆盖第28-29行的编码检测失败代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        # 创建一个包含特殊字符的文件，可能导致编码检测困难
+        content = "header1,header2\nvalue1,value2"
+        file_path = create_csv_file("encoding_test.csv", content, "latin-1")
+
+        parser = CsvParser()
+
+        # 应该能够解析，即使编码检测可能不完美
+        sheets = parser.parse(str(file_path))
+        assert len(sheets) == 1
+        assert isinstance(sheets[0], Sheet)
+
+    def test_parse_with_csv_error_handling(self, create_csv_file):
+        """
+        TDD测试：parse应该处理CSV解析错误
+
+        这个测试覆盖第40-41行的CSV错误处理代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        # 创建一个格式错误的CSV文件
+        content = 'header1,header2\n"unclosed quote,value2\nvalue3,value4'
+        file_path = create_csv_file("malformed.csv", content)
+
+        parser = CsvParser()
+
+        # 应该能够处理错误并继续解析
+        sheets = parser.parse(str(file_path))
+        assert len(sheets) == 1
+
+    def test_parse_with_io_error(self, tmp_path):
+        """
+        TDD测试：parse应该处理文件IO错误
+
+        这个测试确保方法在文件不存在时正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        parser = CsvParser()
+        non_existent_file = str(tmp_path / "non_existent.csv")
+
+        # 应该抛出适当的异常
+        with pytest.raises((FileNotFoundError, IOError)):
+            parser.parse(non_existent_file)
+
+    def test_supports_streaming(self):
+        """
+        TDD测试：CsvParser应该支持流式处理
+
+        这个测试验证流式处理支持
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        parser = CsvParser()
+        assert parser.supports_streaming() is True
+
+    def test_create_lazy_sheet(self, create_csv_file):
+        """
+        TDD测试：create_lazy_sheet应该创建LazySheet对象
+
+        这个测试覆盖第84行的LazySheet创建代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        content = "header1,header2\nvalue1,value2"
+        file_path = create_csv_file("lazy_test.csv", content)
+
+        parser = CsvParser()
+        lazy_sheet = parser.create_lazy_sheet(str(file_path))
+
+        assert lazy_sheet is not None
+        assert isinstance(lazy_sheet, LazySheet)
+        assert lazy_sheet.file_path == str(file_path)
+
+    def test_create_lazy_sheet_with_sheet_name(self, create_csv_file):
+        """
+        TDD测试：create_lazy_sheet应该处理sheet_name参数
+
+        这个测试确保sheet_name参数被正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        content = "header1,header2\nvalue1,value2"
+        file_path = create_csv_file("named_sheet.csv", content)
+
+        parser = CsvParser()
+        lazy_sheet = parser.create_lazy_sheet(str(file_path), "CustomName")
+
+        assert lazy_sheet is not None
+        assert lazy_sheet.sheet_name == "CustomName"
+
+class TestCsvRowProviderAdditional:
+    """额外的CsvRowProvider测试，提升覆盖率。"""
+
+    def test_get_total_rows_with_empty_file(self, create_csv_file):
+        """
+        TDD测试：get_total_rows应该处理空文件
+
+        这个测试确保空文件的行数计算正确
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        file_path = create_csv_file("empty_rows.csv", "")
+        provider = CsvRowProvider(str(file_path))
+
+        total_rows = provider.get_total_rows()
+        assert total_rows == 0
+
+    def test_get_total_rows_with_single_line(self, create_csv_file):
+        """
+        TDD测试：get_total_rows应该正确计算单行文件
+
+        这个测试确保单行文件的行数计算正确
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        content = "header1,header2"
+        file_path = create_csv_file("single_line.csv", content)
+        provider = CsvRowProvider(str(file_path))
+
+        total_rows = provider.get_total_rows()
+        assert total_rows == 1
+
+    def test_get_row_beyond_file_end(self, create_csv_file):
+        """
+        TDD测试：get_row应该处理超出文件末尾的行索引
+
+        这个测试确保方法在索引超出范围时正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        content = "header1,header2\nvalue1,value2"
+        file_path = create_csv_file("short_file.csv", content)
+        provider = CsvRowProvider(str(file_path))
+
+        # 尝试获取不存在的行
+        row = provider.get_row(10)
+        assert row is None
+
+    def test_iter_rows_with_max_rows_exceeding_file(self, create_csv_file):
+        """
+        TDD测试：iter_rows应该处理max_rows超过文件行数的情况
+
+        这个测试确保方法在请求的行数超过文件实际行数时正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        content = "a,b\nc,d"
+        file_path = create_csv_file("short_iter.csv", content)
+        provider = CsvRowProvider(str(file_path))
+
+        # 请求比文件实际行数更多的行
+        rows = list(provider.iter_rows(max_rows=100))
+        assert len(rows) == 2  # 只应该返回实际存在的行数
+
+    def test_iter_rows_with_start_row_at_end(self, create_csv_file):
+        """
+        TDD测试：iter_rows应该处理start_row在文件末尾的情况
+
+        这个测试确保方法在起始行在文件末尾时返回空结果
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        content = "a,b\nc,d"
+        file_path = create_csv_file("end_start.csv", content)
+        provider = CsvRowProvider(str(file_path))
+
+        # 从文件末尾开始迭代
+        rows = list(provider.iter_rows(start_row=10))
         assert len(rows) == 0

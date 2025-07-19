@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 from src.utils.border_utils import (
     get_border_style,
     parse_border_style_complete,
@@ -72,3 +72,140 @@ def test_format_border_color():
     assert format_border_color("#FFF") == "#E0E0E0"
     assert format_border_color("#D8D8D8") == "#E0E0E0"
     assert format_border_color("#FF0000") == "#FF0000"
+
+# === TDD测试：提升BorderUtils覆盖率到100% ===
+
+def test_get_border_style_with_invalid_color(mock_border_side):
+    """
+    TDD测试：get_border_style应该处理无效的颜色值
+
+    这个测试覆盖第69行的异常处理代码路径
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    border = mock_border_side("thin")
+    border.color = MagicMock()
+    border.color.rgb = "INVALID_COLOR"  # 无效颜色
+
+    # 应该使用默认颜色而不是崩溃
+    result = get_border_style(border)
+    assert result == "1px solid #E0E0E0"
+
+def test_get_border_style_with_color_attribute_error(mock_border_side):
+    """
+    TDD测试：get_border_style应该处理颜色属性访问错误
+
+    这个测试覆盖第78行的异常处理代码路径
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    border = mock_border_side("thin")
+    border.color = MagicMock()
+    # 模拟访问rgb属性时抛出AttributeError
+    type(border.color).rgb = PropertyMock(side_effect=AttributeError("No rgb attribute"))
+
+    # 应该使用默认颜色
+    result = get_border_style(border)
+    assert result == "1px solid #E0E0E0"
+
+def test_get_border_style_with_unknown_style(mock_border_side):
+    """
+    TDD测试：get_border_style应该处理未知的边框样式
+
+    这个测试覆盖第102行的默认情况
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    border = mock_border_side("unknown_style", "FF0000")
+
+    # 应该使用默认的solid样式
+    result = get_border_style(border)
+    assert result == "1px solid #FF0000"
+
+def test_get_border_style_with_thick_style(mock_border_side):
+    """
+    TDD测试：get_border_style应该正确处理thick样式
+
+    这个测试覆盖BORDER_STYLE_MAP中thick样式的处理
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    border = mock_border_side("thick", "00FF00")
+
+    result = get_border_style(border)
+    assert result == "3px solid #00FF00"
+
+def test_parse_border_style_complete_with_complex_custom_style():
+    """
+    TDD测试：parse_border_style_complete应该处理复杂的自定义样式
+
+    这个测试覆盖第113行的自定义样式处理
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+
+    # 测试包含多个空格的样式
+    result = parse_border_style_complete("2px   dotted", "#FF0000")
+    assert result == "2px dotted #FF0000"
+
+    # 测试已经包含颜色的样式
+    result = parse_border_style_complete("1px solid red", "#00FF00")
+    assert result == "1px solid red"
+
+def test_get_xls_border_style_name_with_all_known_values():
+    """
+    TDD测试：get_xls_border_style_name应该处理所有已知的XLS边框样式值
+
+    这个测试确保所有映射值都被正确处理
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+
+    # 测试所有已知的XLS边框样式
+    assert get_xls_border_style_name(0) == "none"
+    assert get_xls_border_style_name(1) == "solid"
+    assert get_xls_border_style_name(2) == "dashed"
+    assert get_xls_border_style_name(3) == "dotted"
+    assert get_xls_border_style_name(4) == "double"
+
+    # 测试未知值返回默认值
+    assert get_xls_border_style_name(-1) == "solid"
+    assert get_xls_border_style_name(100) == "solid"
+
+def test_format_border_color_with_edge_cases():
+    """
+    TDD测试：format_border_color应该处理边界情况
+
+    这个测试覆盖各种边界情况的颜色处理
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+
+    # 测试空字符串
+    assert format_border_color("") == "#E0E0E0"
+
+    # 测试不同格式的白色
+    assert format_border_color("FFFFFF") == "#E0E0E0"  # 没有#前缀
+    assert format_border_color("ffffff") == "#E0E0E0"  # 小写
+    assert format_border_color("#ffffff") == "#E0E0E0"  # 小写带#
+
+    # 测试接近白色的颜色
+    assert format_border_color("#FEFEFE") == "#E0E0E0"
+    assert format_border_color("#F0F0F0") == "#E0E0E0"
+
+    # 测试有效的非白色颜色
+    assert format_border_color("#000000") == "#000000"
+    assert format_border_color("#123456") == "#123456"
+
+def test_border_style_map_completeness():
+    """
+    TDD测试：验证BORDER_STYLE_MAP包含所有预期的样式
+
+    这个测试确保边框样式映射的完整性
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+
+    # 验证BORDER_STYLE_MAP包含预期的键
+    expected_styles = [
+        'thin', 'medium', 'thick', 'double', 'dotted', 'dashed',
+        'dashDot', 'dashDotDot', 'slantDashDot', 'mediumDashed',
+        'mediumDashDot', 'mediumDashDotDot'
+    ]
+
+    for style in expected_styles:
+        assert style in BORDER_STYLE_MAP
+        assert isinstance(BORDER_STYLE_MAP[style], str)
+        assert len(BORDER_STYLE_MAP[style]) > 0

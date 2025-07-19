@@ -53,3 +53,283 @@ class TestCellConverter:
 
         cell_integer_float = cell_factory(value=123.0)
         assert cell_converter.convert(cell_integer_float) == "123"
+
+
+def test_format_chinese_date_direct():
+    """直接测试 format_chinese_date 函数。"""
+    date = datetime(2023, 7, 19)
+    assert format_chinese_date(date, 'm"月"d"日"') == "7月19日"
+    assert format_chinese_date(date, 'yyyy"年"m"月"d"日"') == "2023年7月19日"
+    assert format_chinese_date(date, 'some_other_format') == "7月19日"  # 测试默认回退
+
+
+class TestCellConverterRichText:
+    """测试富文本转换。"""
+
+    def test_convert_simple_rich_text(self, cell_converter, cell_factory):
+        """测试简单的富文本值转换。"""
+        fragments = [
+            RichTextFragment(text="Hello ", style=RichTextFragmentStyle(bold=True)),
+            RichTextFragment(text="World", style=RichTextFragmentStyle(italic=True)),
+        ]
+        cell = cell_factory(value=fragments)
+        result = cell_converter.convert(cell)
+        assert '<span style="font-weight: bold;">Hello </span>' in result
+        assert '<span style="font-style: italic;">World</span>' in result
+
+    def test_convert_rich_text_with_all_styles(self, cell_converter, cell_factory):
+        """测试包含所有样式的富文本片段。"""
+        style = RichTextFragmentStyle(
+            font_name="Arial",
+            font_size=12,
+            font_color="0000FF",
+            bold=True,
+            italic=True,
+            underline=True
+        )
+        fragments = [RichTextFragment(text="Full Style", style=style)]
+        cell = cell_factory(value=fragments)
+        result = cell_converter.convert(cell)
+        
+        expected_style = "font-family: Arial; font-size: 12pt; color: #0000FF; font-weight: bold; font-style: italic; text-decoration: underline;"
+        expected_html = f'<span style="{expected_style}">Full Style</span>'
+        # Normalize spaces for robust comparison
+        assert " ".join(result.split()) == " ".join(expected_html.split())
+
+    def test_rich_text_html_escaping(self, cell_converter, cell_factory):
+        """测试富文本内容中的 HTML 特殊字符是否被正确转义。"""
+        fragments = [RichTextFragment(text="<script>alert('xss')</script>", style=RichTextFragmentStyle())]
+        cell = cell_factory(value=fragments)
+        expected = "<span>&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;</span>"
+        assert cell_converter.convert(cell) == expected
+
+
+class TestCellConverterNumberFormatting:
+    """测试数字和日期格式化。"""
+
+    @pytest.mark.parametrize("number_format, value, expected", [
+        ("General", 123, "123"),
+        ("General", 123.45, "123.45"),
+        ("0", 123.55, "124"),
+        ("0.0", 123.456, "123.5"),
+        ("0.00", 123.456, "123.46"),
+        ("#,##0", 12345, "12,345"),
+        ("#,##0.00", 12345.678, "12,345.68"),
+        ("0%", 0.85, "85%"),
+        ("0.0%", 0.852, "85.2%"),
+        ("0.00%", 0.8526, "85.26%"),
+        # Fallback formats from the code
+        ("%", 0.85, "85.0%"),
+        (",", 12345.67, "12,345.67"),
+    ])
+    def test_number_formats(self, cell_converter, cell_factory, number_format, value, expected):
+        """测试各种数字格式。"""
+        style = Style(number_format=number_format)
+        cell = cell_factory(value=value, style=style)
+        assert cell_converter.convert(cell) == expected
+
+    @pytest.mark.parametrize("number_format, date_obj, expected", [
+        ("yyyy-mm-dd", datetime(2023, 7, 19), "2023-07-19"),
+        ("mm/dd/yyyy", datetime(2023, 7, 19), "07/19/2023"),
+        ("dd/mm/yyyy", datetime(2023, 7, 19), "19/07/2023"),
+        ('m"月"d"日"', datetime(2023, 7, 19), "7月19日"),
+        ('yyyy"年"m"月"d"日"', datetime(2023, 7, 19), "2023年7月19日"),
+    ])
+    def test_date_formats(self, cell_converter, cell_factory, number_format, date_obj, expected):
+        """测试各种日期格式。"""
+        style = Style(number_format=number_format)
+        cell = cell_factory(value=date_obj, style=style)
+        assert cell_converter.convert(cell) == expected
+
+    def test_excel_numeric_date_format(self, cell_converter, cell_factory):
+        """测试 Excel 数字日期格式的转换。"""
+        style = Style(number_format='yyyy"年"m"月"d"日"')
+        cell = cell_factory(value=45157, style=style)  # 45157 is 2023-08-19 in Excel
+        assert cell_converter.convert(cell) == "2023年8月19日"
+
+    def test_excel_numeric_date_with_time(self, cell_converter, cell_factory):
+        """测试带时间的 Excel 数字日期格式。"""
+        style = Style(number_format='m"月"d"日"')
+        cell = cell_factory(value=45157.5, style=style)  # .5 is 12:00 PM
+        assert cell_converter.convert(cell) == "8月19日"
+
+    def test_unknown_format_fallback(self, cell_converter, cell_factory):
+        """测试当格式未知时，应回退到值的字符串表示。"""
+        style = Style(number_format="this-is-an-unknown-format")
+        cell = cell_factory(value=123.45, style=style)
+        assert cell_converter.convert(cell) == "123.45"
+
+    def test_formatting_exception_fallback(self, cell_converter, cell_factory):
+        """测试当格式化引发异常时，能够优雅地回退。"""
+        style = Style(number_format="0.00")
+        cell = cell_factory(value="not-a-number", style=style)
+        # _apply_number_format will raise an exception, which is caught, and convert() will fall back
+        assert cell_converter.convert(cell) == "not-a-number"
+
+    # === TDD测试：提升CellConverter覆盖率到100% ===
+
+    def test_convert_with_rich_text_empty_fragments(self, cell_converter, cell_factory):
+        """
+        TDD测试：convert应该处理空的富文本片段列表
+
+        这个测试覆盖第59-60行的空富文本处理代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        cell = cell_factory(value="fallback text")
+        cell.rich_text = []  # 空的富文本片段列表
+
+        result = cell_converter.convert(cell)
+
+        # 应该回退到普通值
+        assert result == "fallback text"
+
+    def test_convert_with_rich_text_none_fragments(self, cell_converter, cell_factory):
+        """
+        TDD测试：convert应该处理None的富文本片段
+
+        这个测试确保方法在富文本为None时正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        cell = cell_factory(value="fallback text")
+        cell.rich_text = None
+
+        result = cell_converter.convert(cell)
+
+        # 应该回退到普通值
+        assert result == "fallback text"
+
+    def test_apply_number_format_with_exception(self, cell_converter, cell_factory):
+        """
+        TDD测试：_apply_number_format应该处理格式化异常
+
+        这个测试覆盖第110-111行的异常处理代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        cell = cell_factory(value="invalid_number")
+
+        # 这应该不会抛出异常，而是返回原始值
+        result = cell_converter._apply_number_format(cell, "0.00")
+        assert result == "invalid_number"
+
+    def test_apply_number_format_with_none_format(self, cell_converter, cell_factory):
+        """
+        TDD测试：_apply_number_format应该处理None格式
+
+        这个测试确保方法在格式为None时返回原始值
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        cell = cell_factory(value=123.456)
+
+        result = cell_converter._apply_number_format(cell, None)
+        assert result == 123.456
+
+    def test_apply_number_format_with_empty_format(self, cell_converter, cell_factory):
+        """
+        TDD测试：_apply_number_format应该处理空格式字符串
+
+        这个测试确保方法在格式为空字符串时返回原始值
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        cell = cell_factory(value=123.456)
+
+        result = cell_converter._apply_number_format(cell, "")
+        assert result == 123.456
+
+    def test_format_rich_text_with_mixed_styles(self, cell_converter):
+        """
+        TDD测试：_format_rich_text应该处理混合样式的富文本
+
+        这个测试覆盖第120行的富文本格式化代码路径
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fragments = [
+            RichTextFragment(
+                text="Bold text",
+                style=RichTextFragmentStyle(bold=True, font_size=14)
+            ),
+            RichTextFragment(
+                text=" and italic text",
+                style=RichTextFragmentStyle(italic=True, font_color="#FF0000")
+            ),
+            RichTextFragment(
+                text=" and normal text",
+                style=None
+            )
+        ]
+
+        result = cell_converter._format_rich_text(fragments)
+
+        # 应该包含所有文本片段的格式化版本
+        assert "Bold text" in result
+        assert "and italic text" in result
+        assert "and normal text" in result
+        assert "<span" in result  # 应该包含span标签
+
+    def test_format_rich_text_fragment_with_all_styles(self, cell_converter):
+        """
+        TDD测试：_format_rich_text_fragment应该处理所有样式属性
+
+        这个测试确保所有富文本样式都被正确应用
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        style = RichTextFragmentStyle(
+            bold=True,
+            italic=True,
+            underline=True,
+            font_size=16,
+            font_color="#FF0000",
+            font_family="Arial"
+        )
+
+        fragment = RichTextFragment(text="Styled text", style=style)
+
+        result = cell_converter._format_rich_text_fragment(fragment)
+
+        # 应该包含所有样式
+        assert "font-weight: bold" in result
+        assert "font-style: italic" in result
+        assert "text-decoration: underline" in result
+        assert "font-size: 16pt" in result
+        assert "color: #FF0000" in result
+        assert "font-family: Arial" in result
+        assert "Styled text" in result
+
+    def test_format_rich_text_fragment_with_no_style(self, cell_converter):
+        """
+        TDD测试：_format_rich_text_fragment应该处理没有样式的片段
+
+        这个测试确保没有样式的片段被正确处理
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fragment = RichTextFragment(text="Plain text", style=None)
+
+        result = cell_converter._format_rich_text_fragment(fragment)
+
+        # 应该只返回纯文本，没有样式标签
+        assert result == "Plain text"
+
+def test_format_chinese_date_with_valid_date():
+    """
+    TDD测试：format_chinese_date应该正确格式化有效日期
+
+    这个测试验证中文日期格式化功能
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    test_date = datetime(2023, 12, 25, 14, 30, 45)
+
+    result = format_chinese_date(test_date)
+
+    # 应该返回中文格式的日期
+    assert "2023年12月25日" in result
+
+def test_format_chinese_date_with_none():
+    """
+    TDD测试：format_chinese_date应该处理None输入
+
+    这个测试确保函数在输入为None时正确处理
+    """
+    # 🔴 红阶段：编写测试描述期望的行为
+    result = format_chinese_date(None)
+
+    # 应该返回空字符串或适当的默认值
+    assert result == "" or result is None

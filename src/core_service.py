@@ -381,11 +381,11 @@ class CoreService:
         import xlwt
 
         workbook = xlwt.Workbook(encoding='utf-8')
-        sheet_name = table_model_json.get("sheet_name", "Sheet1")
+        sheet_name = table_model_json["sheet_name"]
         worksheet = workbook.add_sheet(sheet_name)
 
-        headers = table_model_json.get("headers", [])
-        rows = table_model_json.get("rows", [])
+        headers = table_model_json["headers"]
+        rows = table_model_json["rows"]
 
         # 写入表头
         for col_idx, header in enumerate(headers):
@@ -423,9 +423,7 @@ class CoreService:
         workbook = openpyxl.load_workbook(file_path)
 
         # 根据提供的sheet_name选择正确的工作表
-        sheet_name_to_write = table_model_json.get("sheet_name")
-        if not sheet_name_to_write:
-            raise ValueError("table_model_json 中必须包含 'sheet_name' 字段。")
+        sheet_name_to_write = table_model_json["sheet_name"]
         
         if sheet_name_to_write in workbook.sheetnames:
             worksheet = workbook[sheet_name_to_write]
@@ -611,7 +609,7 @@ class CoreService:
         # 提取表头
         headers = []
         if sheet.rows:
-            headers = [cell.value if cell.value is not None else f"Column_{i}"
+            headers = [cell.value if cell is not None and cell.value is not None else f"Column_{i}"
                       for i, cell in enumerate(sheet.rows[0].cells)]
 
         # 分析数据类型
@@ -625,7 +623,7 @@ class CoreService:
                 "total_cols": total_cols,
                 "total_cells": total_cells,
                 "data_rows": max(0, total_rows - 1),  # 减去表头行
-                "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows),
+                "has_styles": any(any(cell.style for cell in row.cells if cell is not None) for row in sheet.rows),
                 "has_merged_cells": len(sheet.merged_cells) > 0,
                 "merged_cells_count": len(sheet.merged_cells),
                 "preview_rows": min(preview_rows, max(0, total_rows - 1))
@@ -650,9 +648,14 @@ class CoreService:
             for row in sheet.rows[start_row:end_row]:
                 row_data = []
                 for cell in row.cells:
-                    cell_data = {"value": self._value_to_json_serializable(cell.value)}
-                    if include_styles and cell.style:
-                        cell_data["style"] = style_to_dict(cell.style)
+                    if cell is not None:
+                        cell_data = {"value": self._value_to_json_serializable(cell.value)}
+                        if include_styles and cell.style:
+                            cell_data["style"] = style_to_dict(cell.style)
+                    else:
+                        cell_data = {"value": None}
+                        if include_styles:
+                            cell_data["style"] = None
                     row_data.append(cell_data)
                 data_rows.append(row_data)
 
@@ -668,7 +671,10 @@ class CoreService:
                 row_data = []
                 for cell in row.cells:
                     # 预览模式下不包含样式，减少数据量
-                    row_data.append(self._value_to_json_serializable(cell.value))
+                    if cell is not None:
+                        row_data.append(self._value_to_json_serializable(cell.value))
+                    else:
+                        row_data.append(None)
                 preview_data.append(row_data)
 
             response["preview_rows"] = preview_data
@@ -688,17 +694,20 @@ class CoreService:
 
             # 检查前几行来推断数据类型
             for row in sheet.rows[1:min(6, len(sheet.rows))]:
-                if col_idx < len(row.cells) and row.cells[col_idx].value is not None:
-                    value = row.cells[col_idx].value
-                    if isinstance(value, str) and value.strip():
-                        types_found.add("text")
-                    elif isinstance(value, (int, float)):
-                        types_found.add("number")
-                    elif isinstance(value, bool):
-                        types_found.add("boolean")
-                    else:
-                        types_found.add("other")
-                    sample_count += 1
+                if col_idx < len(row.cells):
+                    cell = row.cells[col_idx]
+                    # 检查单元格是否为None或者值为None
+                    if cell is not None and cell.value is not None:
+                        value = cell.value
+                        if isinstance(value, str) and value.strip():
+                            types_found.add("text")
+                        elif isinstance(value, (int, float)):
+                            types_found.add("number")
+                        elif isinstance(value, bool):
+                            types_found.add("boolean")
+                        else:
+                            types_found.add("other")
+                        sample_count += 1
 
             if len(types_found) == 0:
                 data_types[header] = "empty"
@@ -718,7 +727,7 @@ class CoreService:
         # 提取表头
         headers = []
         if sheet.rows:
-            headers = [cell.value if cell.value is not None else f"Column_{i}"
+            headers = [cell.value if cell is not None and cell.value is not None else f"Column_{i}"
                       for i, cell in enumerate(sheet.rows[0].cells)]
 
         # 提取样本数据
@@ -726,10 +735,16 @@ class CoreService:
             if i < len(sheet.rows):
                 row_data = []
                 for cell in sheet.rows[i].cells:
-                    cell_data = {
-                        "value": self._value_to_json_serializable(cell.value),
-                        "style": style_to_dict(cell.style) if cell.style else None
-                    }
+                    if cell is not None:
+                        cell_data = {
+                            "value": self._value_to_json_serializable(cell.value),
+                            "style": style_to_dict(cell.style) if cell.style else None
+                        }
+                    else:
+                        cell_data = {
+                            "value": None,
+                            "style": None
+                        }
                     row_data.append(cell_data)
                 sample_rows.append(row_data)
 
@@ -762,14 +777,17 @@ class CoreService:
 
         if sheet.rows:
             # 第一行作为表头
-            headers = [cell.value if cell.value is not None else f"Column_{i}"
+            headers = [cell.value if cell is not None and cell.value is not None else f"Column_{i}"
                       for i, cell in enumerate(sheet.rows[0].cells)]
 
             # 其余行作为数据（不包含样式）
             for row in sheet.rows[1:]:
                 row_data = []
                 for cell in row.cells:
-                    row_data.append(self._value_to_json_serializable(cell.value))
+                    if cell is not None:
+                        row_data.append(self._value_to_json_serializable(cell.value))
+                    else:
+                        row_data.append(None)
                 data_rows.append(row_data)
 
         return {
@@ -845,11 +863,17 @@ class CoreService:
             for col_idx in range(start_col, min(end_col + 1, len(row.cells))):
                 if col_idx < len(row.cells):
                     cell = row.cells[col_idx]
-                    cell_data = {
-                        "value": self._value_to_json_serializable(cell.value)
-                    }
-                    if include_styles:
-                        cell_data["style"] = style_to_dict(cell.style) if cell.style else None
+                    # 检查单元格是否为None
+                    if cell is not None:
+                        cell_data = {
+                            "value": self._value_to_json_serializable(cell.value)
+                        }
+                        if include_styles:
+                            cell_data["style"] = style_to_dict(cell.style) if cell.style else None
+                    else:
+                        cell_data = {"value": None}
+                        if include_styles:
+                            cell_data["style"] = None
                 else:
                     cell_data = {"value": None}
                     if include_styles:
@@ -892,10 +916,16 @@ class CoreService:
         for row_idx, row in enumerate(sheet.rows[:5]):
             row_data = []
             for cell in row.cells:
-                cell_data = {
-                    "value": self._value_to_json_serializable(cell.value),
-                    "style": style_to_dict(cell.style) if cell.style else None
-                }
+                if cell is not None:
+                    cell_data = {
+                        "value": self._value_to_json_serializable(cell.value),
+                        "style": style_to_dict(cell.style) if cell.style else None
+                    }
+                else:
+                    cell_data = {
+                        "value": None,
+                        "style": None
+                    }
                 row_data.append(cell_data)
 
             if row_idx == 0:
@@ -926,7 +956,7 @@ class CoreService:
                 "total_rows": len(sheet.rows),
                 "total_cols": len(headers),
                 "total_cells": total_cells,
-                "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows),
+                "has_styles": any(any(cell.style for cell in row.cells if cell is not None) for row in sheet.rows),
                 "data_types": data_types
             },
             "sample_data": {
@@ -958,7 +988,7 @@ class CoreService:
                  headers = [f"Column_{i}" for i in range(len(sheet.rows[0].cells))]
                  start_row_index = 0
             else:
-                 headers = [cell.value if cell.value is not None else f"Column_{i}"
+                 headers = [cell.value if cell is not None and cell.value is not None else f"Column_{i}"
                            for i, cell in enumerate(sheet.rows[0].cells)]
                  start_row_index = 1
 
@@ -966,10 +996,16 @@ class CoreService:
             for row in sheet.rows[start_row_index:]:
                 row_data = []
                 for cell in row.cells:
-                    cell_data = {
-                        "value": self._value_to_json_serializable(cell.value),
-                        "style": style_to_dict(cell.style) if cell.style else None
-                    }
+                    if cell is not None:
+                        cell_data = {
+                            "value": self._value_to_json_serializable(cell.value),
+                            "style": style_to_dict(cell.style) if cell.style else None
+                        }
+                    else:
+                        cell_data = {
+                            "value": None,
+                            "style": None
+                        }
                     row_data.append(cell_data)
                 data_rows.append(row_data)
 
@@ -980,7 +1016,7 @@ class CoreService:
                 "total_rows": len(sheet.rows),
                 "total_cols": len(headers),
                 "data_rows": len(data_rows),
-                "has_styles": any(any(cell.style for cell in row.cells) for row in sheet.rows)
+                "has_styles": any(any(cell.style for cell in row.cells if cell is not None) for row in sheet.rows)
             },
             "headers": headers,
             "rows": data_rows,
@@ -1077,10 +1113,16 @@ class CoreService:
                     for row in chunk.rows:
                         row_data = []
                         for cell in row.cells:
-                            cell_data = {
-                                "value": self._value_to_json_serializable(cell.value),
-                                "style": style_to_dict(cell.style) if cell.style else None
-                            }
+                            if cell is not None:
+                                cell_data = {
+                                    "value": self._value_to_json_serializable(cell.value),
+                                    "style": style_to_dict(cell.style) if cell.style else None
+                                }
+                            else:
+                                cell_data = {
+                                    "value": None,
+                                    "style": None
+                                }
                             row_data.append(cell_data)
                         all_rows.append(row_data)
                 
@@ -1144,10 +1186,16 @@ class CoreService:
             for row in chunk.rows[1:]:  # 跳过表头行
                 row_data = []
                 for cell in row.cells:
-                    cell_data = {
-                        "value": self._value_to_json_serializable(cell.value),
-                        "style": style_to_dict(cell.style) if cell.style else None
-                    }
+                    if cell is not None:
+                        cell_data = {
+                            "value": self._value_to_json_serializable(cell.value),
+                            "style": style_to_dict(cell.style) if cell.style else None
+                        }
+                    else:
+                        cell_data = {
+                            "value": None,
+                            "style": None
+                        }
                     row_data.append(cell_data)
                 sample_rows.append(row_data)
             break  # 只需要第一个块

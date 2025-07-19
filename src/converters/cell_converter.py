@@ -31,10 +31,10 @@ DATE_FORMAT_MAP = {
 
 def format_chinese_date(date_obj: dt, format_str: str) -> str:
     """格式化中文日期。"""
-    if 'm"月"d"日"' in format_str:
-        return f"{date_obj.month}月{date_obj.day}日"
-    elif 'yyyy"年"m"月"d"日"' in format_str:
+    if 'yyyy"年"m"月"d"日"' in format_str:
         return f"{date_obj.year}年{date_obj.month}月{date_obj.day}日"
+    elif 'm"月"d"日"' in format_str:
+        return f"{date_obj.month}月{date_obj.day}日"
     else:
         return f"{date_obj.month}月{date_obj.day}日"
 

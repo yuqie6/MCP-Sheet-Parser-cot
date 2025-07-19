@@ -878,40 +878,49 @@ class ChartDataExtractor:
         return shapes
 
     def _extract_single_shape(self, shape_obj, source: str) -> dict[str, Any] | None:
-        """提取单个形状的信息。"""
+        """
+        提取单个形状的信息。
+        重构此函数以提高健壮性和清晰度。
+        只有在找到文本内容时才认为它是一个有效的注释。
+        """
         try:
+            # 首先，尝试提取文本内容
+            text_content = None
+            for text_attr in ['text', 'tx', 'txPr', 'textBody']:
+                if hasattr(shape_obj, text_attr):
+                    text_value = getattr(shape_obj, text_attr)
+                    if text_value:
+                        # 使用现有的轴标题提取器，因为它能处理复杂的文本结构
+                        extracted_text = self.extract_axis_title(text_value)
+                        if extracted_text and not extracted_text.startswith('<'):
+                            text_content = extracted_text
+                            break
+            
+            # 如果没有文本内容，则认为这不是一个注释形状，直接返回None
+            if not text_content:
+                return None
+
+            # 如果有文本内容，则构建形状信息字典
             shape_info = {
                 'type': 'shape',
                 'position': 'unknown',
                 'source': source,
-                'text': None,
+                'text': text_content,
                 'shape_type': None,
                 'properties': {}
             }
 
-            # 尝试提取形状类型
+            # 提取形状类型
             if hasattr(shape_obj, 'type'):
                 shape_info['shape_type'] = str(shape_obj.type)
             elif hasattr(shape_obj, '__class__'):
                 shape_info['shape_type'] = shape_obj.__class__.__name__
 
-            # 尝试提取文本内容
-            for text_attr in ['text', 'tx', 'txPr', 'textBody']:
-                if hasattr(shape_obj, text_attr):
-                    text_value = getattr(shape_obj, text_attr)
-                    if text_value:
-                        text_content = self.extract_axis_title(text_value)
-                        if text_content:
-                            shape_info['text'] = text_content
-                            break
-
-            # 尝试提取形状属性
+            # 提取其他形状属性
             if hasattr(shape_obj, 'spPr') and shape_obj.spPr:
                 shape_info['properties']['spPr'] = 'present'
 
-            # 只有在找到有用信息时才返回
-            if shape_info['text'] or shape_info['shape_type'] or shape_info['properties']:
-                return shape_info
+            return shape_info
 
         except Exception as e:
             import logging

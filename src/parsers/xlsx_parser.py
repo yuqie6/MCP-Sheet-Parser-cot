@@ -73,10 +73,11 @@ class XlsxRowProvider:
                 else:
                     self._merged_cells_cache = []
             except Exception as e:
-                logger.warning(f"Failed to get merged cells: {e}")
-                self._merged_cells_cache = []
+                logger.error(f"获取合并单元格信息失败: {e}")
+                raise RuntimeError(f"无法加载工作簿以获取合并单元格: {e}") from e
             finally:
-                if workbook is not None:
+                # 确保只有在workbook成功创建后才尝试关闭
+                if 'workbook' in locals() and workbook is not None:
                     workbook.close()
         return self._merged_cells_cache
     
@@ -156,18 +157,20 @@ class XlsxRowProvider:
     def get_total_rows(self) -> int:
         """无需加载全部数据即可获取总行数。"""
         if self._total_rows_cache is None:
-            workbook = openpyxl.load_workbook(self.file_path, read_only=True)
-            worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
             try:
+                workbook = openpyxl.load_workbook(self.file_path, read_only=True)
+                worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
                 if worksheet is not None and hasattr(worksheet, "max_row"):
                     self._total_rows_cache = worksheet.max_row or 0
                 else:
                     self._total_rows_cache = 0
             except Exception as e:
-                logger.warning(f"获取工作表行数失败: {e}")
-                self._total_rows_cache = 0
+                logger.error(f"获取工作表总行数失败: {e}")
+                raise RuntimeError(f"无法加载工作簿以获取总行数: {e}") from e
             finally:
-                workbook.close()
+                # 确保只有在workbook成功创建后才尝试关闭
+                if 'workbook' in locals() and workbook is not None:
+                    workbook.close()
         return self._total_rows_cache
 
 
