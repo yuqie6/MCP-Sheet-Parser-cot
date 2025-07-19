@@ -33,8 +33,11 @@ class FontManager:
             config_file: 字体配置文件路径
         """
         self.config_file = config_file or self._get_default_config_path()
-        self.font_database = self._load_font_database()
-        self.custom_mappings = self._load_custom_mappings()
+        
+        config_data = self._load_config_from_file()
+        
+        self.font_database = self._load_font_database(config_data)
+        self.custom_mappings = self._load_custom_mappings(config_data)
         
     def _get_default_config_path(self) -> str:
         """获取默认配置文件路径"""
@@ -42,7 +45,17 @@ class FontManager:
         config_dir.mkdir(exist_ok=True)
         return str(config_dir / "font_config.json")
     
-    def _load_font_database(self) -> dict:
+    def _load_config_from_file(self) -> dict:
+        """从文件加载配置"""
+        try:
+            if Path(self.config_file).exists():
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.warning(f"加载字体配置文件失败: {e}")
+        return {}
+
+    def _load_font_database(self, config_data: dict) -> dict:
         """加载字体数据库"""
         default_database = {
             "chinese_keywords": [
@@ -86,33 +99,19 @@ class FontManager:
             }
         }
         
-        try:
-            if Path(self.config_file).exists():
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    config_data = json.load(f)
-                    # 合并默认配置和用户配置
-                    for key, value in config_data.get('font_database', {}).items():
-                        if key in default_database:
-                            if isinstance(value, list):
-                                default_database[key].extend(value)
-                            elif isinstance(value, dict):
-                                default_database[key].update(value)
-        except Exception as e:
-            logger.warning(f"加载字体配置文件失败，使用默认配置: {e}")
+        # 合并默认配置和用户配置
+        for key, value in config_data.get('font_database', {}).items():
+            if key in default_database:
+                if isinstance(value, list):
+                    default_database[key].extend(value)
+                elif isinstance(value, dict):
+                    default_database[key].update(value)
         
         return default_database
     
-    def _load_custom_mappings(self) -> dict[str, str]:
+    def _load_custom_mappings(self, config_data: dict) -> dict[str, str]:
         """加载自定义字体映射"""
-        try:
-            if Path(self.config_file).exists():
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    config_data = json.load(f)
-                    return config_data.get('custom_mappings', {})
-        except Exception as e:
-            logger.warning(f"加载自定义字体映射失败: {e}")
-        
-        return {}
+        return config_data.get('custom_mappings', {})
     
     def detect_font_type(self, font_name: str) -> str:
         """

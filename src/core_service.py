@@ -277,6 +277,14 @@ class CoreService:
             if not path.exists():
                 raise FileNotFoundError(f"文件不存在: {file_path}")
 
+            # 验证文件格式
+            file_format = path.suffix.lower()
+            supported_formats = ['.csv', '.xlsx', '.xlsm', '.xls']
+            if file_format not in supported_formats:
+                if file_format == '.xlsb':
+                    raise ValueError("XLSB格式暂不支持数据写回，请转换为XLSX格式进行编辑")
+                raise ValueError(f"Unsupported file type: {file_format}")
+
             # 创建备份文件（如果需要）
             backup_path = None
             if create_backup:
@@ -292,7 +300,6 @@ class CoreService:
                     raise ValueError(f"缺少必需字段: {field}")
 
             # 实现真正的数据写回功能
-            file_format = path.suffix.lower()
             changes_applied = 0
 
             if file_format == '.csv':
@@ -301,11 +308,6 @@ class CoreService:
                 changes_applied = self._write_back_xlsx(path, table_model_json)
             elif file_format == '.xls':
                 changes_applied = self._write_back_xls(path, table_model_json)
-            elif file_format == '.xlsb':
-                # XLSB格式比较复杂，暂时不支持写回
-                raise RuntimeError("XLSB格式暂不支持数据写回，请转换为XLSX格式进行编辑")
-            else:
-                raise RuntimeError(f"不支持的文件格式: {file_format}")
 
             return {
                 "status": "success",
@@ -318,7 +320,7 @@ class CoreService:
                 "headers_count": len(table_model_json.get("headers", [])),
                 "rows_count": len(table_model_json.get("rows", []))
             }
-            
+
         except Exception as e:
             logger.error(f"应用修改失败: {e}")
             raise

@@ -34,8 +34,11 @@ mcp-sheet-parser = "src.mcp_server.server:main"
 
 [tool.pytest.ini_options]
 pythonpath = [
-  "src"
+  "."
 ]
 markers = [
     "models: marks tests as related to data models",
 ]
+
+[tool.coverage.run]
+source = ["src"]

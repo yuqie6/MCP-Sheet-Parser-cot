@@ -113,17 +113,34 @@ def extract_style(cell: CellLike) -> Style:
             style.border_color = border_color
         else:
             style.border_color = Style().border_color
-    style.number_format = extract_number_format(cell)
-    if cell.hyperlink:
-        style.hyperlink = extract_hyperlink(cell)
-    if cell.comment:
+    # 提取数字格式
+    if hasattr(cell, 'number_format') and cell.number_format and cell.number_format != 'General':
+        style.number_format = cell.number_format
+
+    # 提取超链接
+    if hasattr(cell, 'hyperlink') and cell.hyperlink:
+        try:
+            if hasattr(cell.hyperlink, 'target') and cell.hyperlink.target:
+                target = cell.hyperlink.target
+                if isinstance(target, str):
+                    style.hyperlink = target
+            elif hasattr(cell.hyperlink, 'location') and cell.hyperlink.location:
+                location = cell.hyperlink.location
+                if isinstance(location, str):
+                    style.hyperlink = f"#{location}"
+        except Exception:
+            pass # 忽略提取超链接时的任何异常
+
+    # 提取注释
+    if hasattr(cell, 'comment') and cell.comment:
         try:
             if hasattr(cell.comment, 'text'):
                 style.comment = str(cell.comment.text)
-            elif hasattr(cell.comment, 'content'):
+            elif hasattr(cell.comment, 'content'): # 兼容不同版本的 comment 对象
                 style.comment = str(cell.comment.content)
         except (AttributeError, TypeError):
-            pass
+            pass # 忽略提取注释时的任何异常
+            
     return style
 
 def extract_fill_color(fill) -> str | None:
@@ -162,40 +179,6 @@ def extract_fill_color(fill) -> str | None:
         # 重要：如果patternType为None，不提取背景色
         # 这避免了提取那些有颜色信息但不应该显示背景的单元格
 
-    except Exception:
-        pass
-    return None
-
-
-
-def extract_number_format(cell) -> str:
-    """
-    增强的数字格式提取。
-    """
-    try:
-        if cell.number_format and cell.number_format != 'General':
-            return cell.number_format
-    except (AttributeError, ValueError):
-        pass
-    return ""
-
-def extract_hyperlink(cell) -> str | None:
-    """
-    增强的超链接提取。
-    """
-    if not cell.hyperlink:
-        return None
-    try:
-        if hasattr(cell.hyperlink, 'target') and cell.hyperlink.target:
-            target = cell.hyperlink.target
-            if isinstance(target, str) and (target.startswith(('http://', 'https://', 'ftp://', 'mailto:', 'file://')) or '.' in target):
-                return target
-        if hasattr(cell.hyperlink, 'location') and cell.hyperlink.location:
-            location = cell.hyperlink.location
-            if isinstance(location, str):
-                return f"#{location}"
-        if hasattr(cell.hyperlink, 'display') and cell.hyperlink.display:
-            return str(cell.hyperlink.display)
     except Exception:
         pass
     return None

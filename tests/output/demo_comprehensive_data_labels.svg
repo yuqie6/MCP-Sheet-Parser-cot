@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800px" height="600px" viewBox="0 0 800 600" style="background: #f8f9fa; border: 1px solid #dee2e6;">
+  <text x="400" y="30" text-anchor="middle" font-size="20px" font-weight="bold" fill="#333">Data Labels and Annotations Demo</text>
+  <rect x="50" y="60" width="700" height="500" fill="#ffffff" stroke="#ddd" stroke-width="1"/>
+  <text x="150" y="140" font-size="12px" fill="#2c3e50" text-anchor="middle" class="comprehensive-data-label" font-family="Arial">Q1 2024 | $15000.00 | (35.7%)</text>
+  <text x="300" y="110" font-size="12px" fill="#2c3e50" text-anchor="middle" class="comprehensive-data-label" font-family="Arial">Q2 2024 | $22000.00 | (52.4%)</text>
+  <text x="450" y="90" font-size="12px" fill="#2c3e50" text-anchor="middle" class="comprehensive-data-label" font-family="Arial">Q3 2024 | $18500.00 | (44.0%)</text>
+  <text x="300" y="190" font-size="11px" fill="#333" text-anchor="middle" class="comprehensive-data-label">$25000.00</text>
+  <text x="450" y="170" font-size="11px" fill="#e74c3c" text-anchor="middle" class="comprehensive-data-label">$35000.00</text>
+  <path d="M 180 380 L 190.0 380 L 190.0 320 L 200 320" stroke="#3498db" stroke-width="2" fill="none" class="leader-line" stroke-dasharray="3,3"/>
+  <path d="M 330 360 L 340.0 360 L 340.0 300 L 350 300" stroke="#3498db" stroke-width="2" fill="none" class="leader-line" stroke-dasharray="3,3"/>
+  <path d="M 480 350 L 490.0 350 L 490.0 290 L 500 290" stroke="#3498db" stroke-width="2" fill="none" class="leader-line" stroke-dasharray="3,3"/>
+  <circle cx="180" cy="380" r="4" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+  <circle cx="330" cy="360" r="4" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+  <circle cx="480" cy="350" r="4" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+  <rect x="211.0" y="402.0" width="78.0" height="36.0" fill="#fff3cd" stroke="#ffc107" stroke-width="1" rx="4" ry="4" class="callout-background"/>
+  <text x="250" y="420" text-anchor="middle" dominant-baseline="middle" font-size="10px" fill="#856404" class="callout-text">
+    <tspan x="250" dy="0">Peak</tspan>
+    <tspan x="250" dy="12.0">Performance</tspan>
+  </text>
+  <line x1="211.0" y1="420.0" x2="200" y2="460" stroke="#666666" stroke-width="1" class="callout-pointer"/>
+  <rect x="505.0" y="388.0" width="90.0" height="24.0" fill="#fff3cd" stroke="#ffc107" stroke-width="1" rx="4" ry="4" class="callout-background"/>
+  <text x="550" y="400" text-anchor="middle" dominant-baseline="middle" font-size="10px" fill="#856404" class="callout-text">Growth Target</text>
+  <line x1="505.0" y1="400.0" x2="500" y2="440" stroke="#666666" stroke-width="1" class="callout-pointer"/>
+</svg>

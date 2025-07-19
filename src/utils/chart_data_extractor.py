@@ -625,6 +625,44 @@ class ChartDataExtractor:
         except Exception:
             return None
 
+    def extract_chart_title(self, chart) -> str | None:
+        """
+        提取图表的主标题。
+        此方法利用现有的 extract_axis_title，因为标题结构相似。
+        """
+        if hasattr(chart, 'title') and chart.title:
+            return self.extract_axis_title(chart.title)
+        return None
+
+    def extract_plot_area(self, chart) -> dict[str, Any]:
+        """
+        提取图表绘图区域的背景色和布局信息。
+        """
+        plot_area_info: dict[str, Any] = {
+            'background_color': None,
+            'layout': None
+        }
+        if not (hasattr(chart, 'plotArea') and chart.plotArea):
+            return plot_area_info
+
+        plot_area = chart.plotArea
+
+        # 提取背景颜色
+        if hasattr(plot_area, 'spPr') and plot_area.spPr and hasattr(plot_area.spPr, 'solidFill'):
+            plot_area_info['background_color'] = self.extract_color(plot_area.spPr.solidFill)
+
+        # 提取布局信息
+        if hasattr(plot_area, 'layout') and plot_area.layout and hasattr(plot_area.layout, 'manualLayout'):
+            manual_layout = plot_area.layout.manualLayout
+            plot_area_info['layout'] = {
+                'x': getattr(manual_layout, 'x', None),
+                'y': getattr(manual_layout, 'y', None),
+                'width': getattr(manual_layout, 'w', None),
+                'height': getattr(manual_layout, 'h', None)
+            }
+            
+        return plot_area_info
+
     def extract_chart_annotations(self, chart) -> list[dict[str, Any]]:
         """
         提取图表的注释和文本框信息。

@@ -20,15 +20,18 @@ class StyleConverter:
             以样式ID为键、Style对象为值的字典。
         """
         styles = {}
+        seen_style_keys = set()
         style_counter = 0
 
         for row in sheet.rows:
             for cell in row.cells:
                 if cell.style:
                     style_key = self.get_style_key(cell.style)
-                    if style_key not in styles:
+                    if style_key not in seen_style_keys:
+                        seen_style_keys.add(style_key)
+                        style_id = f"style_{style_counter}"
+                        styles[style_id] = cell.style
                         style_counter += 1
-                        styles[f"style_{style_counter}"] = cell.style
         return styles
 
     def get_style_key(self, style: Style) -> str:

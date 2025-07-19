@@ -78,7 +78,7 @@ def get_border_style(border_side) -> str:
         return style_str
 
 
-def parse_border_style_complete(border_style: str, border_color: str = "#E0E0E0") -> str:
+def parse_border_style_complete(border_style: str | None, border_color: str = "#E0E0E0") -> str:
     """
     解析完整的边框样式字符串。
     
@@ -126,7 +126,7 @@ def get_xls_border_style_name(style_code: int) -> str:
     return BORDER_STYLE_MAP.get(style_code, "solid")
 
 
-def format_border_color(color: str) -> str:
+def format_border_color(color: str | None) -> str:
     """
     格式化边框颜色，确保边框一致性。
     

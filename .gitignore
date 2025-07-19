@@ -8,13 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
-.claude
 
-# docs
-CLAUDE.md
-docs
+# Test and coverage reports
+.coverage
 memory-bank
-tests
 *.xlsx
 *.html
-.kiro
+*.xml

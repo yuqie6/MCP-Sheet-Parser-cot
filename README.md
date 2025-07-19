@@ -1,64 +1,54 @@
-# MCP 表格解析器
+# MCP Sheet Parser
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
-一个专为 **模型上下文协议 (MCP) 服务器** 设计的高保真表格解析器和HTML转换器。该工具使llm能够无缝读取、分析和修改表格文件、转化为html，并完整保留样式。
+MCP Sheet Parser 是一个基于模型上下文协议（Model Context Protocol, MCP）构建的服务器。它为 AI 代理提供解析、转换和修改电子表格文件的能力。
 
-## 🚀 什么是 MCP 表格解析器？
+该服务器通过标准输入输出（stdio）与兼容 MCP 的客户端（如 Claude Desktop）通信，允许 AI 代理以工具调用的方式处理包括 XLSX、XLSM、XLS、XLSB 和 CSV 在内的多种表格格式。
 
-MCP 表格解析器是一个 **模型上下文协议服务器**，为AI助手提供强大的表格处理能力。它充当AI模型与表格文件之间的桥梁，提供三个核心工具：
+## 工作原理
 
-- **`parse_sheet`** - 将任何表格解析为AI友好的JSON格式
-- **`convert_to_html`** - 生成保留样式的高保真HTML
-- **`apply_changes`** - 将修改后的数据写回原始文件
+当 AI 代理需要处理一个表格文件时，它会通过 MCP 向本服务器发送一个 JSON-RPC 请求。服务器接收请求，调用内部相应的处理函数，并将结构化的 JSON 数据返回给代理。这个过程使得 AI 代理能够理解和操作传统上难以访问的表格数据。
 
-## ✨ 核心特性
+其基本架构如下：
+1.  **MCP 客户端**: AI 代理的运行环境，例如 Claude Desktop 或其他 IDE。
+2.  **通信协议**: 客户端与服务器之间通过标准输入输出（stdio）进行 JSON-RPC 通信。
+3.  **MCP 服务器**: 本项目，一个独立的 Python 进程，负责监听和响应来自客户端的请求。
+4.  **核心服务**: 服务器内部的业务逻辑，调用特定的解析器或转换器来完成任务。
 
-### 🎯 **高保真解析**
-- **多格式支持**: Excel (.xlsx, .xlsm, .xls, .xlsb)、CSV等多种格式
-- **完整样式保留**: 字体、颜色、边框、对齐方式、背景色
-- **结构完整性**: 合并单元格、公式和数据类型保持不变
-- **大文件处理**: 自动流式处理以优化性能
+## 核心功能
 
-### 🤖 **AI优化设计**
-- **上下文友好**: 默认返回概览数据，避免LLM上下文爆炸
-- **智能分层**: 概览→采样→完整数据，按需加载
-- **参数化控制**: LLM可自主决定数据详细程度
-- **使用指导**: 自动提供下一步操作建议
-- **灵活范围选择**: 解析特定单元格、范围或整个工作表
-- **多工作表支持**: 处理包含多个工作表的复杂工作簿
+服务器提供三个核心工具来完成一个完整的数据处理闭环：
 
-### 🔧 **生产就绪**
-- **MCP协议兼容**: 完全兼容Claude Desktop和其他MCP客户端
-- **错误处理**: 强大的错误报告和恢复机制
-- **性能优化**: 高效的内存使用和处理
-- **备份支持**: 修改前自动创建文件备份
+1.  **`parse_sheet`**: 解析电子表格文件。此工具将文件内容转换为结构化的 JSON 对象，该对象为 AI 代理的上下文进行了优化。默认情况下，它只返回文件的概览信息（如尺寸、列名和数据预览），以避免消耗过多的令牌。代理可以根据需要请求获取完整数据或样式信息。
 
-## 🛠️ 安装
+2.  **`convert_to_html`**: 将电子表格转换为 HTML 文件。此功能可以保留原始文件中的大部分样式，包括字体、颜色、边框和合并单元格，使得数据可以在浏览器中进行可视化查阅。
+
+3.  **`apply_changes`**: 将 AI 代理修改后的 JSON 数据写回到原始电子表格文件中。此工具接收从 `parse_sheet` 获取并由代理处理过的数据，完成数据的修改和保存。
+
+## 安装与配置
 
 ### 前置要求
 - Python 3.8 或更高版本
 - [uv](https://docs.astral.sh/uv/) (推荐的包管理器)
-- Claude Desktop 或其他兼容MCP的客户端，比如Cherry stdio
 
-### 从源码安装
+### 安装步骤
 ```bash
 git clone https://github.com/yuqie6/MCP-Sheet-Parser.git
 cd MCP-Sheet-Parser
 uv sync
 ```
 
-## 🚀 快速开始
+### 客户端配置
+要将此服务器与兼容 MCP 的客户端一同使用，需要在客户端的配置文件中进行设置。
 
-### 1. 配置 Claude Desktop
+以 Claude Desktop 为例，配置文件路径如下：
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
 
-将此服务器添加到您的 Claude Desktop 配置文件中：
-
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
-
+在配置文件中添加以下 `mcpServers` 条目：
 ```json
 {
   "mcpServers": {
@@ -66,7 +56,7 @@ uv sync
       "command": "uv",
       "args": [
         "--directory",
-        "path/MCP-Sheet-Parser-cot",
+        "/path/to/MCP-Sheet-Parser-cot",
         "run",
         "main.py"
       ]
@@ -74,201 +64,46 @@ uv sync
   }
 }
 ```
+**注意**: 请将 `/path/to/MCP-Sheet-Parser-cot` 替换为本项目的绝对路径。
 
-> **注意**: 请将 `path/MCP-Sheet-Parser-cot` 替换为您的实际项目目录路径。
+## 使用指南
 
-### 2. 配置cherry stdio
+配置完成后，重启客户端即可开始使用。您可以向 AI 代理发出自然语言指令来处理表格文件。
 
-命令填写 **uv**
+- **解析文件**: "请解析 `/path/to/sales.xlsx` 文件并提供一份摘要。"
+- **转换文件**: "将 `/path/to/data.csv` 转换为 HTML 文件。"
+- **修改数据**: "读取库存表 `/path/to/inventory.xlsx`，然后将所有'笔记本电脑'的数量增加10，最后保存修改。"
 
-参数填写：
-> --directory
-> 
-> path\MCP-Sheet-Parser-cot
-> 
-> run
-> 
-> main.py
-> 
-路径请填写绝对路径
-
-### 3. 在 Claude Desktop 中开始使用
-
-配置完成后，重启 Claude Desktop，您就可以让 Claude 处理表格了：
-
-> "请解析 `/path/to/sales.xlsx` 中的销售数据并显示摘要"
-
-> "将path/name.xlsx转换为HTML（绝对路径）"
-
-> "更新库存表格，将所有数量增加10%"
-
-## 🔧 可用工具
+## 工具定义
 
 ### `parse_sheet`
-将表格文件解析为AI友好的JSON格式。默认返回概览信息，可按需获取详细数据。
+解析一个表格文件，返回其结构化的 JSON 表示。
 
-**参数:**
-- `file_path` (必需): 表格文件的绝对路径，支持 .csv, .xlsx, .xls, .xlsb, .xlsm 格式
-- `sheet_name` (可选): 要解析的工作表名称，留空则使用第一个工作表
-- `range_string` (可选): 单元格范围，如 "A1:D10"，指定范围时返回该范围的完整数据
-- `include_full_data` (可选，默认false): 是否返回完整数据，false时只返回概览和预览
-- `include_styles` (可选，默认false): 是否包含样式信息（字体、颜色、边框等）
-- `preview_rows` (可选，默认5): 预览行数，当include_full_data为false时生效
-- `max_rows` (可选): 最大返回行数，用于限制大文件的数据量
-
-**使用示例:**
-
-```json
-// 基础概览（推荐首次使用）
-{
-  "file_path": "/path/to/data.xlsx"
-}
-
-// 获取特定工作表的完整数据
-{
-  "file_path": "/path/to/data.xlsx",
-  "sheet_name": "销售数据",
-  "include_full_data": true,
-  "max_rows": 100
-}
-
-// 获取指定范围的数据（包含样式）
-{
-  "file_path": "/path/to/data.xlsx",
-  "range_string": "A1:E50",
-  "include_styles": true
-}
-```
+- **`file_path`** (字符串, 必需): 表格文件的绝对路径。
+- **`sheet_name`** (字符串, 可选): 需要解析的特定工作表名称。如果留空，则解析第一个工作表。
+- **`range_string`** (字符串, 可选): 指定单元格范围，例如 "A1:D10"。
+- **`include_full_data`** (布尔值, 可选, 默认 `false`): 是否返回所有行的数据。
+- **`include_styles`** (布尔值, 可选, 默认 `false`): 是否在返回的数据中包含样式信息。
+- **`preview_rows`** (整数, 可选, 默认 `5`): 在概览模式下，返回的数据预览行数。
+- **`max_rows`** (整数, 可选): 限制返回的最大行数，用于处理大型文件。
 
 ### `convert_to_html`
-将表格文件转换为保留样式的高保真HTML，支持多工作表和分页功能。
+将一个表格文件转换为 HTML。
 
-**参数:**
-- `file_path` (必需): 源表格文件的绝对路径，支持 .csv, .xlsx, .xls, .xlsb, .xlsm 格式
-- `output_path` (可选): 输出HTML文件的路径，留空则在源文件目录生成同名.html文件
-- `sheet_name` (可选): 要转换的单个工作表名称，留空则转换所有工作表
-- `page_size` (可选，默认100): 分页时每页显示的行数，用于控制大型文件的单页大小
-- `page_number` (可选，默认1): 要查看的页码，从1开始，用于浏览大型文件的特定页面
-- `header_rows` (可选，默认1): 将文件顶部的指定行数视为表头
-
-**示例:**
-```json
-// 转换整个文件
-{
-  "file_path": "/path/to/report.xlsx",
-  "output_path": "/path/to/report.html"
-}
-
-// 转换特定工作表并分页
-{
-  "file_path": "/path/to/large_data.xlsx",
-  "sheet_name": "数据表",
-  "page_size": 50,
-  "page_number": 1
-}
-```
+- **`file_path`** (字符串, 必需): 源表格文件的绝对路径。
+- **`output_path`** (字符串, 可选): 输出 HTML 文件的路径。如果留空，则在源文件相同目录下生成同名 HTML 文件。
+- **`sheet_name`** (字符串, 可选): 指定要转换的单个工作表名称。如果留空，则转换所有工作表。
+- **`page_size`** (整数, 可选, 默认 `100`): 分页时每页显示的行数。
+- **`page_number`** (整数, 可选, 默认 `1`): 查看分页结果时的页码。
+- **`header_rows`** (整数, 可选, 默认 `1`): 将文件顶部的指定行数视为固定表头。
 
 ### `apply_changes`
-将修改后的数据写回原始表格文件，完成数据编辑闭环。
+将修改后的数据写回表格文件。
 
-**参数:**
-- `file_path` (必需): 需要写回数据的目标文件的绝对路径
-- `table_model_json` (必需): 从 `parse_sheet` 工具获取并修改后的 TableModel JSON 数据
-  - 必须包含: `sheet_name` (字符串), `headers` (字符串数组), `rows` (二维数组)
-- `create_backup` (可选，默认true): 是否在写入前创建原始文件的备份，防止意外覆盖
+- **`file_path`** (字符串, 必需): 目标文件的绝对路径。
+- **`table_model_json`** (对象, 必需): 从 `parse_sheet` 工具获取并由 AI 代理修改后的数据对象。
+- **`create_backup`** (布尔值, 可选, 默认 `true`): 是否在写入前创建原始文件的备份。
 
-**示例:**
-```json
-{
-  "file_path": "/path/to/data.xlsx",
-  "table_model_json": {
-    "sheet_name": "销售数据",
-    "headers": ["日期", "产品", "销量", "金额"],
-    "rows": [
-      ["2024-01-01", "产品A", 100, 5000],
-      ["2024-01-02", "产品B", 150, 7500]
-    ]
-  },
-  "create_backup": true
-}
-```
+## 许可证
 
-## 🏗️ 架构
-
-```
-Claude Desktop (MCP 客户端)
-           ↓
-    JSON-RPC over stdin/stdout
-           ↓
-    MCP 表格解析服务器
-           ↓
-      核心服务层
-           ↓
-    格式特定解析器
-    (XLSX, XLS, CSV, XLSB, XLSM)
-```
-
-## 🧪 开发
-
-### 设置开发环境
-```bash
-git clone https://github.com/yuqie6/MCP-Sheet-Parser.git
-cd MCP-Sheet-Parser
-uv sync --dev
-```
-
-### 运行测试
-```bash
-# 使用 uv (推荐)
-uv run pytest tests/ -v
-
-# 或使用传统方法
-python -m pytest tests/ -v
-```
-
-### 本地调试和测试
-
-#### 使用MCP Inspector调试
-MCP Inspector是官方提供的可视化调试工具（但是我不会用，给不了建议，贴一份官方的代码）
-```
-npx @modelcontextprotocol/inspector \
-  uv \
-  --directory path/to/server \
-  run \
-  package-name \
-  args...
-```
-
-#### 使用客户端调试
-
-直接要求llm使用工具并查看返回内容
-
-
-### 代码结构
-```
-src/
-├── mcp_server/          # MCP 协议实现
-├── core_service.py      # 业务逻辑层
-├── parsers/            # 格式特定解析器
-├── converters/         # HTML 转换
-├── models/             # 数据模型和工具定义
-└── utils/              # 工具函数
-```
-
-## 🤝 贡献
-
-1. Fork 本仓库
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交您的更改 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 开启 Pull Request
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
-
-## 🙏 致谢
-
-- 为 [MCP](https://modelcontextprotocol.io/) 而构建
-- 专为与 Claude Desktop 无缝协作而设计
-- 受到腾讯犀牛鸟计划，改善 llm 表格集成需求的启发
+本项目采用 MIT 许可证。详情请参阅 [LICENSE](LICENSE) 文件。

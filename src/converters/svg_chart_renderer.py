@@ -479,6 +479,7 @@ class SVGChartRenderer:
         title_style = chart_data.get('title_style')
         svg = self._create_svg_root(chart_data.get('title', ''), title_style=title_style)
         series_list = chart_data.get('series', [])
+        self.current_series = series_list
         
         if not series_list:
             return self._format_svg(svg)

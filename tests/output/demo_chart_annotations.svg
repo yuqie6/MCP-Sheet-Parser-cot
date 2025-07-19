@@ -1,0 +1,53 @@
+<?xml version="1.0" ?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800px" height="600px" viewBox="0 0 800 600" style="background: #f8f9fa; border: 1px solid #dee2e6;">
+  <text x="400" y="30" text-anchor="middle" font-size="20px" font-weight="bold" fill="#333">Data Labels and Annotations Demo</text>
+  <rect x="50" y="60" width="700" height="500" fill="#ffffff" stroke="#ddd" stroke-width="1"/>
+  <g class="text-box-annotation" id="textbox-0">
+    <rect x="100" y="100" width="150" height="60" fill="#e8f4fd" stroke="#3498db" stroke-width="1" opacity="0.9" class="text-box-background" rx="8" ry="8"/>
+    <text x="175.0" y="121.60000000000001" text-anchor="middle" dominant-baseline="middle" font-size="14px" fill="#2c3e50" font-family="Arial" class="text-box-content" font-weight="bold">Market Analysis</text>
+    <text x="175.0" y="138.4" text-anchor="middle" dominant-baseline="middle" font-size="14px" fill="#2c3e50" font-family="Arial" class="text-box-content" font-weight="bold">Q4 2024</text>
+  </g>
+  <g class="text-box-annotation" id="textbox-1">
+    <rect x="300" y="120" width="120" height="40" fill="#f8f9fa" stroke="#6c757d" stroke-width="1" opacity="0.9" class="text-box-background"/>
+    <text x="360.0" y="140.0" text-anchor="middle" dominant-baseline="middle" font-size="12px" fill="#000000" font-family="Arial" class="text-box-content">Key Insights</text>
+  </g>
+  <g class="rectangle-annotation" id="shape-2">
+    <rect x="500" y="100" width="80" height="50" fill="#d4edda" stroke="#28a745" stroke-width="2" opacity="0.7" class="rectangle-shape"/>
+  </g>
+  <g class="circle-annotation" id="shape-3">
+    <circle cx="645" cy="135" r="25" fill="#f8d7da" stroke="#dc3545" stroke-width="1" opacity="0.7" class="circle-shape"/>
+  </g>
+  <g class="star-annotation" id="shape-4">
+    <polygon points="700.0,100.0 704.7022820183398,113.52786404500043 719.0211303259031,113.81966011250105 707.6084521303612,122.47213595499957 711.7557050458495,136.18033988749895 700.0,128.0 688.2442949541505,136.18033988749895 692.3915478696388,122.47213595499959 680.9788696740969,113.81966011250105 695.2977179816602,113.52786404500043" fill="#fff3cd" stroke="#ffc107" stroke-width="1" opacity="0.7" class="star-shape"/>
+  </g>
+  <g class="arrow-annotation" id="arrow-5">
+    <line x1="100" y1="250" x2="200" y2="300" stroke="#e74c3c" stroke-width="3" class="arrow-line"/>
+    <polygon points="200,300 190.0179653300854,300.59915260879217 194.49010128508496,291.654880698793" fill="#e74c3c" stroke="#e74c3c" stroke-width="1" class="arrow-head"/>
+    <text x="145.52786404500043" y="283.94427190999915" text-anchor="middle" dominant-baseline="middle" font-size="11px" fill="#333333" class="arrow-label">Trend</text>
+  </g>
+  <g class="arrow-annotation" id="arrow-6">
+    <line x1="350" y1="280" x2="450" y2="250" stroke="#27ae60" stroke-width="2" class="arrow-line" stroke-dasharray="5,5"/>
+    <polygon points="350,280 356.85827952630825,272.72236288765225 359.7317583819717,282.3006257398638" fill="#27ae60" stroke="#27ae60" stroke-width="1" class="arrow-head"/>
+    <polygon points="450,250 443.14172047369175,257.27763711234775 440.2682416180283,247.69937426013624" fill="#27ae60" stroke="#27ae60" stroke-width="1" class="arrow-head"/>
+    <text x="402.87347885566345" y="274.57826285221154" text-anchor="middle" dominant-baseline="middle" font-size="10px" fill="#333333" class="arrow-label">Correlation</text>
+  </g>
+  <g class="line-annotation" id="line-7">
+    <polyline points="100,400 200,380 300,420 400,390" fill="none" stroke="#3498db" stroke-width="2" class="straight-line"/>
+  </g>
+  <g class="line-annotation" id="line-8">
+    <path d="M 450 400 Q 550 360 650 410 700 380" fill="none" stroke="#9b59b6" stroke-width="3" class="curved-line"/>
+  </g>
+  <g class="line-annotation" id="line-9">
+    <path d="M 100 480 L 200 480 L 200 460 L 300 460 L 300 500 L 400 500 L 400 470" fill="none" stroke="#f39c12" stroke-width="2" class="stepped-line"/>
+  </g>
+  <g class="image-annotation" id="image-10">
+    <image x="500" y="450" width="100" height="80" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" class="embedded-image" opacity="0.8"/>
+    <rect x="500" y="450" width="100" height="80" fill="none" stroke="#6c757d" stroke-width="1" class="image-border"/>
+  </g>
+  <g class="callout-annotation" id="callout-11">
+    <rect x="576.0" y="285.4" width="148.0" height="29.2" fill="#ffffff" stroke="#17a2b8" stroke-width="1" rx="4" ry="4" class="callout-background"/>
+    <text x="650" y="300" text-anchor="middle" dominant-baseline="middle" font-size="11px" fill="#000000" class="callout-text">Important
+Data Point</text>
+    <line x1="650" y1="300" x2="600" y2="350" stroke="#17a2b8" stroke-width="1" class="callout-pointer"/>
+  </g>
+</svg>
