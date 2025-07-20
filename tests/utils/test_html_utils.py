@@ -52,7 +52,6 @@ def test_compact_html():
     compacted = compact_html(html)
     assert compacted == "<div>\n<p>Hello</p>\n</div>"
 
-# === TDD测试：提升HTMLUtils覆盖率到100% ===
 
 def test_escape_html_with_none_input():
     """
@@ -60,7 +59,6 @@ def test_escape_html_with_none_input():
 
     这个测试覆盖第20行的None处理代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = escape_html(None)
     assert result == ""
 
@@ -70,7 +68,6 @@ def test_escape_html_with_empty_string():
 
     这个测试确保空字符串被正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = escape_html("")
     assert result == ""
 
@@ -80,7 +77,6 @@ def test_escape_html_with_no_special_characters():
 
     这个测试确保没有特殊字符的文本不被修改
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     normal_text = "Hello World 123"
     result = escape_html(normal_text)
     assert result == normal_text
@@ -91,7 +87,6 @@ def test_generate_style_attribute_with_empty_list():
 
     这个测试覆盖第39行的空列表处理代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = generate_style_attribute([])
     assert result == ""
 
@@ -101,7 +96,6 @@ def test_generate_style_attribute_with_none_styles():
 
     这个测试确保None值被正确过滤
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     styles = ["color: red;", None, "font-size: 12px;", None]
     result = generate_style_attribute(styles)
     assert result == 'style="color: red; font-size: 12px;"'
@@ -112,7 +106,6 @@ def test_generate_class_attribute_with_empty_list():
 
     这个测试覆盖第54行的空列表处理代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = generate_class_attribute([])
     assert result == ""
 
@@ -122,7 +115,6 @@ def test_generate_class_attribute_with_none_classes():
 
     这个测试确保None值被正确过滤
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     classes = ["class1", None, "class2", None]
     result = generate_class_attribute(classes)
     assert result == 'class="class1 class2"'
@@ -133,7 +125,6 @@ def test_create_html_element_with_minimal_parameters():
 
     这个测试确保方法在只有标签名时正确工作
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = create_html_element("div")
     assert result == "<div></div>"
 
@@ -143,7 +134,6 @@ def test_create_html_element_with_self_closing_tag():
 
     这个测试覆盖第119行的自闭合标签处理代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = create_html_element("br", self_closing=True)
     assert result == "<br />"
 
@@ -157,7 +147,6 @@ def test_create_table_cell_with_all_parameters():
 
     这个测试确保方法能处理所有可能的参数组合
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = create_table_cell(
         content="Cell Content",
         is_header=True,
@@ -182,7 +171,6 @@ def test_create_table_cell_with_no_colspan_rowspan():
 
     这个测试确保方法在没有跨列跨行时正确工作
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = create_table_cell("Simple Cell")
 
     assert result.startswith("<td")
@@ -196,7 +184,6 @@ def test_create_svg_element_with_attributes():
 
     这个测试确保SVG元素能包含额外的属性
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = create_svg_element(
         width=200,
         height=100,
@@ -216,7 +203,6 @@ def test_compact_html_with_empty_string():
 
     这个测试确保空字符串被正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     result = compact_html("")
     assert result == ""
 
@@ -226,12 +212,10 @@ def test_compact_html_with_no_whitespace():
 
     这个测试确保已经紧凑的HTML不被过度处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     compact_html_input = "<div><p>Hello</p></div>"
     result = compact_html(compact_html_input)
     assert result == compact_html_input
 
-# === TDD测试：提升html_utils覆盖率到100% ===
 
 class TestEscapeHtmlEdgeCases:
     """测试escape_html的边界情况。"""
@@ -242,7 +226,7 @@ class TestEscapeHtmlEdgeCases:
 
         这个测试覆盖第22行的类型转换代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 测试数字
         assert escape_html(123) == "123"
@@ -272,7 +256,7 @@ class TestGenerateStyleAttributeEdgeCases:
 
         这个测试覆盖第45行的空valid_parts处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 测试全为None的列表
         result = generate_style_attribute([None, None, None])
@@ -295,7 +279,7 @@ class TestGenerateClassAttributeEdgeCases:
 
         这个测试覆盖第64行的空valid_classes处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 测试全为None的列表
         result = generate_class_attribute([None, None, None])
@@ -318,7 +302,7 @@ class TestCreateTableCellWithTitle:
 
         这个测试覆盖第135行的title属性设置代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 测试带title的表格单元格
         result = create_table_cell("Content", title="Tooltip text")

@@ -23,8 +23,7 @@
       "PingFang",
       "Hiragino",
       "Yu Gothic",
-      "Meiryo",
-      "测试字体"
+      "Meiryo"
     ],
     "monospace_keywords": [
       "Courier",
@@ -97,7 +96,5 @@
       ]
     }
   },
-  "custom_mappings": {
-    "测试映射": "目标字体"
-  }
+  "custom_mappings": {}
 }

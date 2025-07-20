@@ -73,7 +73,6 @@ def test_format_border_color():
     assert format_border_color("#D8D8D8") == "#E0E0E0"
     assert format_border_color("#FF0000") == "#FF0000"
 
-# === TDD测试：提升BorderUtils覆盖率到100% ===
 
 def test_get_border_style_with_invalid_color(mock_border_side):
     """
@@ -81,7 +80,6 @@ def test_get_border_style_with_invalid_color(mock_border_side):
 
     这个测试覆盖第69行的异常处理代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     border = mock_border_side("thin")
     border.color = MagicMock()
     border.color.rgb = "INVALID_COLOR"  # 无效颜色
@@ -99,7 +97,6 @@ def test_get_border_style_with_color_attribute_error(mock_border_side):
 
     这个测试覆盖第78行的异常处理代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     border = mock_border_side("thin")
     border.color = MagicMock()
     # 模拟访问rgb属性时抛出AttributeError
@@ -118,7 +115,6 @@ def test_get_border_style_with_unknown_style(mock_border_side):
 
     这个测试覆盖第102行的默认情况
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     border = mock_border_side("unknown_style", "FF0000")
 
     # 应该使用默认的solid样式
@@ -131,7 +127,6 @@ def test_get_border_style_with_thick_style(mock_border_side):
 
     这个测试覆盖BORDER_STYLE_MAP中thick样式的处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     border = mock_border_side("thick", "00FF00")
 
     result = get_border_style(border)
@@ -143,7 +138,6 @@ def test_parse_border_style_complete_with_complex_custom_style():
 
     这个测试覆盖第113行的自定义样式处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试包含多个空格的样式
     result = parse_border_style_complete("2px   dotted", "#FF0000")
@@ -159,7 +153,6 @@ def test_get_xls_border_style_name_with_all_known_values():
 
     这个测试确保所有映射值都被正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试所有已知的XLS边框样式
     assert get_xls_border_style_name(0) == "none"
@@ -178,7 +171,6 @@ def test_format_border_color_with_edge_cases():
 
     这个测试覆盖各种边界情况的颜色处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试空字符串
     assert format_border_color("") == "#E0E0E0"
@@ -202,7 +194,6 @@ def test_border_style_map_completeness():
 
     这个测试确保边框样式映射的完整性
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 验证BORDER_STYLE_MAP包含预期的键
     expected_styles = [
@@ -221,7 +212,6 @@ def test_border_style_map_completeness():
         else:
             assert len(style_value) > 0
 
-# === TDD测试：提升border_utils覆盖率到95%+ ===
 
 class TestFormatBorderColorEdgeCases:
     """测试format_border_color的边界情况。"""
@@ -232,7 +222,7 @@ class TestFormatBorderColorEdgeCases:
 
         这个测试覆盖第78行的特定颜色转换代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 测试需要转换的特定灰色
         assert format_border_color("#D8D8D8") == "#E0E0E0"
@@ -253,7 +243,7 @@ class TestGetBorderStyleEdgeCases:
 
         这个测试覆盖第87行的旧格式返回代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 创建一个没有颜色的边框对象
         mock_border = MagicMock()
@@ -275,7 +265,7 @@ class TestParseBorderStyleCompleteEdgeCases:
 
         这个测试覆盖第115行的单个样式信息处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 查找一个映射为字符串而不是元组的样式
         # 从BORDER_STYLE_MAP中找到一个字符串值的样式
@@ -310,7 +300,7 @@ class TestParseBorderStyleCompleteEdgeCases:
 
         这个测试覆盖第126行的默认返回代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 使用一个无法解析的样式字符串
         result = parse_border_style_complete("invalid_unparseable_style", "#FF0000")
@@ -335,7 +325,7 @@ class TestGetBorderStyleStringFormat:
 
         这个测试覆盖第87行的字符串格式返回代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 临时修改BORDER_STYLE_MAP来包含一个字符串值
         original_value = BORDER_STYLE_MAP.get('test_string_style')
@@ -365,7 +355,7 @@ class TestGetBorderStyleStringFormat:
 
         这个测试覆盖第78行else分支的正常颜色处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 使用一个正常的颜色（不在转换列表中）
         border = mock_border_side("thin", "00FF00")  # 绿色
@@ -387,7 +377,7 @@ class TestGetBorderStyleStringFormat:
 
         这个测试覆盖第78行的特定灰色转换代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
+
 
         # 测试需要转换的特定灰色
         border = mock_border_side("thin", "D8D8D8")

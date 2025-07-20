@@ -166,7 +166,6 @@ class TestCellConverterNumberFormatting:
         # _apply_number_format will raise an exception, which is caught, and convert() will fall back
         assert cell_converter.convert(cell) == "not-a-number"
 
-    # === TDD测试：提升CellConverter覆盖率到100% ===
 
     def test_convert_with_rich_text_empty_fragments(self, cell_converter, cell_factory):
         """
@@ -174,7 +173,6 @@ class TestCellConverterNumberFormatting:
 
         这个测试覆盖第59-60行的空富文本处理代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         cell = cell_factory(value="fallback text")
         cell.rich_text = []  # 空的富文本片段列表
 
@@ -189,7 +187,6 @@ class TestCellConverterNumberFormatting:
 
         这个测试确保方法在富文本为None时正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         cell = cell_factory(value="fallback text")
         cell.rich_text = None
 
@@ -204,7 +201,6 @@ class TestCellConverterNumberFormatting:
 
         这个测试覆盖第110-111行的异常处理代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         # 这应该不会抛出异常，而是返回原始值
         result = cell_converter._apply_number_format("invalid_number", "0.00")
         assert result == "invalid_number"
@@ -215,7 +211,6 @@ class TestCellConverterNumberFormatting:
 
         这个测试确保方法在格式为None时返回原始值
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         result = cell_converter._apply_number_format(123.456, None)
         assert result == "123.456"
 
@@ -225,7 +220,6 @@ class TestCellConverterNumberFormatting:
 
         这个测试确保方法在格式为空字符串时返回原始值
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         result = cell_converter._apply_number_format(123.456, "")
         assert result == "123.456"
 
@@ -235,7 +229,6 @@ class TestCellConverterNumberFormatting:
 
         这个测试覆盖第120行的富文本格式化代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         fragments = [
             RichTextFragment(
                 text="Bold text",
@@ -265,7 +258,6 @@ class TestCellConverterNumberFormatting:
 
         这个测试确保所有富文本样式都被正确应用
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         style = RichTextFragmentStyle(
             bold=True,
             italic=True,
@@ -294,7 +286,6 @@ class TestCellConverterNumberFormatting:
 
         这个测试确保没有样式的片段被正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         fragment = RichTextFragment(text="Plain text", style=RichTextFragmentStyle())
 
         result = cell_converter._format_rich_text_fragment(fragment)
@@ -308,7 +299,6 @@ def test_format_chinese_date_with_valid_date():
 
     这个测试验证中文日期格式化功能
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     test_date = datetime(2023, 12, 25, 14, 30, 45)
 
     result = format_chinese_date(test_date, 'yyyy"年"m"月"d"日"')
@@ -322,7 +312,6 @@ def test_format_chinese_date_with_different_format():
 
     这个测试确保函数能处理不同的中文日期格式
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     test_date = datetime(2023, 12, 25, 14, 30, 45)
 
     # 测试月日格式
@@ -333,8 +322,6 @@ def test_format_chinese_date_with_different_format():
     result = format_chinese_date(test_date, "other_format")
     assert "12月25日" in result
 
-# === TDD测试：提升cell_converter覆盖率到95%+ ===
-
 class TestCellConverterExceptionHandling:
     """测试CellConverter的异常处理。"""
 
@@ -344,9 +331,7 @@ class TestCellConverterExceptionHandling:
 
         这个测试覆盖第59-60行的异常处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
-
-        # 创建一个会导致格式化异常的单元格
+        
         style = Style()
         style.number_format = "invalid_format"
         cell = cell_factory(value=123.45, style=style)
@@ -364,9 +349,7 @@ class TestCellConverterExceptionHandling:
 
         这个测试覆盖第112-113行的异常处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
-        # 使用一个会导致日期转换异常的数值
         with patch('src.converters.cell_converter.timedelta', side_effect=OverflowError("Date out of range")):
             result = cell_converter._apply_number_format(99999999.0, "yyyy-mm-dd")
 
@@ -379,9 +362,6 @@ class TestCellConverterExceptionHandling:
 
         这个测试覆盖第122行的默认日期格式代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
-
-        from datetime import datetime
 
         # 使用一个不匹配任何预定义格式的日期格式
         test_date = datetime(2023, 12, 25)  # 不包含时间部分
@@ -399,8 +379,6 @@ class TestCellConverterAdditionalCoverage:
 
         这个测试确保第58行的成功路径被覆盖
         """
-        # 🔴 红阶段：编写测试描述期望的行为
-
         style = Style()
         style.number_format = "0.00"
         cell = cell_factory(value=123.456, style=style)
@@ -418,8 +396,6 @@ class TestCellConverterAdditionalCoverage:
 
         这个测试确保第110-111行的成功路径被覆盖
         """
-        # 🔴 红阶段：编写测试描述期望的行为
-
         # 使用一个有效的Excel日期数值（2023年1月1日）
         excel_date = 44927.0  # 2023-01-01
         result = cell_converter._apply_number_format(excel_date, "yyyy年mm月dd日")

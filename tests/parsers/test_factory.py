@@ -47,7 +47,6 @@ def test_supports_streaming(mock_get_parser):
     mock_parser.supports_streaming.return_value = False
     assert ParserFactory.supports_streaming("non_streaming.xls") is False
 
-# === TDD测试：提升ParserFactory覆盖率到100% ===
 
 @patch('src.parsers.factory.validate_file_input')
 def test_get_parser_xls(mock_validate):
@@ -56,7 +55,6 @@ def test_get_parser_xls(mock_validate):
 
     这个测试覆盖XLS文件类型的解析器创建代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     from src.parsers.xls_parser import XlsParser
 
     mock_validate.return_value = ("dummy.xls", "xls")
@@ -70,7 +68,6 @@ def test_get_parser_with_exception_handling(mock_validate):
 
     这个测试覆盖异常处理的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     mock_validate.return_value = ("dummy.xlsx", "xlsx")
 
     # 模拟解析器创建时抛出异常
@@ -85,7 +82,6 @@ def test_is_supported_format_with_various_extensions():
 
     这个测试覆盖所有支持的文件格式检查
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试支持的格式
     supported_files = [
@@ -112,7 +108,6 @@ def test_is_supported_format_with_no_extension():
 
     这个测试确保方法在文件没有扩展名时正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     assert ParserFactory.is_supported_format("filename_without_extension") is False
     assert ParserFactory.is_supported_format("") is False
 
@@ -122,7 +117,6 @@ def test_is_supported_format_with_path_separators():
 
     这个测试确保方法能正确处理完整的文件路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # Unix风格路径
     assert ParserFactory.is_supported_format("/path/to/file.xlsx") is True
@@ -138,7 +132,6 @@ def test_get_supported_formats_completeness():
 
     这个测试确保返回的格式列表包含所有预期的格式
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     formats = ParserFactory.get_supported_formats()
 
     # 验证返回的是列表
@@ -159,8 +152,6 @@ def test_supports_streaming_with_exception(mock_get_parser):
 
     这个测试覆盖异常处理的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 模拟get_parser抛出异常
     mock_get_parser.side_effect = Exception("Parser creation failed")
 
@@ -175,8 +166,6 @@ def test_supports_streaming_with_parser_without_method(mock_get_parser):
 
     这个测试确保方法在解析器缺少方法时正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 创建一个没有supports_streaming方法的模拟解析器
     mock_parser = object()  # 简单对象，没有supports_streaming方法
     mock_get_parser.return_value = mock_parser
@@ -191,8 +180,6 @@ def test_parser_factory_is_static():
 
     这个测试验证工厂类的设计模式
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 验证所有方法都是静态方法或类方法
     assert hasattr(ParserFactory, 'get_parser')
     assert hasattr(ParserFactory, 'get_supported_formats')
@@ -210,8 +197,6 @@ def test_get_parser_with_case_insensitive_extension(mock_validate):
 
     这个测试确保文件扩展名的大小写不影响解析器选择
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 测试大写扩展名
     mock_validate.return_value = ("dummy.XLSX", "xlsx")
     parser = ParserFactory.get_parser("dummy.XLSX")
@@ -228,7 +213,6 @@ def test_get_format_info():
 
     这个测试覆盖第91行的get_format_info方法
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     format_info = ParserFactory.get_format_info()
 
     # 验证返回的是字典
@@ -252,8 +236,6 @@ def test_is_supported_format_with_malformed_filename():
 
     这个测试覆盖第143-144行的IndexError异常处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 测试空字符串（会导致IndexError）
     assert ParserFactory.is_supported_format("") is False
 
@@ -270,8 +252,6 @@ def test_is_supported_format_edge_cases():
 
     这个测试确保覆盖IndexError异常处理的所有情况
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 直接测试会导致IndexError的情况
     # 空字符串split('.')[-1]会导致IndexError
     result = ParserFactory.is_supported_format("")
@@ -287,7 +267,6 @@ def test_get_streaming_formats():
 
     这个测试覆盖第171-181行的get_streaming_formats方法
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     streaming_formats = ParserFactory.get_streaming_formats()
 
     # 验证返回的是列表
@@ -305,8 +284,6 @@ def test_get_streaming_formats_with_parser_creation_failure():
 
     这个测试覆盖第178-180行的异常处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 模拟一个会在创建时抛出异常的解析器类
     class FailingParser:
         def __init__(self):
@@ -336,8 +313,6 @@ def test_create_lazy_sheet(mock_get_parser):
 
     这个测试覆盖第198-199行的create_lazy_sheet方法
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 创建模拟解析器
     mock_parser = MagicMock()
     mock_lazy_sheet = MagicMock()
@@ -359,8 +334,6 @@ def test_create_lazy_sheet_without_sheet_name(mock_get_parser):
 
     这个测试确保方法支持可选的sheet_name参数
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 创建模拟解析器
     mock_parser = MagicMock()
     mock_lazy_sheet = MagicMock()

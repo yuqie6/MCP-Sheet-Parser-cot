@@ -163,7 +163,6 @@ class TestCsvRowProvider:
         rows = list(provider.iter_rows())
         assert len(rows) == 0
 
-    # === TDD测试：提升CSV解析器覆盖率到100% ===
 
     def test_parse_with_encoding_detection_failure(self, create_csv_file):
         """
@@ -171,7 +170,6 @@ class TestCsvRowProvider:
 
         这个测试覆盖第28-29行的编码检测失败代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         # 创建一个包含特殊字符的文件，可能导致编码检测困难
         content = "header1,header2\nvalue1,value2"
         file_path = create_csv_file("encoding_test.csv", content, "latin-1")
@@ -189,7 +187,6 @@ class TestCsvRowProvider:
 
         这个测试覆盖第40-41行的CSV错误处理代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         # 创建一个格式错误的CSV文件
         content = 'header1,header2\n"unclosed quote,value2\nvalue3,value4'
         file_path = create_csv_file("malformed.csv", content)
@@ -206,7 +203,6 @@ class TestCsvRowProvider:
 
         这个测试确保方法在文件不存在时正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         parser = CsvParser()
         non_existent_file = str(tmp_path / "non_existent.csv")
 
@@ -220,7 +216,6 @@ class TestCsvRowProvider:
 
         这个测试验证流式处理支持
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         parser = CsvParser()
         assert parser.supports_streaming() is True
 
@@ -230,7 +225,6 @@ class TestCsvRowProvider:
 
         这个测试覆盖第84行的LazySheet创建代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         content = "header1,header2\nvalue1,value2"
         file_path = create_csv_file("lazy_test.csv", content)
 
@@ -247,7 +241,6 @@ class TestCsvRowProvider:
 
         这个测试确保sheet_name参数被正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         content = "header1,header2\nvalue1,value2"
         file_path = create_csv_file("named_sheet.csv", content)
 
@@ -266,7 +259,6 @@ class TestCsvRowProviderAdditional:
 
         这个测试确保空文件的行数计算正确
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         file_path = create_csv_file("empty_rows.csv", "")
         provider = CsvRowProvider(str(file_path))
 
@@ -279,7 +271,6 @@ class TestCsvRowProviderAdditional:
 
         这个测试确保单行文件的行数计算正确
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         content = "header1,header2"
         file_path = create_csv_file("single_line.csv", content)
         provider = CsvRowProvider(str(file_path))
@@ -293,7 +284,6 @@ class TestCsvRowProviderAdditional:
 
         这个测试确保方法在索引超出范围时正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         content = "header1,header2\nvalue1,value2"
         file_path = create_csv_file("short_file.csv", content)
         provider = CsvRowProvider(str(file_path))
@@ -308,7 +298,6 @@ class TestCsvRowProviderAdditional:
 
         这个测试确保方法在请求的行数超过文件实际行数时正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         content = "a,b\nc,d"
         file_path = create_csv_file("short_iter.csv", content)
         provider = CsvRowProvider(str(file_path))
@@ -323,7 +312,6 @@ class TestCsvRowProviderAdditional:
 
         这个测试确保方法在起始行在文件末尾时返回空结果
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         content = "a,b\nc,d"
         file_path = create_csv_file("end_start.csv", content)
         provider = CsvRowProvider(str(file_path))
@@ -332,7 +320,6 @@ class TestCsvRowProviderAdditional:
         rows = list(provider.iter_rows(start_row=10))
         assert len(rows) == 0
 
-# === TDD测试：提升csv_parser覆盖率到100% ===
 
 class TestCsvRowProviderEncodingDetection:
     """测试CsvRowProvider的编码检测功能。"""
@@ -343,7 +330,6 @@ class TestCsvRowProviderEncodingDetection:
 
         这个测试覆盖第28-29行的异常处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
         # 创建一个包含GBK特有字符的文件，这些字符在UTF-8下会导致解码错误
         content = "测试,数据\n中文,内容"
@@ -370,7 +356,6 @@ class TestCsvParserStyleExtraction:
 
         这个测试覆盖第84行的返回None代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
         content = "header1,header2\nvalue1,value2"
         file_path = create_csv_file("test_style.csv", content, "utf-8")

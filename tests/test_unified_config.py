@@ -7,7 +7,6 @@ def config():
     """Fixture for UnifiedConfig."""
     return UnifiedConfig()
 
-# === TDD测试：提升UnifiedConfig覆盖率 ===
 
 def test_config_initialization_with_defaults():
     """
@@ -15,7 +14,6 @@ def test_config_initialization_with_defaults():
 
     这个测试覆盖初始化的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config = UnifiedConfig()
 
     # 验证默认值（使用实际的属性名）
@@ -32,7 +30,6 @@ def test_is_cache_enabled_with_both_enabled(config):
     
     这个测试覆盖第71行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config.memory_cache_enabled = True
     config.disk_cache_enabled = True
     
@@ -44,7 +41,6 @@ def test_is_cache_enabled_with_memory_only(config):
     
     这个测试覆盖第71行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config.memory_cache_enabled = True
     config.disk_cache_enabled = False
     
@@ -56,7 +52,6 @@ def test_is_cache_enabled_with_disk_only(config):
     
     这个测试覆盖第71行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config.memory_cache_enabled = False
     config.disk_cache_enabled = True
     
@@ -68,7 +63,6 @@ def test_is_cache_enabled_with_both_disabled(config):
     
     这个测试覆盖第71行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config.memory_cache_enabled = False
     config.disk_cache_enabled = False
     
@@ -82,7 +76,6 @@ def test_config_with_environment_variables():
     这个测试覆盖环境变量处理的代码路径
     注意：当前实现不支持环境变量，使用默认值
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config = UnifiedConfig()
 
     # 验证使用默认值（当前实现不支持环境变量）
@@ -95,7 +88,6 @@ def test_config_with_numeric_environment_variables():
 
     这个测试覆盖数值环境变量处理的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config = UnifiedConfig()
 
     # 验证数值环境变量被正确读取（注意：当前实现不支持环境变量，所以使用默认值）
@@ -107,7 +99,6 @@ def test_get_cache_config():
 
     这个测试覆盖缓存配置获取的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     from src.unified_config import get_cache_config
 
     config = get_cache_config()
@@ -123,7 +114,6 @@ def test_get_streaming_config():
     
     这个测试覆盖第85行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     from src.unified_config import get_streaming_config
     
     config = get_streaming_config()
@@ -137,7 +127,6 @@ def test_get_conversion_config():
     
     这个测试覆盖第88行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     from src.unified_config import get_conversion_config
     
     config = get_conversion_config()
@@ -151,7 +140,6 @@ def test_get_parsing_config():
     
     这个测试覆盖第91行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     from src.unified_config import get_parsing_config
     
     config = get_parsing_config()
@@ -165,7 +153,6 @@ def test_get_validation_config():
     
     这个测试覆盖第94行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     from src.unified_config import get_validation_config
     
     config = get_validation_config()
@@ -179,7 +166,6 @@ def test_get_font_config():
     
     这个测试覆盖第97行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     from src.unified_config import get_font_config
     
     config = get_font_config()
@@ -194,7 +180,6 @@ def test_config_with_invalid_boolean_environment_variable():
     
     这个测试确保方法在遇到无效布尔值时使用默认值
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config = UnifiedConfig()
     
     # 应该使用默认值而不是崩溃
@@ -207,7 +192,6 @@ def test_config_with_invalid_numeric_environment_variable():
 
     这个测试确保方法在遇到无效数值时使用默认值
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     config = UnifiedConfig()
 
     # 应该使用默认值而不是崩溃（当前实现不支持环境变量）
@@ -219,7 +203,6 @@ def test_config_validation_errors():
 
     这个测试覆盖第82-97行的验证错误代码
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试max_file_size_mb <= 0
     config = UnifiedConfig()
@@ -265,7 +248,6 @@ def test_get_default_cache_dir_unix():
 
     这个测试覆盖第73行的Unix缓存目录逻辑
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 简化测试，只验证逻辑而不实际创建对象
     with patch('os.name', 'posix'):
@@ -286,7 +268,6 @@ def test_get_cache_dir_with_none_cache_dir():
 
     这个测试覆盖第101-105行的缓存目录为空处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     config = UnifiedConfig()
     # 手动设置cache_dir为None
@@ -307,7 +288,6 @@ def test_config_manager_update_config():
 
     这个测试覆盖第127-136行的配置更新代码
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     from src.unified_config import ConfigManager
 
@@ -331,7 +311,6 @@ def test_config_manager_reset_to_defaults():
 
     这个测试覆盖第140-142行的重置代码
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     from src.unified_config import ConfigManager
 
@@ -356,7 +335,6 @@ def test_module_level_getter_functions():
 
     这个测试覆盖第191-279行的各种getter函数
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     from src.unified_config import (
         get_cache_config, get_streaming_config, get_conversion_config,
@@ -399,7 +377,6 @@ def test_module_level_update_config():
 
     这个测试覆盖第191行的update_config函数
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     from src.unified_config import update_config, get_config
 
@@ -423,7 +400,6 @@ def test_config_manager_singleton_behavior():
 
     这个测试确保配置管理器的一致性
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     from src.unified_config import ConfigManager
 

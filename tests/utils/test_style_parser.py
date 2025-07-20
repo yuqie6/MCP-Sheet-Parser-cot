@@ -1,9 +1,10 @@
 import pytest
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
 from src.utils.style_parser import (
     extract_style,
     extract_cell_value,
-    extract_fill_color
+    extract_fill_color,
+    style_to_dict
 )
 from src.models.table_model import Style, RichTextFragment
 
@@ -217,7 +218,6 @@ class TestExtractMisc:
         style = extract_style(cell)
         assert style.comment == "This is a comment."
 
-# === TDD测试：提升style_parser覆盖率到90%+ ===
 
 class TestExtractCellValueEdgeCases:
     """测试extract_cell_value函数的边界情况。"""
@@ -228,7 +228,6 @@ class TestExtractCellValueEdgeCases:
 
         这个测试覆盖第57行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_cell = MagicMock()
         # 删除value属性
         del mock_cell.value
@@ -242,7 +241,6 @@ class TestExtractCellValueEdgeCases:
 
         这个测试覆盖基本的None值处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         cell = mock_cell_factory(value=None)
         result = extract_cell_value(cell)
         assert result is None
@@ -256,7 +254,6 @@ class TestRichTextEdgeCases:
 
         这个测试覆盖第19行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         from src.utils.style_parser import _extract_rich_text
 
         mock_cell = MagicMock()
@@ -272,7 +269,6 @@ class TestRichTextEdgeCases:
 
         这个测试覆盖第19行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         from src.utils.style_parser import _extract_rich_text
 
         mock_cell = MagicMock()
@@ -287,7 +283,6 @@ class TestRichTextEdgeCases:
 
         这个测试覆盖第35行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         from src.utils.style_parser import _extract_rich_text
 
         mock_cell = MagicMock()
@@ -309,7 +304,6 @@ class TestRichTextEdgeCases:
 
         这个测试覆盖第50行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         from src.utils.style_parser import _extract_rich_text
 
         mock_cell = MagicMock()
@@ -332,7 +326,6 @@ class TestExtractStyleEdgeCases:
 
         这个测试覆盖第68行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_cell = MagicMock()
         # 删除has_style属性
         del mock_cell.has_style
@@ -348,7 +341,6 @@ class TestExtractStyleEdgeCases:
 
         这个测试覆盖第68行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         cell = mock_cell_factory(has_style=False)
 
         result = extract_style(cell)
@@ -362,7 +354,6 @@ class TestExtractStyleEdgeCases:
 
         这个测试覆盖字体为空的处理逻辑
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         cell = mock_cell_factory(has_style=True, font=None)
 
         result = extract_style(cell)
@@ -377,7 +368,6 @@ class TestExtractStyleEdgeCases:
 
         这个测试覆盖字体属性的None值处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_font = MagicMock()
         mock_font.bold = None
         mock_font.italic = None
@@ -406,7 +396,6 @@ class TestExtractFillColorEdgeCases:
 
         这个测试覆盖填充类型检查的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_fill = MagicMock()
         mock_fill.patternType = None
 
@@ -419,7 +408,6 @@ class TestExtractFillColorEdgeCases:
 
         这个测试覆盖颜色提取的边界情况
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_fill = MagicMock()
         mock_fill.patternType = 'solid'
         mock_fill.start_color = None
@@ -427,3 +415,220 @@ class TestExtractFillColorEdgeCases:
         result = extract_fill_color(mock_fill)
         # 实际实现返回默认颜色而不是None
         assert result == '#000000'
+
+# === 边界情况和未覆盖代码测试 ===
+
+class TestExtractStyleEdgeCases:
+    """测试extract_style函数的边界情况和未覆盖代码。"""
+
+    def test_extract_style_with_no_font(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该处理没有字体的单元格
+
+        这个测试覆盖第41行的else分支
+        """
+        cell = mock_cell_factory(value="test", has_style=True, font=None)
+
+        style = extract_style(cell)
+
+        # 验证样式对象被创建，但没有字体相关属性
+        assert style is not None
+        assert style.bold is False
+        assert style.italic is False
+        assert style.font_name is None
+
+    def test_extract_style_with_background_color_applied(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该应用背景颜色
+
+        这个测试覆盖第88行的背景颜色应用
+        """
+        # 创建模拟填充对象
+        mock_fill = MagicMock()
+        mock_fill.patternType = 'solid'
+        mock_fill.start_color.rgb = 'FFFF0000'  # 红色
+
+        cell = mock_cell_factory(value="test", has_style=True, fill=mock_fill)
+
+        # 模拟extract_fill_color返回颜色
+        with patch('src.utils.style_parser.extract_fill_color', return_value='#FF0000'):
+            style = extract_style(cell)
+
+        # 验证背景颜色被应用
+        assert style.background_color == '#FF0000'
+
+    def test_extract_style_with_hyperlink_target(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该提取超链接目标
+
+        这个测试覆盖第125-126行的超链接目标提取
+        """
+        # 创建模拟超链接对象
+        mock_hyperlink = MagicMock()
+        mock_hyperlink.target = "https://example.com"
+
+        cell = mock_cell_factory(value="link", has_style=True, hyperlink=mock_hyperlink)
+
+        style = extract_style(cell)
+
+        # 验证超链接被提取
+        assert style.hyperlink == "https://example.com"
+
+    def test_extract_style_with_hyperlink_location(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该提取超链接位置
+
+        这个测试覆盖第127-130行的超链接位置提取
+        """
+        # 创建模拟超链接对象（没有target但有location）
+        mock_hyperlink = MagicMock()
+        mock_hyperlink.target = None
+        mock_hyperlink.location = "Sheet1!A1"
+
+        cell = mock_cell_factory(value="link", has_style=True, hyperlink=mock_hyperlink)
+
+        style = extract_style(cell)
+
+        # 验证超链接位置被提取并添加#前缀
+        assert style.hyperlink == "#Sheet1!A1"
+
+    def test_extract_style_with_hyperlink_exception(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该处理超链接提取异常
+
+        这个测试覆盖第131-132行的异常处理
+        """
+        # 创建会抛出异常的模拟超链接对象
+        mock_hyperlink = MagicMock()
+        mock_hyperlink.target = property(lambda self: (_ for _ in ()).throw(Exception("超链接错误")))
+
+        cell = mock_cell_factory(value="link", has_style=True, hyperlink=mock_hyperlink)
+
+        # 应该不抛出异常
+        style = extract_style(cell)
+
+        # 验证超链接为None（异常被忽略）
+        assert style.hyperlink is None
+
+    def test_extract_style_with_comment_text(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该提取注释文本
+
+        这个测试覆盖第137-138行的注释文本提取
+        """
+        # 创建模拟注释对象
+        mock_comment = MagicMock()
+        mock_comment.text = "这是一个注释"
+
+        cell = mock_cell_factory(value="test", has_style=True, comment=mock_comment)
+
+        style = extract_style(cell)
+
+        # 验证注释被提取
+        assert style.comment == "这是一个注释"
+
+    def test_extract_style_with_comment_content(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该提取注释内容（兼容性）
+
+        这个测试覆盖第139-140行的注释内容提取
+        """
+        # 创建模拟注释对象（没有text但有content）
+        mock_comment = MagicMock()
+        del mock_comment.text  # 删除text属性
+        mock_comment.content = "兼容性注释"
+
+        cell = mock_cell_factory(value="test", has_style=True, comment=mock_comment)
+
+        style = extract_style(cell)
+
+        # 验证注释内容被提取
+        assert style.comment == "兼容性注释"
+
+    def test_extract_style_with_comment_exception(self, mock_cell_factory):
+        """
+        TDD测试：extract_style应该处理注释提取异常
+
+        这个测试覆盖第141-142行的异常处理
+        """
+        # 创建会在str()调用时抛出异常的模拟注释对象
+        class BadComment:
+            def __init__(self):
+                self.text = BadText()
+
+        class BadText:
+            def __str__(self):
+                raise TypeError("无法转换为字符串")
+
+        cell = mock_cell_factory(value="test", has_style=True, comment=BadComment())
+
+        # 应该不抛出异常
+        style = extract_style(cell)
+
+        # 验证注释为None（异常被忽略）
+        assert style.comment is None
+
+class TestExtractFillColorEdgeCases:
+    """测试extract_fill_color函数的边界情况。"""
+
+    def test_extract_fill_color_with_exception(self):
+        """
+        TDD测试：extract_fill_color应该处理提取异常
+
+        这个测试覆盖第182-183行的异常处理
+        """
+        # 创建会抛出异常的模拟填充对象
+        mock_fill = MagicMock()
+        mock_fill.patternType = property(lambda self: (_ for _ in ()).throw(Exception("填充错误")))
+
+        # 应该不抛出异常，返回None
+        result = extract_fill_color(mock_fill)
+        assert result is None
+
+class TestStyleToDict:
+    """测试style_to_dict函数。"""
+
+    def test_style_to_dict_with_none_style(self):
+        """
+        TDD测试：style_to_dict应该处理None样式
+
+        这个测试覆盖第190-191行的None检查
+        """
+        result = style_to_dict(None)
+        assert result == {}
+
+    def test_style_to_dict_with_custom_style(self):
+        """
+        TDD测试：style_to_dict应该转换自定义样式
+
+        这个测试覆盖第196-201行的样式转换逻辑
+        """
+        # 创建自定义样式
+        style = Style(
+            bold=True,
+            font_name="Arial",
+            background_color="#FF0000",
+            text_align="center"
+        )
+
+        result = style_to_dict(style)
+
+        # 验证只包含非默认值的属性
+        expected_keys = {'bold', 'font_name', 'background_color', 'text_align'}
+        assert set(result.keys()) == expected_keys
+        assert result['bold'] is True
+        assert result['font_name'] == "Arial"
+        assert result['background_color'] == "#FF0000"
+        assert result['text_align'] == "center"
+
+    def test_style_to_dict_with_default_style(self):
+        """
+        TDD测试：style_to_dict应该处理默认样式
+
+        这个测试验证默认样式返回空字典
+        """
+        default_style = Style()
+        result = style_to_dict(default_style)
+
+        # 默认样式应该返回空字典（所有值都是默认值）
+        assert result == {}

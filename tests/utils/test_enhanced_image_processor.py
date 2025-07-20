@@ -54,15 +54,12 @@ def test_generate_placeholder_html(processor):
     html = processor._generate_placeholder_html("Placeholder")
     assert '图片加载失败: Placeholder' in html
 
-# === TDD测试：提升EnhancedImageProcessor覆盖率到100% ===
-
 def test_detect_image_format_with_edge_cases(processor):
     """
     TDD测试：detect_image_format应该处理边界情况
 
     这个测试覆盖各种边界情况的图像格式检测
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试非常短的数据
     assert processor.detect_image_format(b'\x89') == 'unknown'
@@ -82,7 +79,6 @@ def test_detect_image_format_webp_support(processor):
 
     这个测试覆盖WebP格式检测的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     fake_webp = b'RIFF\x00\x00\x00\x00WEBP'
 
     result = processor.detect_image_format(fake_webp)
@@ -94,7 +90,6 @@ def test_detect_image_format_tiff_support(processor):
 
     这个测试覆盖TIFF格式检测的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     fake_tiff_le = b'II*\x00'  # Little-endian TIFF
     fake_tiff_be = b'MM\x00*'  # Big-endian TIFF
 
@@ -107,7 +102,6 @@ def test_validate_image_data_with_minimum_sizes(processor):
 
     这个测试确保方法正确验证图像数据的最小大小要求
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试刚好达到最小大小的数据
     min_size_data = b'x' * 10  # 假设最小大小是10字节
@@ -123,7 +117,6 @@ def test_validate_image_data_with_various_formats(processor):
 
     这个测试确保所有支持的格式都被正确验证
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 创建更完整的测试数据
     complete_png = FAKE_PNG + b'\x00' * 20  # 添加更多数据使其看起来更真实
@@ -142,7 +135,6 @@ def test_optimize_image_size_with_different_max_sizes(processor):
 
     这个测试覆盖optimize_image_size方法的各种参数组合
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试非常小的最大大小
     result = processor.optimize_image_size(FAKE_PNG, max_size=1)
@@ -162,7 +154,6 @@ def test_generate_image_html_with_empty_alt_text(processor):
 
     这个测试确保方法在没有alt文本时正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     html = processor.generate_image_html(FAKE_PNG, alt_text="")
 
     assert '<img src="data:image/png;base64,' in html
@@ -174,7 +165,6 @@ def test_generate_image_html_with_none_alt_text(processor):
 
     这个测试确保方法在alt文本为None时正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     html = processor.generate_image_html(FAKE_PNG, alt_text=None)
 
     assert '<img src="data:image/png;base64,' in html
@@ -186,7 +176,6 @@ def test_generate_image_html_with_special_characters_in_alt(processor):
 
     这个测试确保HTML特殊字符被正确转义
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     alt_text = 'Image with "quotes" & <tags>'
     html = processor.generate_image_html(FAKE_PNG, alt_text=alt_text)
 
@@ -201,7 +190,6 @@ def test_generate_image_html_with_different_formats(processor):
 
     这个测试确保不同图像格式有正确的MIME类型
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 测试JPEG
     jpeg_html = processor.generate_image_html(FAKE_JPEG, alt_text="JPEG image")
@@ -221,7 +209,6 @@ def test_generate_placeholder_html_with_special_characters(processor):
 
     这个测试确保占位符文本中的特殊字符被正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     alt_text = 'Error with "quotes" & <symbols>'
     html = processor._generate_placeholder_html(alt_text)
 
@@ -234,7 +221,6 @@ def test_generate_placeholder_html_with_empty_text(processor):
 
     这个测试确保方法在空文本时正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     html = processor._generate_placeholder_html("")
 
     assert '图片加载失败' in html
@@ -247,7 +233,6 @@ def test_processor_initialization():
 
     这个测试验证处理器的初始化
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 验证处理器有所有必要的方法
@@ -263,7 +248,6 @@ def test_image_format_constants():
 
     这个测试确保测试用的图像数据格式正确
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 验证我们的测试常量确实被识别为正确的格式
@@ -284,7 +268,6 @@ def test_main_demo_execution(mock_print):
 
     这个测试覆盖第97-117行的演示代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 导入并执行演示代码
     import sys
@@ -336,7 +319,6 @@ def test_demo_with_various_image_formats():
 
     这个测试确保演示代码对不同格式的处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 测试各种格式
@@ -369,7 +351,6 @@ def test_demo_invalid_data_handling():
 
     这个测试覆盖演示代码中无效数据的处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 各种无效数据
@@ -400,7 +381,6 @@ def test_demo_performance_with_large_data():
 
     这个测试确保演示代码在处理大图像时的性能
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 创建一个较大的PNG数据（在有效PNG头后添加大量数据）
@@ -427,7 +407,6 @@ def test_demo_edge_cases():
 
     这个测试覆盖演示代码中的各种边界情况
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 边界情况测试
@@ -456,7 +435,6 @@ def test_validate_image_data_with_short_recognized_format():
 
     这个测试覆盖第84-85行的警告日志代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 创建一个能被识别为BMP但太短的数据（BMP只需要2字节签名，容易测试）
@@ -481,7 +459,6 @@ def test_validate_image_data_with_recognized_but_insufficient_data():
 
     这个测试覆盖第84-85行的特定警告日志代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 创建一个有效的BMP数据
@@ -535,7 +512,6 @@ def test_validate_image_data_with_short_webp():
 
     这个测试确保WebP格式的最小长度验证正确工作
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     processor = EnhancedImageProcessor()
 
     # 创建一个能被识别为WebP但太短的数据
@@ -566,7 +542,6 @@ def test_validate_image_data_with_logging_warning(processor):
 
     这个测试覆盖第84-85行的日志警告代码
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     import logging
     with patch('src.utils.enhanced_image_processor.logger') as mock_logger:
@@ -592,7 +567,6 @@ def test_demo_function_execution():
 
     这个测试覆盖第130-150行的demo函数代码
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     from src.utils.enhanced_image_processor import demo_enhanced_image_processing
 
@@ -620,7 +594,6 @@ def test_image_constants_coverage():
 
     这个测试提供额外的覆盖率
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 验证所有必要的常量都存在
     assert hasattr(ImageConstants, 'MIN_DATA_SIZE')

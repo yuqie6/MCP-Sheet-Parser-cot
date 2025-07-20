@@ -282,3 +282,142 @@ def test_font_database_completeness():
         assert category in fm.font_database
         assert isinstance(fm.font_database[category], list)
         assert len(fm.font_database[category]) > 0
+
+# === TDD测试：提升font_manager覆盖率到95%+ ===
+
+class TestFontManagerEdgeCases:
+    """测试FontManager的边界情况。"""
+
+    def test_detect_font_type_with_empty_font_name(self):
+        """
+        TDD测试：detect_font_type应该处理空字体名称
+
+        这个测试覆盖第127行的空字体名称处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fm = FontManager()
+
+        # 测试空字符串
+        assert fm.detect_font_type("") == "sans_serif"
+
+        # 测试None
+        assert fm.detect_font_type(None) == "sans_serif"
+
+        # 测试只有空格的字符串
+        assert fm.detect_font_type("   ") == "sans_serif"
+
+    def test_detect_font_type_with_chinese_characters(self):
+        """
+        TDD测试：detect_font_type应该正确检测中文字符
+
+        这个测试覆盖第138行的中文字符检测代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fm = FontManager()
+
+        # 测试包含中文字符的字体名称
+        assert fm.detect_font_type("微软雅黑") == "chinese"
+        assert fm.detect_font_type("宋体") == "chinese"
+        assert fm.detect_font_type("Arial 中文") == "chinese"
+        assert fm.detect_font_type("Font字体") == "chinese"
+
+    def test_needs_quotes_with_empty_font_name(self):
+        """
+        TDD测试：needs_quotes应该处理空字体名称
+
+        这个测试覆盖第164行的空字体名称检查代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fm = FontManager()
+
+        # 测试空字符串
+        assert fm.needs_quotes("") is False
+
+        # 测试None
+        assert fm.needs_quotes(None) is False
+
+    def test_format_font_name_with_empty_font_name(self):
+        """
+        TDD测试：format_font_name应该处理空字体名称
+
+        这个测试覆盖第182行的空字体名称格式化代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fm = FontManager()
+
+        # 测试空字符串
+        assert fm.format_font_name("") == ""
+
+        # 测试None
+        assert fm.format_font_name(None) == ""
+
+    def test_generate_font_family_with_empty_font_name(self):
+        """
+        TDD测试：generate_font_family应该处理空字体名称
+
+        这个测试覆盖第221行的空字体名称处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fm = FontManager()
+
+        # 测试空字符串
+        result = fm.generate_font_family("")
+        assert "sans-serif" in result  # 应该返回默认的sans-serif后备字体
+
+        # 测试None
+        result = fm.generate_font_family(None)
+        assert "sans-serif" in result  # 应该返回默认的sans-serif后备字体
+
+    def test_learn_font_with_invalid_parameters(self):
+        """
+        TDD测试：learn_font应该处理无效参数
+
+        这个测试覆盖第246行的无效参数处理代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fm = FontManager()
+
+        # 测试空字体名称
+        fm.learn_font("", "sans_serif")  # 应该不会抛出异常
+
+        # 测试None字体名称
+        fm.learn_font(None, "sans_serif")  # 应该不会抛出异常
+
+        # 测试无效字体类型
+        fm.learn_font("TestFont", "invalid_type")  # 应该不会抛出异常
+
+        # 验证这些调用不会影响字体数据库
+        original_keywords = len(fm.font_database.get('sans_serif_keywords', []))
+        fm.learn_font("", "sans_serif")
+        assert len(fm.font_database.get('sans_serif_keywords', [])) == original_keywords
+
+class TestFontManagerSaveConfigExceptions:
+    """测试FontManager保存配置的异常处理。"""
+
+    @patch("pathlib.Path.exists", return_value=False)
+    @patch("pathlib.Path.mkdir")
+    @patch("tempfile.NamedTemporaryFile")
+    @patch("src.font_manager.logger")
+    def test_save_config_with_success_logging(self, mock_logger, mock_temp_file, mock_mkdir, mock_exists):
+        """
+        TDD测试：save_config应该在成功时记录日志
+
+        这个测试覆盖第303行的成功日志记录代码
+        """
+        # 🔴 红阶段：编写测试描述期望的行为
+        fm = FontManager()
+
+        # 模拟临时文件操作
+        mock_temp_instance = mock_temp_file.return_value.__enter__.return_value
+        mock_temp_instance.name = "/tmp/test_config"
+
+        # 模拟Path.replace操作
+        with patch("pathlib.Path.replace"):
+            fm.save_config()
+
+            # 验证成功日志被记录
+            mock_logger.info.assert_called()
+            info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
+            assert any("字体配置已保存到" in call for call in info_calls)
+
+

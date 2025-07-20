@@ -167,8 +167,6 @@ def test_generate_next_steps_guidance():
     guidance = _generate_next_steps_guidance(result_meta, True, True)
     assert "数据已完整加载" in guidance[0]
 
-# === TDD测试：提升models/tools.py覆盖率到90%+ ===
-
 class TestConvertToHtmlExceptionHandling:
     """测试convert_to_html的异常处理。"""
 
@@ -179,7 +177,6 @@ class TestConvertToHtmlExceptionHandling:
 
         这个测试覆盖第205-214行的PermissionError处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_core_service.convert_to_html.side_effect = PermissionError("Permission denied")
 
         arguments = {
@@ -204,7 +201,6 @@ class TestConvertToHtmlExceptionHandling:
 
         这个测试覆盖第215-224行的ValueError处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_core_service.convert_to_html.side_effect = ValueError("Invalid parameter")
 
         arguments = {
@@ -229,7 +225,6 @@ class TestConvertToHtmlExceptionHandling:
 
         这个测试覆盖第225行之后的一般异常处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_core_service.convert_to_html.side_effect = RuntimeError("Unexpected error")
 
         arguments = {
@@ -256,7 +251,6 @@ class TestParseSheetParameterValidation:
 
         这个测试覆盖第244行的file_path验证代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         arguments = {
             "file_path": ""  # 空字符串
         }
@@ -277,7 +271,6 @@ class TestParseSheetParameterValidation:
 
         这个测试覆盖第248行的sheet_name验证代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         arguments = {
             "file_path": "test.xlsx",
             "sheet_name": 123  # 非字符串
@@ -299,7 +292,6 @@ class TestParseSheetParameterValidation:
 
         这个测试覆盖第252行的range_string验证代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         arguments = {
             "file_path": "test.xlsx",
             "range_string": 123  # 非字符串
@@ -321,7 +313,6 @@ class TestParseSheetParameterValidation:
 
         这个测试覆盖第256行的include_full_data验证代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         arguments = {
             "file_path": "test.xlsx",
             "include_full_data": "true"  # 非布尔值
@@ -343,7 +334,6 @@ class TestParseSheetParameterValidation:
 
         这个测试覆盖第260行的include_styles验证代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         arguments = {
             "file_path": "test.xlsx",
             "include_styles": "false"  # 非布尔值
@@ -365,7 +355,6 @@ class TestParseSheetParameterValidation:
 
         这个测试覆盖第268行的max_rows验证代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         arguments = {
             "file_path": "test.xlsx",
             "max_rows": -1  # 负数
@@ -390,7 +379,6 @@ class TestParseSheetExceptionHandling:
 
         这个测试覆盖第304行的FileNotFoundError处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_core_service.parse_sheet_optimized.side_effect = FileNotFoundError("File not found")
 
         arguments = {
@@ -413,7 +401,6 @@ class TestParseSheetExceptionHandling:
 
         这个测试覆盖第323-324行的一般异常处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_core_service.parse_sheet_optimized.side_effect = RuntimeError("Parsing failed")
 
         arguments = {
@@ -439,7 +426,6 @@ class TestApplyChangesExceptionHandling:
 
         这个测试覆盖第380行的FileNotFoundError处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_core_service.apply_changes.side_effect = FileNotFoundError("File not found")
 
         arguments = {
@@ -463,7 +449,6 @@ class TestApplyChangesExceptionHandling:
 
         这个测试覆盖第399-408行的ValueError处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_core_service.apply_changes.side_effect = ValueError("Invalid data format")
 
         arguments = {
@@ -487,7 +472,6 @@ class TestApplyChangesExceptionHandling:
 
         这个测试覆盖第409-410行之后的一般异常处理代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         mock_core_service.apply_changes.side_effect = RuntimeError("Apply failed")
 
         arguments = {

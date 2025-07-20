@@ -1,0 +1,100 @@
+{
+  "font_database": {
+    "chinese_keywords": [
+      "华文",
+      "微软",
+      "宋体",
+      "黑体",
+      "楷体",
+      "仿宋",
+      "隶书",
+      "行楷",
+      "方正",
+      "汉仪",
+      "文泉驿",
+      "思源",
+      "Source Han",
+      "Noto",
+      "SimSun",
+      "SimHei",
+      "SimKai",
+      "FangSong",
+      "Microsoft YaHei",
+      "PingFang",
+      "Hiragino",
+      "Yu Gothic",
+      "Meiryo"
+    ],
+    "monospace_keywords": [
+      "Courier",
+      "Consolas",
+      "Monaco",
+      "Menlo",
+      "DejaVu Sans Mono",
+      "Liberation Mono",
+      "Source Code Pro",
+      "Fira Code",
+      "JetBrains Mono",
+      "Cascadia Code",
+      "SF Mono",
+      "Roboto Mono"
+    ],
+    "serif_keywords": [
+      "Times",
+      "Georgia",
+      "Garamond",
+      "Book Antiqua",
+      "Palatino",
+      "Baskerville",
+      "Minion",
+      "Caslon",
+      "Trajan",
+      "Optima"
+    ],
+    "sans_serif_keywords": [
+      "Arial",
+      "Helvetica",
+      "Verdana",
+      "Tahoma",
+      "Calibri",
+      "Segoe UI",
+      "Open Sans",
+      "Roboto",
+      "Lato",
+      "Montserrat"
+    ],
+    "fallback_chains": {
+      "chinese": [
+        "Microsoft YaHei",
+        "PingFang SC",
+        "Hiragino Sans GB",
+        "Source Han Sans SC",
+        "Noto Sans CJK SC",
+        "SimHei",
+        "SimSun",
+        "sans-serif"
+      ],
+      "monospace": [
+        "Consolas",
+        "Monaco",
+        "Courier New",
+        "Liberation Mono",
+        "DejaVu Sans Mono",
+        "monospace"
+      ],
+      "serif": [
+        "Times New Roman",
+        "Georgia",
+        "Times",
+        "serif"
+      ],
+      "sans_serif": [
+        "Arial",
+        "Helvetica",
+        "Segoe UI",
+        "sans-serif"
+      ]
+    }
+  },
+  "custom_mappings": {}
+}

@@ -28,8 +28,6 @@ async def test_main(mock_stdio_server, mock_create_server):
     mock_stdio_server.assert_called_once()
     mock_server.run.assert_called_once()
 
-# === TDD测试：提升MCP Server覆盖率到100% ===
-
 @pytest.mark.asyncio
 @patch('src.mcp_server.server.create_server')
 @patch('src.mcp_server.server.stdio_server')
@@ -40,7 +38,6 @@ async def test_main_with_exception(mock_logger, mock_stdio_server, mock_create_s
 
     这个测试覆盖第46-48行的异常处理代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     mock_server = MagicMock(spec=Server)
     mock_create_server.return_value = mock_server
 
@@ -68,7 +65,6 @@ async def test_main_logs_startup_message(mock_logger, mock_stdio_server, mock_cr
 
     这个测试覆盖第40行的日志记录代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     mock_server = MagicMock(spec=Server)
     mock_create_server.return_value = mock_server
 
@@ -89,7 +85,6 @@ async def test_main_calls_server_with_correct_parameters(mock_stdio_server, mock
 
     这个测试覆盖第41-45行的server.run调用代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     mock_server = MagicMock(spec=Server)
     mock_create_server.return_value = mock_server
 
@@ -117,11 +112,8 @@ def test_main_function_name_guard():
 
     这个测试覆盖第51-52行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
-    # 这个测试验证当脚本作为主程序运行时会调用main()
-    # 由于我们不能直接测试__name__ == "__main__"的条件，
-    # 我们验证main函数的存在和可调用性
+    # 验证main函数的存在和可调用性
 
     from src.mcp_server.server import main
     import asyncio
@@ -137,7 +129,6 @@ def test_create_server_returns_server_instance(mock_register_tools):
 
     这个测试验证服务器创建的完整性
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     server = create_server()
 
     # 验证返回的是Server实例
@@ -159,7 +150,6 @@ async def test_main_stdio_server_context_manager(mock_stdio_server, mock_create_
 
     这个测试验证异步上下文管理器的正确使用
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     mock_server = MagicMock(spec=Server)
     mock_create_server.return_value = mock_server
 
@@ -185,7 +175,6 @@ def test_main_name_guard_execution(mock_asyncio_run):
 
     这个测试覆盖第52行的代码
     """
-    # 🔴 红阶段：编写测试描述期望的行为
 
     # 直接测试模块级别的代码执行
     # 通过重新导入模块并设置__name__来触发主要执行路径

@@ -7,7 +7,6 @@ from src.exceptions import (
     TimeoutError, CacheError, ConfigurationError, ERROR_CODE_MAP, get_error_by_code
 )
 
-# === TDD测试：提升Exceptions覆盖率到100% ===
 
 class TestSheetParserError:
     """测试基础异常类SheetParserError。"""
@@ -18,7 +17,6 @@ class TestSheetParserError:
         
         这个测试覆盖第17-29行的初始化代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         error = SheetParserError("Test error message")
         
         assert error.message == "Test error message"
@@ -32,7 +30,6 @@ class TestSheetParserError:
         
         这个测试确保所有参数都被正确设置
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         details = {"key": "value", "number": 123}
         error = SheetParserError("Custom message", "CUSTOM_CODE", details)
         
@@ -46,7 +43,6 @@ class TestSheetParserError:
         
         这个测试覆盖第31-38行的to_dict方法代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         details = {"test": "data"}
         error = SheetParserError("Test message", "TEST_CODE", details)
         
@@ -70,7 +66,6 @@ class TestFileErrors:
         
         这个测试覆盖第46-54行的FileNotFoundError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         file_path = "/path/to/missing/file.xlsx"
         error = FileNotFoundError(file_path)
         
@@ -85,7 +80,6 @@ class TestFileErrors:
         
         这个测试覆盖第57-65行的FileAccessError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         file_path = "/path/to/protected/file.xlsx"
         error = FileAccessError(file_path)
         
@@ -99,7 +93,6 @@ class TestFileErrors:
         
         这个测试确保自定义操作类型被正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         file_path = "/path/to/file.xlsx"
         error = FileAccessError(file_path, "write")
         
@@ -112,7 +105,6 @@ class TestFileErrors:
         
         这个测试覆盖第68-76行的UnsupportedFileTypeError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         extension = ".xyz"
         supported = [".xlsx", ".xls", ".csv"]
         error = UnsupportedFileTypeError(extension, supported)
@@ -129,7 +121,6 @@ class TestFileErrors:
         
         这个测试覆盖第79-87行的CorruptedFileError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         file_path = "/path/to/corrupted.xlsx"
         error = CorruptedFileError(file_path)
         
@@ -144,7 +135,6 @@ class TestFileErrors:
         
         这个测试确保自定义原因被正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         file_path = "/path/to/file.xlsx"
         custom_reason = "ZIP archive corrupted"
         error = CorruptedFileError(file_path, custom_reason)
@@ -161,7 +151,6 @@ class TestParseErrors:
         
         这个测试覆盖第95-104行的SheetNotFoundError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         sheet_name = "NonExistentSheet"
         error = SheetNotFoundError(sheet_name)
         
@@ -175,7 +164,6 @@ class TestParseErrors:
         
         这个测试确保可用工作表列表被正确包含
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         sheet_name = "Missing"
         available = ["Sheet1", "Sheet2", "Data"]
         error = SheetNotFoundError(sheet_name, available)
@@ -189,7 +177,6 @@ class TestParseErrors:
         
         这个测试覆盖第107-115行的InvalidRangeError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         range_string = "INVALID_RANGE"
         error = InvalidRangeError(range_string)
         
@@ -203,7 +190,6 @@ class TestParseErrors:
         
         这个测试确保自定义原因被正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         range_string = "A1:Z999999"
         custom_reason = "Range too large"
         error = InvalidRangeError(range_string, custom_reason)
@@ -217,7 +203,6 @@ class TestParseErrors:
         
         这个测试覆盖第118-126行的StyleExtractionError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         cell_ref = "A1"
         reason = "Invalid color format"
         error = StyleExtractionError(cell_ref, reason)
@@ -237,7 +222,6 @@ class TestConversionErrors:
         
         这个测试覆盖第134-142行的HTMLConversionError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         reason = "Template rendering failed"
         error = HTMLConversionError(reason)
         
@@ -251,7 +235,6 @@ class TestConversionErrors:
         
         这个测试确保工作表名被正确包含
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         reason = "CSS generation failed"
         sheet_name = "DataSheet"
         error = HTMLConversionError(reason, sheet_name)
@@ -264,7 +247,6 @@ class TestConversionErrors:
         
         这个测试覆盖第145-153行的ValidationError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         field = "email"
         value = "invalid-email"
         reason = "Invalid email format"
@@ -287,7 +269,6 @@ class TestResourceErrors:
 
         这个测试覆盖第161-169行的MemoryLimitExceededError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         current_usage = 512
         limit = 256
         error = MemoryLimitExceededError(current_usage, limit)
@@ -305,7 +286,6 @@ class TestResourceErrors:
 
         这个测试覆盖第172-180行的FileSizeLimitExceededError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         file_size = 100
         limit = 50
         file_path = "/path/to/large/file.xlsx"
@@ -325,7 +305,6 @@ class TestResourceErrors:
 
         这个测试覆盖第183-191行的TimeoutError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         operation = "file parsing"
         timeout_seconds = 30
         error = TimeoutError(operation, timeout_seconds)
@@ -346,7 +325,6 @@ class TestOtherErrors:
 
         这个测试覆盖第194-202行的CacheError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         operation = "cache_get"
         reason = "Redis connection failed"
         error = CacheError(operation, reason)
@@ -364,7 +342,6 @@ class TestOtherErrors:
 
         这个测试覆盖第205-213行的ConfigurationError代码路径
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         config_key = "database.host"
         reason = "Invalid hostname format"
         error = ConfigurationError(config_key, reason)
@@ -385,7 +362,6 @@ class TestErrorCodeMap:
 
         这个测试覆盖第217-232行的ERROR_CODE_MAP定义
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         expected_codes = [
             "FILE_NOT_FOUND", "FILE_ACCESS_DENIED", "UNSUPPORTED_FILE_TYPE",
             "CORRUPTED_FILE", "SHEET_NOT_FOUND", "INVALID_RANGE",
@@ -404,7 +380,6 @@ class TestErrorCodeMap:
 
         这个测试覆盖第235-237行的get_error_by_code函数
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         error_class = get_error_by_code("FILE_NOT_FOUND")
         assert error_class == FileNotFoundError
 
@@ -414,7 +389,6 @@ class TestErrorCodeMap:
 
         这个测试确保未知错误代码被正确处理
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         error_class = get_error_by_code("UNKNOWN_ERROR_CODE")
         assert error_class == SheetParserError
 
@@ -427,7 +401,6 @@ class TestInheritanceHierarchy:
 
         这个测试验证异常类的继承关系
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         assert issubclass(FileError, SheetParserError)
         assert issubclass(FileNotFoundError, FileError)
         assert issubclass(FileAccessError, FileError)
@@ -440,7 +413,6 @@ class TestInheritanceHierarchy:
 
         这个测试验证解析错误的继承关系
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         assert issubclass(ParseError, SheetParserError)
         assert issubclass(SheetNotFoundError, ParseError)
         assert issubclass(InvalidRangeError, ParseError)
@@ -452,7 +424,6 @@ class TestInheritanceHierarchy:
 
         这个测试验证转换错误的继承关系
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         assert issubclass(ConversionError, SheetParserError)
         assert issubclass(HTMLConversionError, ConversionError)
 
@@ -462,7 +433,6 @@ class TestInheritanceHierarchy:
 
         这个测试验证资源错误的继承关系
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         assert issubclass(ResourceError, SheetParserError)
         assert issubclass(MemoryLimitExceededError, ResourceError)
         assert issubclass(FileSizeLimitExceededError, ResourceError)
@@ -474,7 +444,6 @@ class TestInheritanceHierarchy:
 
         这个测试确保所有异常都有正确的基类
         """
-        # 🔴 红阶段：编写测试描述期望的行为
         all_error_classes = [
             FileError, FileNotFoundError, FileAccessError, UnsupportedFileTypeError,
             CorruptedFileError, ParseError, SheetNotFoundError, InvalidRangeError,

@@ -51,7 +51,6 @@ def test_generate_standalone_charts_html(chart_converter, sample_chart):
     assert "<h2>Charts</h2>" in html
     assert "<h3>TestChart</h3>" in html
 
-# === TDD测试：提升ChartConverter覆盖率到100% ===
 
 @patch('src.converters.chart_converter.SVGChartRenderer')
 def test_render_chart_content_with_exception(mock_renderer, chart_converter, sample_chart):
@@ -60,7 +59,6 @@ def test_render_chart_content_with_exception(mock_renderer, chart_converter, sam
 
     这个测试覆盖第29-31行的异常处理代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     mock_renderer.return_value.render_chart_to_svg.side_effect = Exception("Rendering failed")
 
     with patch('src.converters.chart_converter.logger') as mock_logger:
@@ -77,7 +75,6 @@ def test_generate_overlay_charts_html_with_no_charts():
 
     这个测试覆盖第50行的边界情况
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     chart_converter = ChartConverter(MagicMock())
     sheet = Sheet(name="EmptySheet", rows=[], charts=[])
 
@@ -92,7 +89,6 @@ def test_generate_overlay_charts_html_with_chart_without_position():
 
     这个测试确保方法在图表没有位置信息时正确处理
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     chart_converter = ChartConverter(MagicMock())
 
     chart = Chart(name="NoPositionChart", type="bar", anchor="A1")
@@ -117,7 +113,6 @@ def test_generate_standalone_charts_html_with_empty_list():
 
     这个测试确保方法在没有图表时的行为
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     chart_converter = ChartConverter(MagicMock())
 
     html = chart_converter.generate_standalone_charts_html([])
@@ -131,7 +126,6 @@ def test_generate_standalone_charts_html_with_multiple_charts():
 
     这个测试验证方法能正确处理多个图表
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     chart_converter = ChartConverter(MagicMock())
 
     chart1 = Chart(name="Chart1", type="bar", anchor="A1")
@@ -154,7 +148,6 @@ def test_render_chart_content_with_chart_data_none(mock_renderer, chart_converte
 
     这个测试覆盖第32-33行的代码路径
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     chart = Chart(name="NullDataChart", type="bar", anchor="A1")
     chart.chart_data = None
 
@@ -171,7 +164,6 @@ def test_render_chart_content_with_empty_chart_data(mock_renderer, chart_convert
 
     这个测试确保方法在chart_data为空字典时的行为
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     chart = Chart(name="EmptyDataChart", type="bar", anchor="A1")
     chart.chart_data = {}  # 空字典
 
@@ -188,14 +180,12 @@ def test_chart_converter_initialization():
 
     这个测试验证构造函数的正确性
     """
-    # 🔴 红阶段：编写测试描述期望的行为
     mock_cell_converter = MagicMock()
     converter = ChartConverter(mock_cell_converter)
 
     # 验证cell_converter被正确设置
     assert converter.cell_converter is mock_cell_converter
 
-# === TDD测试：提升chart_converter覆盖率到100% ===
 
 @patch('src.converters.chart_converter.create_position_calculator')
 def test_generate_overlay_charts_html_with_image_chart(mock_pos_calc, chart_converter):
@@ -204,8 +194,6 @@ def test_generate_overlay_charts_html_with_image_chart(mock_pos_calc, chart_conv
 
     这个测试覆盖第50行的图片类型高度计算代码
     """
-    # 🔴 红阶段：编写测试描述期望的行为
-
     # 创建一个图片类型的图表
     image_chart = Chart(name="ImageChart", type="image", anchor="A1")
     image_chart.chart_data = {"type": "image", "data": "image_data"}

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class DiskCache:
     """基于磁盘的缓存管理类。"""
 
-    def __init__(self, cache_dir: str, max_cache_size_mb: int = 1024):
+    def __init__(self, cache_dir: str, max_cache_size_mb: float = 1024):
         self.cache_dir = Path(cache_dir)
         self.max_cache_size_mb = max_cache_size_mb
 

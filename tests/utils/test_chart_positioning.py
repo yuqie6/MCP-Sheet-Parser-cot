@@ -214,7 +214,6 @@ def test_calculate_cell_position_with_defaults(calculator):
     assert abs(x - expected_x) < 1e-9
     assert abs(y - expected_y) < 1e-9
 
-# === TDD测试：提升chart_positioning覆盖率到90%+ ===
 
 class TestGenerateChartHtmlEdgeCases:
     """测试generate_chart_html_with_positioning的边界情况。"""
@@ -225,7 +224,6 @@ class TestGenerateChartHtmlEdgeCases:
 
         这个测试覆盖第207行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
         # 创建没有position的模拟图表
         mock_chart = MagicMock()
@@ -245,7 +243,6 @@ class TestGenerateChartHtmlEdgeCases:
 
         这个测试覆盖第215、225、235-236行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
         # 创建非图片类型的模拟图表
         mock_chart = MagicMock()
@@ -278,7 +275,6 @@ class TestImagePositionCalculation:
 
         这个测试覆盖第265-278行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
         # 创建模拟的图片位置
         mock_position = MagicMock()
@@ -304,7 +300,6 @@ class TestImagePositionCalculation:
 
         这个测试覆盖第294行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
         # 创建没有to_col_offset的模拟位置
         mock_position = MagicMock()
@@ -325,7 +320,6 @@ class TestImagePositionCalculation:
 
         这个测试覆盖第308行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
         # 创建没有to_row_offset的模拟位置
         mock_position = MagicMock()
@@ -349,7 +343,6 @@ class TestFactoryFunction:
 
         这个测试覆盖第324行的代码
         """
-        # 🔴 红阶段：编写测试描述期望的行为
 
         from src.utils.chart_positioning import create_position_calculator
 

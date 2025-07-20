@@ -4,7 +4,7 @@
 from typing import Any, TypeAlias
 from openpyxl.cell.cell import Cell as OpenpyxlCell, MergedCell as OpenpyxlMergedCell
 from src.models.table_model import Style, RichTextFragment, RichTextFragmentStyle, CellValue
-from src.utils.color_utils import extract_color, get_color_brightness, has_sufficient_contrast, get_color_by_index, get_theme_color, apply_tint, apply_smart_color_matching
+from src.utils.color_utils import extract_color, apply_smart_color_matching
 from src.utils.border_utils import get_border_style
 
 # 定义一个类型提示，表示既可以是普通单元格也可以是合并单元格

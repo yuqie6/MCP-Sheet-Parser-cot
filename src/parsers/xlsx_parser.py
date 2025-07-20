@@ -24,12 +24,10 @@ from openpyxl.chart.pie_chart import PieChart
 from openpyxl.chart.area_chart import AreaChart
 from typing import BinaryIO, cast
 from collections.abc import Iterator
-from io import BytesIO
 from src.models.table_model import Sheet, Row, Cell, LazySheet, Chart, ChartPosition
 from src.parsers.base_parser import BaseParser
 from src.utils.style_parser import extract_style, extract_cell_value
 from src.utils.chart_data_extractor import ChartDataExtractor
-from src.utils.color_utils import convert_scheme_color_to_hex, generate_pie_color_variants
 
 
 class XlsxRowProvider:
@@ -157,6 +155,7 @@ class XlsxRowProvider:
     def get_total_rows(self) -> int:
         """无需加载全部数据即可获取总行数。"""
         if self._total_rows_cache is None:
+            workbook = None  # 初始化workbook变量
             try:
                 workbook = openpyxl.load_workbook(self.file_path, read_only=True)
                 worksheet = workbook.active if self.sheet_name is None else workbook[self.sheet_name]
@@ -169,7 +168,7 @@ class XlsxRowProvider:
                 raise RuntimeError(f"无法加载工作簿以获取总行数: {e}") from e
             finally:
                 # 确保只有在workbook成功创建后才尝试关闭
-                if 'workbook' in locals() and workbook is not None:
+                if workbook is not None:
                     workbook.close()
         return self._total_rows_cache
 
